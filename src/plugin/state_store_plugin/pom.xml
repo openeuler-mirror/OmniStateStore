@@ -126,10 +126,6 @@
                     <skipAssembly>true</skipAssembly>
                 </configuration>
             </plugin>
-            <plugin>
-                <groupId>com.huawei.bepcloud</groupId>
-                <artifactId>rebuild-maven-plugin</artifactId>
-            </plugin>
         </plugins>
         <resources>
             <resource>
