@@ -25,7 +25,6 @@
         <dt4j.version>2.0.9</dt4j.version>
         <mockito.version>2.23.0</mockito.version>
         <powermock.version>2.0.2</powermock.version>
-        <jacoco.version>0.8.8</jacoco.version>
         <build-helper-maven-plugin.version>3.3.0</build-helper-maven-plugin.version>
     </properties>
 
@@ -145,13 +144,6 @@
                 <version>${powermock.version}</version>
                 <scope>test</scope>
             </dependency>
-            <dependency>
-                <groupId>org.jacoco</groupId>
-                <artifactId>org.jacoco.agent</artifactId>
-                <version>${jacoco.version}</version>
-                <classifier>runtime</classifier>
-                <scope>test</scope>
-            </dependency>
         </dependencies>
     </dependencyManagement>
 
@@ -224,43 +216,6 @@
                 </configuration>
             </plugin>
             <plugin>
-                <groupId>com.huawei.dt</groupId>
-                <artifactId>dt4j-coverage-maven-plugin</artifactId>
-                <version>${dt4j.version}</version>
-                <configuration>
-                    <reportName>BSSTestReport</reportName>
-                    <reportVersion>1.0.0</reportVersion>
-                    <reportUser>BSS</reportUser>
-                    <checkoutRelativeDirectory>src/plugin</checkoutRelativeDirectory>
-                    <excludeStats>
-                        <item>/com/huawei/ock/bss/common/*</item>
-                        <item>/com/huawei/ock/bss/jni/*</item>
-                        <item>/com/huawei/ock/bss/ockdb/*</item>
-                        <item>/com/huawei/ock/bss/util/*</item>
-                        <item>/com/huawei/ock/bss/OckDB*</item>
-                        <item>/com/huawei/ock/bss/snapshot/*</item>
-                        <item>/com/huawei/ock/bss/resource/*</item>
-                        <item>/com/huawei/ock/bss/restore/*</item>
-                        <item>/com/huawei/ock/bss/state/internal/descriptor/*</item>
-                        <item>/com/huawei/ock/bss/iterator/*</item>
-                        <item>/com/huawei/ock/bss/table/api/*</item>
-                        <item>com/huawei/ock/bss/common/Checkpoint</item>
-                        <item>com/huawei/ock/bss/state/unified/UnifiedAggregatingState</item>
-                        <item>com/huawei/ock/bss/state/unified/UnifiedReducingState</item>
-                        <item>com/huawei/ock/bss/state/unified/namespace/UnifiedNSAggregatingState</item>
-                        <item>com/huawei/ock/bss/state/unified/namespace/UnifiedNSReducingState</item>
-                    </excludeStats>
-                </configuration>
-                <executions>
-                    <execution>
-                        <id>instrument</id>
-                        <goals>
-                            <goal>instrument</goal>
-                        </goals>
-                    </execution>
-                </executions>
-            </plugin>
-            <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-assembly-plugin</artifactId>
                 <version>3.5.0</version>
@@ -280,38 +235,6 @@
                         <goals>
                             <goal>single</goal>
                         </goals>
-                    </execution>
-                </executions>
-            </plugin>
-            <plugin>
-                <groupId>com.huawei.bepcloud</groupId>
-                <artifactId>rebuild-maven-plugin</artifactId>
-                <version>2.1.T1</version>
-                <executions>
-                    <execution>
-                        <id>rebuild_1</id>
-                        <goals>
-                            <goal>rebuild</goal>
-                        </goals>
-                        <configuration>
-                            <overwrite>true</overwrite>
-                            <rules>
-                                <rule>(pom.properties,#)->del</rule>
-                            </rules>
-                        </configuration>
-                    </execution>
-                    <execution>
-                        <id>rebuild_2</id>
-                        <goals>
-                            <goal>fixFileTimeAttr</goal>
-                        </goals>
-                        <configuration>
-                            <outputDirectory>
-                                ${project.build.directory}
-                            </outputDirectory>
-                            <forAllFiles>true</forAllFiles>
-                            <recursively>true</recursively>
-                        </configuration>
                     </execution>
                 </executions>
             </plugin>
@@ -351,38 +274,6 @@
                     <configuration>
                         <skipTests>false</skipTests>
                     </configuration>
-                </plugin>
-                <plugin>
-                    <groupId>com.huawei.bepcloud</groupId>
-                    <artifactId>rebuild-maven-plugin</artifactId>
-                    <version>2.1.T1</version>
-                    <executions>
-                        <execution>
-                            <id>rebuild_1</id>
-                            <goals>
-                                <goal>rebuild</goal>
-                            </goals>
-                            <configuration>
-                                <overwrite>true</overwrite>
-                                <rules>
-                                    <rule>(pom.properties,#)->del</rule>
-                                </rules>
-                            </configuration>
-                        </execution>
-                        <execution>
-                            <id>rebuild_2</id>
-                            <goals>
-                                <goal>fixFileTimeAttr</goal>
-                            </goals>
-                            <configuration>
-                                <outputDirectory>
-                                    ${project.build.directory}
-                                </outputDirectory>
-                                <forAllFiles>true</forAllFiles>
-                                <recursively>true</recursively>
-                            </configuration>
-                        </execution>
-                    </executions>
                 </plugin>
             </plugins>
         </pluginManagement>
