@@ -25,7 +25,6 @@
         <dt4j.version>2.0.9</dt4j.version>
         <mockito.version>2.23.0</mockito.version>
         <powermock.version>2.0.2</powermock.version>
-        <jacoco.version>0.8.8</jacoco.version>
         <build-helper-maven-plugin.version>3.3.0</build-helper-maven-plugin.version>
     </properties>
 
@@ -143,13 +142,6 @@
                 <groupId>org.powermock</groupId>
                 <artifactId>powermock-module-junit4</artifactId>
                 <version>${powermock.version}</version>
-                <scope>test</scope>
-            </dependency>
-            <dependency>
-                <groupId>org.jacoco</groupId>
-                <artifactId>org.jacoco.agent</artifactId>
-                <version>${jacoco.version}</version>
-                <classifier>runtime</classifier>
                 <scope>test</scope>
             </dependency>
         </dependencies>
