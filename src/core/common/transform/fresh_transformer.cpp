@@ -13,7 +13,7 @@
 
 namespace ock {
 namespace bss {
-BResult FreshHandler::Handle(BoostSegmentRef segment)
+BResult FreshHandler::Handle(const BoostSegmentRef &segment)
 {
     // 1. 组织数据.
     std::unordered_map<SliceIndexContextRef, std::shared_ptr<RawDataSlice>, SliceIndexContextHash,
@@ -84,31 +84,31 @@ BResult FreshHandler::DoTrans(FreshKeyNodePtr key, FreshValueNodePtr value,
     primaryKey.Parse(key);
     uint16_t stateId = primaryKey.mStateId;
     StateType stateType = StateId::GetStateType(stateId);
-    if (StateTypeUtil::HasSecKey(stateType)) {
-        BoostHashMapRef hashMap = MakeRef<BoostHashMap>();
-        if (UNLIKELY(hashMap == nullptr)) {
-            LOG_ERROR("MakeRef failed, boostHashMap is null.");
-            return BSS_ERR;
-        }
 
-        uint32_t offset = value->MapData() - segment->GetMemorySegment()->GetSegment();
-        hashMap->Init(segment->GetMemorySegment(), offset, false);
-        auto iterator = hashMap->KVIterator();
-        RETURN_ERROR_AS_NULLPTR(iterator);
-        while (iterator->HasNext()) {
-            auto entry = iterator->Next();
-            SecKey secondKey;
-            secondKey.Parse(entry.first);
-            BinaryKey binaryKey;
-            binaryKey.Parse(primaryKey, secondKey);
-            LOG_TRACE(binaryKey.ToString() << entry.second->ToString());
-            collection.emplace_back(std::move(binaryKey), entry.second);
-        }
-    } else {
+    if (!StateTypeUtil::HasSecKey(stateType)) {
         BinaryKey binaryKey;
         binaryKey.Parse(primaryKey, stateType == VALUE);
         collection.emplace_back(std::move(binaryKey), value);
         LOG_TRACE(binaryKey.ToString() << value->ToString());
+        return BSS_OK;
+    }
+    BoostHashMapRef hashMap = MakeRef<BoostHashMap>();
+    RETURN_ERROR_AS_NULLPTR(hashMap);
+    auto memorySegment = segment->GetMemorySegment();
+    RETURN_ERROR_AS_NULLPTR(memorySegment);
+
+    uint32_t offset = value->MapData() - memorySegment->GetSegment();
+    hashMap->Init(memorySegment, offset, false);
+    auto iterator = hashMap->KVIterator();
+    RETURN_ERROR_AS_NULLPTR(iterator);
+    while (iterator->HasNext()) {
+        auto entry = iterator->Next();
+        SecKey secondKey;
+        secondKey.Parse(entry.first);
+        BinaryKey binaryKey;
+        binaryKey.Parse(primaryKey, secondKey);
+        collection.emplace_back(std::move(binaryKey), entry.second);
+        LOG_TRACE(binaryKey.ToString() << entry.second->ToString());
     }
     return BSS_OK;
 }

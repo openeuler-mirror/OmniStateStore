@@ -10,6 +10,7 @@
  */
 
 #include "restore_operator.h"
+
 #include "slice_table_restore_operation.h"
 
 namespace ock {
@@ -39,7 +40,7 @@ BResult RestoreOperator::Restore(std::vector<PathRef> &restoredMetaPaths,
         return BSS_OK;
     }
 
-    uint64_t restoredSnapshotId = restoredDbMetas[0]->GetSnapshotId(); // 本次恢复的snapshotId.
+    uint64_t restoredSnapshotId = restoredDbMetas[0]->GetSnapshotId();  // 本次恢复的snapshotId.
     LOG_INFO("Receive restore operator, metaSize:" << restoredDbMetas.size() << ", snapshotId:" << restoredSnapshotId);
 
     // 2. 恢复statIdProvider.
@@ -47,6 +48,11 @@ BResult RestoreOperator::Restore(std::vector<PathRef> &restoredMetaPaths,
     for (const auto &table : mTables) {
         auto tableDescription = table.second->GetTableDescription();
         tableDescriptions.push_back(tableDescription);
+    }
+    for (const auto &item : mPQTables) {
+        auto des = std::make_shared<TableDescription>(PQ, item.second->GetStateName(), -1,
+            TableSerializer(), *mConfig);
+        tableDescriptions.push_back(des);
     }
     RETURN_ERROR_AS_NULLPTR(mStateIdProvider);
     for (const RestoredDbMetaRef &dbMeta : restoredDbMetas) {
@@ -56,8 +62,9 @@ BResult RestoreOperator::Restore(std::vector<PathRef> &restoredMetaPaths,
     }
     // 3. 处理fileId冲突.
     std::vector<SnapshotFileMappingRef> restoredLocalFileMappings;
+    restoredLocalFileMappings.reserve(restoredDbMetas.size());
     for (const auto &restoredDbMeta : restoredDbMetas) {
-        restoredLocalFileMappings.push_back(restoredDbMeta->GetLocalFileMapping());
+        restoredLocalFileMappings.emplace_back(restoredDbMeta->GetLocalFileMapping());
     }
     std::vector<FileIdRef> restoredFileIdObjs;
     std::vector<uint32_t> restoredFileIds;
@@ -81,7 +88,7 @@ BResult RestoreOperator::Restore(std::vector<PathRef> &restoredMetaPaths,
         }
     }
     mFileCacheFactory->GetLocalFileIdGenerator()->Restore(restoredFileIdObjs);
-    for (const auto &item : conflictFileInfos) { // 冲突的fileId需要重新申请.
+    for (const auto &item : conflictFileInfos) {  // 冲突的fileId需要重新申请.
         auto fileId = mFileCacheFactory->GetLocalFileIdGenerator()->Generate();
         item->SetFileId(fileId->Get());
         restorePathFileIdMap.emplace(item->GetFileName(), fileId->Get());
@@ -90,22 +97,25 @@ BResult RestoreOperator::Restore(std::vector<PathRef> &restoredMetaPaths,
     // 4. 恢复Local file manager.
     std::vector<SnapshotFileMappingRef> relocatedLocalFileMappings;
     std::vector<SnapshotFileMappingRef> relocatedRemoteFileMappings;
-    if (!isLazyDownload) {
-        relocatedLocalFileMappings = SnapshotRestoreUtils::RelocateLocalFileMappings(mLocalFileManager->GetBasePath(),
-                                                                                     restoredLocalFileMappings);
-        RETURN_NOT_OK(CreateHardLinkForRestoredLocalFile(restoredLocalFileMappings,
-                                                         mLocalFileManager->GetBasePath()));
-    }
+    // 获取fileMapping
+    bool isExcludeSSTFiles = isLazyDownload;
+    relocatedLocalFileMappings = SnapshotRestoreUtils::RelocateLocalFileMappings(mLocalFileManager->GetBasePath(),
+                                                                                 restoredLocalFileMappings);
+    RETURN_NOT_OK(CreateHardLinkForRestoredLocalFile(isExcludeSSTFiles, restoredLocalFileMappings,
+        mLocalFileManager->GetBasePath()));
+
     auto remoteFileMapping = OrganizeRemoteFileInfo(restoredLocalFileMappings, lazyPathMapping);
     RETURN_INVALID_PARAM_AS_NULLPTR(remoteFileMapping);
     relocatedRemoteFileMappings.emplace_back(remoteFileMapping);
-    RETURN_NOT_OK(mLocalFileManager->StartRestore(relocatedLocalFileMappings));
-    RETURN_NOT_OK(mRemoteFileManager->StartRestore(relocatedRemoteFileMappings));
+    RETURN_NOT_OK(mLocalFileManager->StartRestore(relocatedLocalFileMappings, isExcludeSSTFiles));
+    RETURN_NOT_OK(mRemoteFileManager->StartRestore(relocatedRemoteFileMappings, !isExcludeSSTFiles));
 
     // 5. 恢复Slice table.
     auto sliceTableRestoreOp = std::make_shared<SliceTableRestoreOperation>(mConfig, mSliceTable);
     std::vector<SliceTableRestoreMetaRef> restoreMetaList;
     RETURN_NOT_OK(sliceTableRestoreOp->RestoreSliceBucketIndex(restoredDbMetas, restoreMetaList));
+    // 恢复Blob store
+    RETURN_NOT_OK(sliceTableRestoreOp->RestoreBlobStore(restoreMetaList, restorePathFileIdMap));
     // 6. 恢复File store.
     RETURN_NOT_OK(sliceTableRestoreOp->RestoreFileStoreOperator(restoreMetaList, lazyPathMapping, restorePathFileIdMap,
                                                                 isLazyDownload));
@@ -128,23 +138,32 @@ BResult RestoreOperator::Restore(std::vector<PathRef> &restoredMetaPaths,
     return BSS_OK;
 }
 
-BResult RestoreOperator::CreateHardLinkForRestoredLocalFile(
-    const std::vector<SnapshotFileMappingRef> &restoredLocalFileMapping, const PathRef &currentBasePath)
+BResult RestoreOperator::CreateHardLinkForRestoredLocalFile(bool isExcludeSSTFiles,
+    const std::vector<SnapshotFileMappingRef> &restoredLocalFileMappings, const PathRef &currentBasePath)
 {
     RETURN_INVALID_PARAM_AS_NULLPTR(currentBasePath);
     if (access(currentBasePath->Name().c_str(), F_OK) != 0) {
         LOG_ERROR("Local working directory " << currentBasePath->ExtractFileName() << " does not exist");
         return BSS_ERR;
     }
-    for (const auto &item : restoredLocalFileMapping) {
+    PathRef currentBlobPath = std::make_shared<Path>(currentBasePath->Name() + "/blobFile");
+    for (const auto &item : restoredLocalFileMappings) {
         PathRef restoredBasePath = item->GetBasePath();
         std::vector<SnapshotFileInfoRef> restoredFileInos = item->GetFileMapping();
 
+        PathRef targetPath;
         for (SnapshotFileInfoRef &restoredFileIno : restoredFileInos) {
-            PathRef srcFile = std::make_shared<Path>(restoredBasePath,
-                                                     PathTransform::ExtractFileName(restoredFileIno->GetFileName()));
-            PathRef targetFile = std::make_shared<Path>(currentBasePath,
-                                                        PathTransform::ExtractFileName(restoredFileIno->GetFileName()));
+            std::string fileName = PathTransform::ExtractFileName(restoredFileIno->GetFileName());
+            if (isExcludeSSTFiles && fileName.find(BLOB_FILE_NAME_PREFIX) == std::string::npos) {
+                continue;
+            }
+            if (fileName.find(BLOB_FILE_NAME_PREFIX) != std::string::npos) {
+                targetPath = currentBlobPath;
+            } else {
+                targetPath = currentBasePath;
+            }
+            PathRef srcFile = std::make_shared<Path>(restoredBasePath, fileName);
+            PathRef targetFile = std::make_shared<Path>(targetPath, fileName);
             // 如果目标文件存在，先删除
             if (access(targetFile->Name().c_str(), F_OK) == 0) {
                 auto ret = unlink(targetFile->Name().c_str());
@@ -171,21 +190,28 @@ SnapshotFileMappingRef RestoreOperator::OrganizeRemoteFileInfo(
         LOG_ERROR("restoredLocalFileMappings is empty.");
         return nullptr;
     }
-    auto restoredLocalFileMapping = restoredLocalFileMappings[0];
-    for (auto &fileInfo : restoredLocalFileMapping->GetFileMapping()) {
-        CONTINUE_LOOP_AS_NULLPTR(fileInfo);
-        LOG_INFO("local file path:" << PathTransform::ExtractFileName(fileInfo->GetFileName()));
+    LOG_INFO("restoredLocalFileMappings size:" << restoredLocalFileMappings.size());
+
+    for (auto &restoredLocalFileMapping : restoredLocalFileMappings) {
+        for (auto &fileInfo : restoredLocalFileMapping->GetFileMapping()) {
+            CONTINUE_LOOP_AS_NULLPTR(fileInfo);
+            LOG_DEBUG("local file path:" << PathTransform::ExtractFileName(fileInfo->GetFileName()));
+        }
     }
+
     std::vector<SnapshotFileInfoRef> fileMapping;
     for (auto &item : pathMap) {
         auto remotePath = item.second;
         auto localPath = item.first;
 
-        for (auto &fileInfo : restoredLocalFileMapping->GetFileMapping()) {
-            CONTINUE_LOOP_AS_NULLPTR(fileInfo);
-            if (fileInfo->GetFileName() == PathTransform::ExtractFileName(localPath)) {
-                auto remoteFIleInfo =  std::make_shared<SnapshotFileInfo>(remotePath, fileInfo->GetFileId(), 0);
-                fileMapping.emplace_back(remoteFIleInfo);
+        for (auto &restoredLocalFileMapping : restoredLocalFileMappings) {
+            for (auto &fileInfo : restoredLocalFileMapping->GetFileMapping()) {
+                CONTINUE_LOOP_AS_NULLPTR(fileInfo);
+                if (fileInfo->GetFileName() == PathTransform::ExtractFileName(localPath)) {
+                    LOG_INFO("matched file path:" << PathTransform::ExtractFileName(fileInfo->GetFileName()));
+                    auto remoteFIleInfo = std::make_shared<SnapshotFileInfo>(remotePath, fileInfo->GetFileId(), 0);
+                    fileMapping.emplace_back(remoteFIleInfo);
+                }
             }
         }
     }

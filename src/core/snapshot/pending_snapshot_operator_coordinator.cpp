@@ -30,7 +30,7 @@ BResult PendingSnapshotOperatorCoordinator::Start()
 
     // 1. FreshTable执行checkpoint.
     auto freshTableSnapshotOperator = std::make_shared<FreshTableSnapshotOperator>(AllocateOperatorId(), mFreshTable,
-        mConfig, mMemManager);
+        mConfig, mMemManager, mPqTables);
     RegisterSnapshotOperator(freshTableSnapshotOperator);
     freshTableSnapshotOperator->Start();
     RETURN_NOT_OK(freshTableSnapshotOperator->SyncSnapshot(IsSavepoint()));
@@ -60,7 +60,10 @@ BResult PendingSnapshotOperatorCoordinator::Start()
     sliceTableSnapshotOperator->Start();
     RETURN_NOT_OK(sliceTableSnapshotOperator->SyncSnapshot(IsSavepoint()));
 
-    // 3. FileStore执行checkpoint.
+    // 3. BlobStore执行checkpoint.
+    RETURN_NOT_OK(DoBlobStoreSnapshot());
+
+    // 4. FileStore执行checkpoint.
     auto fileStoreSnapshotOperator = mSliceTable->PrepareFileStoreSnapshot(AllocateOperatorId(), GetSnapshotId());
     RegisterSnapshotOperator(fileStoreSnapshotOperator);
     fileStoreSnapshotOperator->Start();
@@ -70,6 +73,25 @@ BResult PendingSnapshotOperatorCoordinator::Start()
     compactionTask->FinishSnapshot();
     evictTask->FinishSnapshot();
     return ret;
+}
+
+BResult PendingSnapshotOperatorCoordinator::DoBlobStoreSnapshot()
+{
+    auto blobStoreSnapshotOperator = mSliceTable->PrepareBlobStoreSnapshot(AllocateOperatorId(), GetSnapshotId());
+    if (LIKELY(blobStoreSnapshotOperator != nullptr)) {
+        RegisterSnapshotOperator(blobStoreSnapshotOperator);
+        blobStoreSnapshotOperator->Start();
+        BResult result = blobStoreSnapshotOperator->SyncSnapshot(IsSavepoint());
+        if (UNLIKELY(result == BSS_BLOB_NOT_SNAPSHOT)) {
+            // 如果没有blob快照,则删除快照调度器
+            blobStoreSnapshotOperator->InternalRelease();
+            UnregisterSnapshotOperator(blobStoreSnapshotOperator);
+            LOG_INFO("Current blob files is empty, not need snapshot.");
+            return BSS_OK;
+        }
+        RETURN_NOT_OK(result);
+    }
+    return BSS_OK;
 }
 
 BResult PendingSnapshotOperatorCoordinator::WriteMeta()

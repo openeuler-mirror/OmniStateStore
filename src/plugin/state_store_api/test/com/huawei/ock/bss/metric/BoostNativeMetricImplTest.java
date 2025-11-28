@@ -12,6 +12,7 @@
 package com.huawei.ock.bss.metric;
 
 import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyLong;
 
 import org.apache.flink.metrics.MetricGroup;
 import org.junit.Before;
@@ -35,9 +36,10 @@ public class BoostNativeMetricImplTest {
     private MetricGroup metricGroup;
 
     @Before
-    public void setUp() {
+    public void setUp() throws Exception {
         PowerMockito.mockStatic(BoostNativeMetricImpl.class);
         PowerMockito.when(BoostNativeMetricImpl.open(anyInt())).thenReturn(1L);
+        PowerMockito.doNothing().when(BoostNativeMetricImpl.class, "close", anyLong());
         options = PowerMockito.mock(BoostNativeMetricOptions.class);
         PowerMockito.when(options.isStatisticsEnabled()).thenReturn(true);
         metricGroup = PowerMockito.mock(MetricGroup.class);

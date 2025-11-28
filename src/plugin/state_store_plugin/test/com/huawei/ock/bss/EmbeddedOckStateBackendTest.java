@@ -502,17 +502,23 @@ public class EmbeddedOckStateBackendTest {
     @Test
     public void test_setPriorityQueueStateType_normal() throws IOException {
         OckDBStateBackendFactory factory = new OckDBStateBackendFactory();
+        config.set(OckDBOptions.OCKDB_PRIORITY_QUEUE_TYPE, "HEAP");
         EmbeddedOckStateBackend stateBackend = factory.createFromConfig(config, this.getClass().getClassLoader());
-        stateBackend.setPriorityQueueStateType(EmbeddedOckStateBackend.PriorityQueueStateType.HEAP);
         Assert.assertEquals(EmbeddedOckStateBackend.PriorityQueueStateType.HEAP,
+            stateBackend.getPriorityQueueStateType());
+
+        config.set(OckDBOptions.OCKDB_PRIORITY_QUEUE_TYPE, "OCKDB");
+        stateBackend = factory.createFromConfig(config, this.getClass().getClassLoader());
+        Assert.assertEquals(EmbeddedOckStateBackend.PriorityQueueStateType.OCKDB,
             stateBackend.getPriorityQueueStateType());
     }
 
-    @Test(expected = UnsupportedOperationException.class)
-    public void test_setPriorityQueueStateType_abnormal() throws IOException {
+    @Test(expected = IllegalConfigurationException.class)
+    public void test_getPriorityQueueStateType_abnormal() throws IOException {
         OckDBStateBackendFactory factory = new OckDBStateBackendFactory();
+        config.set(OckDBOptions.OCKDB_PRIORITY_QUEUE_TYPE, "XXX");
         EmbeddedOckStateBackend stateBackend = factory.createFromConfig(config, this.getClass().getClassLoader());
-        stateBackend.setPriorityQueueStateType(EmbeddedOckStateBackend.PriorityQueueStateType.OCKDB);
+        stateBackend.getPriorityQueueStateType();
     }
 
     @Test

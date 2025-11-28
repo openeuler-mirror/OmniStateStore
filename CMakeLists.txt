@@ -103,6 +103,7 @@ include_directories(
 		${SRC_DIR}/src/core/common
 		${SRC_DIR}/src/core/compress
 		${SRC_DIR}/src/core/db
+        ${SRC_DIR}/src/core/blob_store
 		${SRC_DIR}/src/core/executor
 		${SRC_DIR}/src/core/fresh_table
         ${SRC_DIR}/src/core/include

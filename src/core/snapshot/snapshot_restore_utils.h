@@ -92,6 +92,20 @@ public:
         return mRescaleMappingInfo;
     }
 
+    inline void SetBlobServiceMetaOffset(int64_t offset)
+    {
+        if (mBlobServiceMetaOffset != -1L) {
+            LOG_ERROR("BlobServiceMetaOffset Bug.");
+            return;
+        }
+        mBlobServiceMetaOffset = offset;
+    }
+
+    inline int64_t GetBlobServiceMetaOffset() const
+    {
+        return mBlobServiceMetaOffset;
+    }
+
 private:
     int64_t mSliceTableMetaOffset = -1;
     std::unordered_map<int32_t, uint64_t> mFileStoreMetaMap;

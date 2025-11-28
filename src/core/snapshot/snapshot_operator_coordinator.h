@@ -34,6 +34,10 @@ public:
     {
     }
 
+    virtual void UnregisterSnapshotOperator(const AbstractSnapshotOperatorRef &snapshotOperator)
+    {
+    }
+
     virtual std::map<uint32_t, AbstractSnapshotOperatorRef> GetRegisterSnapshotOperator()
     {
         return {};

@@ -39,6 +39,7 @@ import org.apache.flink.runtime.state.PriorityComparable;
 import org.apache.flink.runtime.state.PriorityQueueSetFactory;
 import org.apache.flink.runtime.state.RegisteredKeyValueStateBackendMetaInfo;
 import org.apache.flink.runtime.state.RegisteredPriorityQueueStateBackendMetaInfo;
+import org.apache.flink.runtime.state.RegisteredStateMetaInfoBase;
 import org.apache.flink.runtime.state.StateSerializerProvider;
 import org.apache.flink.runtime.state.StateSnapshotKeyGroupReader;
 import org.apache.flink.runtime.state.heap.HeapPriorityQueueElement;
@@ -90,7 +91,7 @@ public abstract class AbstractBoostIncrementalRestoreOperation<K> extends Abstra
 
     private final ClassLoader userCodeClassLoader;
 
-    private final HeapPriorityQueueSetFactory priorityQueueSetFactory;
+    private final PriorityQueueSetFactory priorityQueueSetFactory;
 
     private final StateSerializerProvider<K> keySerializerProvider;
 
@@ -102,7 +103,7 @@ public abstract class AbstractBoostIncrementalRestoreOperation<K> extends Abstra
 
     private final Map<String, HeapPriorityQueueSnapshotRestoreWrapper<?>> registeredPQStates;
 
-    private final Map<String, RegisteredKeyValueStateBackendMetaInfo<?, ?>> registeredKvStateMetaInfos;
+    private final Map<String, RegisteredStateMetaInfoBase> registeredKvStateMetaInfos;
 
     private boolean isKeySerializerCompatibilityChecked = false;
 
@@ -139,7 +140,7 @@ public abstract class AbstractBoostIncrementalRestoreOperation<K> extends Abstra
         BoostStateDB db, int keyGroupPrefixBytes, int numberOfTransferringThreads,
         CloseableRegistry cancelStreamRegistry,
         ClassLoader userCodeClassLoader, PriorityQueueSetFactory priorityQueueSetFactory,
-        Map<String, RegisteredKeyValueStateBackendMetaInfo<?, ?>> registeredKvStateMetaInfos,
+        Map<String, RegisteredStateMetaInfoBase> registeredKvStateMetaInfos,
         Map<String, KeyedStateDescriptor> keyedStateDescriptorMap,
         Map<String, NSKeyedStateDescriptor> nsKeyedStateDescriptorMap,
         Map<String, HeapPriorityQueueSnapshotRestoreWrapper<?>> registeredPQStates, Map<String, Table> tables,
@@ -153,8 +154,7 @@ public abstract class AbstractBoostIncrementalRestoreOperation<K> extends Abstra
         this.numberOfTransferringThreads = numberOfTransferringThreads;
         this.cancelStreamRegistry = cancelStreamRegistry;
         this.userCodeClassLoader = userCodeClassLoader;
-        Preconditions.checkState(priorityQueueSetFactory instanceof HeapPriorityQueueSetFactory);
-        this.priorityQueueSetFactory = (HeapPriorityQueueSetFactory) priorityQueueSetFactory;
+        this.priorityQueueSetFactory = priorityQueueSetFactory;
         this.registeredKvStateMetaInfos = registeredKvStateMetaInfos;
         this.keyedStateDescriptorMap = keyedStateDescriptorMap;
         this.nsKeyedStateDescriptorMap = nsKeyedStateDescriptorMap;
@@ -345,16 +345,25 @@ public abstract class AbstractBoostIncrementalRestoreOperation<K> extends Abstra
                     i++;
                     break;
                 case PRIORITY_QUEUE:
-                    RegisteredPriorityQueueStateBackendMetaInfo pqMetaInfo
-                        = new RegisteredPriorityQueueStateBackendMetaInfo<>(stateMetaInfoSnapshot);
-                    HeapPriorityQueueSet<T> priorityQueueSet = this.priorityQueueSetFactory.create(pqMetaInfo.getName(),
-                        pqMetaInfo.getElementSerializer());
-                    registeredPQStates.computeIfAbsent(name,
-                        key -> new HeapPriorityQueueSnapshotRestoreWrapper(priorityQueueSet, pqMetaInfo,
-                            KeyExtractorFunction.forKeyedObjects(), this.keyGroupRange,
-                            this.db.getConfig().getMaxParallelism()));
+                    if (priorityQueueSetFactory instanceof HeapPriorityQueueSetFactory) {
+                        RegisteredPriorityQueueStateBackendMetaInfo pqMetaInfo
+                                = new RegisteredPriorityQueueStateBackendMetaInfo<>(stateMetaInfoSnapshot);
+                        HeapPriorityQueueSet<T> priorityQueueSet =
+                                (HeapPriorityQueueSet<T>) this.priorityQueueSetFactory.create(pqMetaInfo.getName(),
+                                pqMetaInfo.getElementSerializer());
+                        registeredPQStates.computeIfAbsent(name,
+                                key -> new HeapPriorityQueueSnapshotRestoreWrapper(priorityQueueSet, pqMetaInfo,
+                                        KeyExtractorFunction.forKeyedObjects(), this.keyGroupRange,
+                                        this.db.getConfig().getMaxParallelism()));
+                        j++;
+                    } else {
+                        RegisteredPriorityQueueStateBackendMetaInfo pqMetaInfo
+                                = new RegisteredPriorityQueueStateBackendMetaInfo<>(stateMetaInfoSnapshot);
+                        this.priorityQueueSetFactory.create(pqMetaInfo.getName(), pqMetaInfo.getElementSerializer());
+                        registeredKvStateMetaInfos.put(name, pqMetaInfo);
+                        i++;
+                    }
                     LOG.info("registeredPQStates restore, j = {}, and name = {}", j, name);
-                    j++;
                     break;
                 default:
                     throw new IllegalStateException("Failed to restore Meta info because of invalid state type: "

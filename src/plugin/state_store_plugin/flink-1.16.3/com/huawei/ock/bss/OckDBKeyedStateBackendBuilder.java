@@ -41,7 +41,7 @@ import org.apache.flink.runtime.state.KeyGroupRange;
 import org.apache.flink.runtime.state.KeyedStateHandle;
 import org.apache.flink.runtime.state.LocalRecoveryConfig;
 import org.apache.flink.runtime.state.PriorityQueueSetFactory;
-import org.apache.flink.runtime.state.RegisteredKeyValueStateBackendMetaInfo;
+import org.apache.flink.runtime.state.RegisteredStateMetaInfoBase;
 import org.apache.flink.runtime.state.StreamCompressionDecorator;
 import org.apache.flink.runtime.state.heap.HeapPriorityQueueSnapshotRestoreWrapper;
 import org.apache.flink.runtime.state.metrics.LatencyTrackingStateConfig;
@@ -93,20 +93,19 @@ public class OckDBKeyedStateBackendBuilder<K> extends AbstractOckDBKeyedStateBac
      */
     @Override
     public OckDBKeyedStateBackend<K> build() throws BackendBuildingException {
-        if (!instanceBasePath.mkdirs()) {
-            logger.info("instanceBasePath is exist!");
-        }
+        initInstanceBasePath();
+
         BoostConfig dbOptions = createBoostConfig();
         createBackupPathForLocalRecovery(dbOptions);
         BoostStateDB db = new BoostStateDB(dbOptions);
         if (this.boostNativeMetricOptions.isStatisticsEnabled()) {
             db.createBoostNativeMetric(this.boostNativeMetricOptions, this.metricGroup);
         }
-        PriorityQueueSetFactory priorityQueueSetFactory = initPriorityQueueFactory();
+        Map<String, RegisteredStateMetaInfoBase> registeredKvStateMetaInfos = new HashMap<>();
+        PriorityQueueSetFactory priorityQueueSetFactory = initPriorityQueueFactory(db, registeredKvStateMetaInfos);
         Map<String, Table> tables = new HashMap<>();
         Map<String, KeyedStateDescriptor> keyedStateDescriptorMap = new HashMap<>();
         Map<String, NSKeyedStateDescriptor> nsKeyedStateDescriptorMap = new HashMap<>();
-        Map<String, RegisteredKeyValueStateBackendMetaInfo<?, ?>> registeredKvStateMetaInfos = new HashMap<>();
         // registeredPQStates要放入heapPriorityQueuesManager
         Map<String, HeapPriorityQueueSnapshotRestoreWrapper<?>> registeredPQStates = new HashMap<>();
         // cancelStreamRegistryForBackend在创建checkpointSnapshotStrategy和创建OckDBKeyedStateBackend时使用
@@ -155,7 +154,7 @@ public class OckDBKeyedStateBackendBuilder<K> extends AbstractOckDBKeyedStateBac
 
     private BoostSnapshotStrategyBase<K> initSavepointAndCheckpointStrategies(
         String jobID, ResourceGuard resourceGuard, BoostStateDB db, int keyGroupPrefixBytes, UUID backendID,
-        Map<String, RegisteredKeyValueStateBackendMetaInfo<?, ?>> registeredKvStateMetaInfos,
+        Map<String, RegisteredStateMetaInfoBase> registeredKvStateMetaInfos,
         long lastCompletedCheckpointId,
         SortedMap<Long, Collection<HandleAndLocalPath>> materializedSstFiles,
         Map<String, KeyedStateDescriptor> keyedStateDescriptorMap,

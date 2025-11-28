@@ -249,7 +249,12 @@ void FreshTable::EndSegmentFlush()
     BoostSegmentRef boostSegment;
     PollFlushingSegment(boostSegment);  // poll出待淘汰队列的队首的segment, 即释放该segment内存.
     // 由于只有一个异步线程flush, flush队列中的任务是串行的, 所以此处监控项更新不需要考虑多线程
+    if (UNLIKELY(boostSegment == nullptr)) {
+        LOG_WARN("boostSegment is nullptr.");
+        return;
+    }
     IncrementFreshFlush(boostSegment->Size());
+    LOG_INFO("finish to flush fresh segment:" << boostSegment->GetSegmentId());
 }
 
 BResult FreshTable::InitNewActiveBinarySegment()
@@ -457,7 +462,7 @@ BResult FreshTable::FillDataByMemorySegment(const BoostSegmentRef &boostSegment,
                 QueryKey queryKey(stateId, binaryKey.mKeyHashCode, priKey, secKey);
                 keyValue.key = queryKey;
                 Value putVal;
-                putVal.Init(ValueType::PUT, entryVal->ValueDataLen(), entryVal->Value(), entryVal->ValueSeqId());
+                putVal.Init(entryVal->ValueType(), entryVal->ValueDataLen(), entryVal->Value(), entryVal->ValueSeqId());
                 keyValue.value = putVal;
                 RETURN_NOT_OK(Add(keyValue));
             }

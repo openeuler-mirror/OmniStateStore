@@ -90,6 +90,7 @@ import org.apache.flink.runtime.state.LocalRecoveryConfig;
 import org.apache.flink.runtime.state.PriorityComparable;
 import org.apache.flink.runtime.state.PriorityQueueSetFactory;
 import org.apache.flink.runtime.state.RegisteredKeyValueStateBackendMetaInfo;
+import org.apache.flink.runtime.state.RegisteredStateMetaInfoBase;
 import org.apache.flink.runtime.state.SavepointResources;
 import org.apache.flink.runtime.state.SnapshotExecutionType;
 import org.apache.flink.runtime.state.SnapshotResult;
@@ -189,12 +190,12 @@ public class OckDBKeyedStateBackend<K> extends AbstractKeyedStateBackend<K> {
 
     private final Map<String, NSKeyedStateDescriptor> nsKeyedStateDescriptorMap;
 
-    private final Map<String, RegisteredKeyValueStateBackendMetaInfo<?, ?>> registeredKvStateMetaInfos;
+    private final Map<String, RegisteredStateMetaInfoBase> registeredKvStateMetaInfos;
 
     public OckDBKeyedStateBackend(BoostStateDB db, Map<String, Table> tables, File instanceBasePath,
         File instanceOckDBPath, Map<String, KeyedStateDescriptor> keyedStateDescriptorMap,
         Map<String, NSKeyedStateDescriptor> namespaceKeyedStateDescriptorMap,
-        Map<String, RegisteredKeyValueStateBackendMetaInfo<?, ?>> registeredKvStateMetaInfos,
+        Map<String, RegisteredStateMetaInfoBase> registeredKvStateMetaInfos,
         Map<String, HeapPriorityQueueSnapshotRestoreWrapper<?>> registeredPQStates,
         boolean priorityQueueIsAsyncSnapshot, KeyGroupRange keyGroupRange, ClassLoader userCodeClassLoader,
         LocalRecoveryConfig localRecoveryConfig, TaskKvStateRegistry kvStateRegistry, String fileCompatibleIdentifier,
@@ -692,8 +693,9 @@ public class OckDBKeyedStateBackend<K> extends AbstractKeyedStateBackend<K> {
         LOG.info("create PriorityQueue of state:{}", LogSanitizer.sanitize(stateName));
         if (this.heapPriorityQueuesManager != null) {
             return this.heapPriorityQueuesManager.createOrUpdate(stateName, byteOrderedElementSerializer);
+        } else {
+            return priorityQueueSetFactory.create(stateName, byteOrderedElementSerializer, false);
         }
-        throw new UnsupportedOperationException("not supported yet.");
     }
 
     @Nonnull
@@ -721,16 +723,23 @@ public class OckDBKeyedStateBackend<K> extends AbstractKeyedStateBackend<K> {
         Map<String, FullBoostSnapshotResources.KvMetaData> kvStateMetaDataMap = new HashMap<>();
         Map<String, FullBoostSnapshotResources.PqMetaData> pqMetaDataMap = new HashMap<>();
 
-        for (Map.Entry<String, RegisteredKeyValueStateBackendMetaInfo<?, ?>> metaInfo
-            : registeredKvStateMetaInfos.entrySet()) {
+        for (Map.Entry<String, RegisteredStateMetaInfoBase> metaInfo : registeredKvStateMetaInfos.entrySet()) {
             int stateId = stateMetaInfoSnapshots.size();
             StateMetaInfoSnapshot stateMetaInfoSnapshot = metaInfo.getValue().snapshot();
             stateMetaInfoSnapshots.add(stateMetaInfoSnapshot);
-            StateSnapshotTransformer<byte[]> stateSnapshotTransformer =
-                (metaInfo.getValue()).getStateSnapshotTransformFactory().createForSerializedState().orElse(null);
-            kvStateMetaDataMap.put(metaInfo.getKey(),
-                new FullBoostSnapshotResources.KvMetaData(stateId, metaInfo.getValue().getStateType(),
-                    stateMetaInfoSnapshot, stateSnapshotTransformer));
+            if (metaInfo.getValue() instanceof RegisteredKeyValueStateBackendMetaInfo) {
+                RegisteredKeyValueStateBackendMetaInfo<?, ?> meta =
+                        (RegisteredKeyValueStateBackendMetaInfo<?, ?>) metaInfo.getValue();
+                StateSnapshotTransformer<byte[]> stateSnapshotTransformer =
+                        meta.getStateSnapshotTransformFactory().createForSerializedState().orElse(null);
+                kvStateMetaDataMap.put(metaInfo.getKey(),
+                        new FullBoostSnapshotResources.KvMetaData(stateId, meta.getStateType(),
+                                stateMetaInfoSnapshot, stateSnapshotTransformer));
+            } else {
+                kvStateMetaDataMap.put(metaInfo.getKey(),
+                        new FullBoostSnapshotResources.KvMetaData(stateId, StateDescriptor.Type.UNKNOWN,
+                                stateMetaInfoSnapshot, null));
+            }
         }
 
         for (HeapPriorityQueueSnapshotRestoreWrapper<?> pqStateInfo : registeredPQStates.values()) {
@@ -752,13 +761,23 @@ public class OckDBKeyedStateBackend<K> extends AbstractKeyedStateBackend<K> {
     }
 
     /**
+     * isSafeToReuseKVState
+     *
+     * @return boolean
+     */
+    @Override
+    public boolean isSafeToReuseKVState() {
+        return true;
+    }
+
+    /**
      * 封装需要快照的state相关信息
      */
     public static class BoostKvStateInfo implements AutoCloseable {
         /**
          * 状态元信息
          */
-        public final Map<String, RegisteredKeyValueStateBackendMetaInfo<?, ?>> metaInfoMap;
+        public final Map<String, RegisteredStateMetaInfoBase> metaInfoMap;
 
         /**
          * 记录了已存在的keyedStateDescriptor
@@ -781,7 +800,7 @@ public class OckDBKeyedStateBackend<K> extends AbstractKeyedStateBackend<K> {
          */
         public final boolean priorityQueueIsAsyncSnapshot;
 
-        public BoostKvStateInfo(Map<String, RegisteredKeyValueStateBackendMetaInfo<?, ?>> metaInfoMap,
+        public BoostKvStateInfo(Map<String, RegisteredStateMetaInfoBase> metaInfoMap,
             Map<String, KeyedStateDescriptor> keyedStateDescriptorMap,
             Map<String, NSKeyedStateDescriptor> nsKeyedStateDescriptorMap,
             @Nullable HeapPriorityQueuesManager heapPriorityQueuesManager,

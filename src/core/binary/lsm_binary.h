@@ -36,6 +36,9 @@ public:
 
     inline int32_t CompareKeyNode(const PriKeyNode &other)
     {
+        if (StateId::GetStateType(other.StateId()) == PQ) {
+            return PQBinaryDataComparator::ComparePrefix(mKeyData, mKeyLen, other.KeyData(), other.KeyLen());
+        }
         int32_t cmp = BssMath::IntegerCompare(mKeyHashCode, other.KeyHashCode());
         if (cmp != 0) {
             return cmp;
@@ -173,6 +176,15 @@ public:
 
     inline int32_t Compare(const Key &other) const
     {
+        if (StateId::GetStateType(other.StateId()) == PQ) {
+            int32_t cmp = BssMath::IntegerCompare(mSgl.mStateId, other.StateId());
+            if (cmp != 0) {
+                return cmp;
+            }
+            cmp = PQBinaryDataComparator::ComparePrefix(mPriKey->mKeyData, mPriKey->mKeyLen,
+                other.PriKey().KeyData(), other.PriKey().KeyLen());
+            return cmp != 0 ? cmp : other.IsEndKey() ? -1 : cmp;
+        }
         // compare primary key.
         int32_t cmp = mPriKey->CompareKeyNode(other.PriKey());
         if (cmp != 0) {

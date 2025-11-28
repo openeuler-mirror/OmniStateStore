@@ -29,7 +29,8 @@
 
 namespace ock {
 namespace bss {
-
+class SliceTable;
+using SliceTableManagerRef = std::shared_ptr<SliceTable>;
 using SliceKVMap = std::unordered_map<SliceKey, Value, SliceKeyHash, SliceKeyEqual>;
 
 #pragma pack(1)
@@ -309,47 +310,8 @@ public:
         return BSS_OK;
     }
 
-    uint64_t Put(uint32_t index, FreshValueNodePtr &value, const MemorySegment &freshSegment, bool isValue)
-    {
-        uint32_t count = 0;
-        uint64_t seqId = 0;
-        bool deleteOrPut = false;
-        std::vector<FreshValueNode *> nodes;
-        value->VisitAsList(freshSegment, [&](FreshValueNode &curVal) {
-            seqId = std::max(seqId, curVal.ValueSeqId());
-            if (curVal.ValueType() == ValueType::DELETE) {
-                deleteOrPut = true;
-                return false;
-            } else if (curVal.ValueType() == ValueType::PUT) {
-                deleteOrPut = true;
-                nodes.emplace_back(&curVal);
-                return false;
-            }
-            nodes.emplace_back(&curVal);
-            return true;
-        });
-
-        for (auto node = nodes.rbegin(); node != nodes.rend(); ++node) {
-            count++;
-            uint32_t len = (*node)->ValueDataLen();
-            mBuffer->WriteAt((*node)->Value(), len, mValueDataBaseOffset + mWritenBytes);
-            mWritenBytes += len;
-        }
-        auto valType = value->ValueType();
-        if (!isValue) {
-            valType = ValueType::APPEND;
-            if (!count) {
-                valType = ValueType::DELETE;
-            } else if (deleteOrPut) {
-                valType = ValueType::PUT;
-            }
-        } else if (count > 1) {
-            LOG_ERROR("Value type should not have more than one element");
-        }
-        // value offset;
-        mValueOffsets[index] = (static_cast<uint8_t>(valType) << VALUE_INDICATOR_OFFSET) | (mWritenBytes & 0xFFFFFFF);
-        return seqId;
-    }
+    BResult Put(uint32_t index, FreshValueNodePtr &value, const MemorySegment &freshSegment, bool isValue,
+        SliceTableManagerRef sliceTable, uint32_t keyHashCode, uint16_t stateId, uint64_t &seqId);
 
     inline void ReleaseByteBuffer()
     {
@@ -375,7 +337,7 @@ public:
                        const SliceCreateMeta &meta, const MemManagerRef &memManager, bool forceMemory = true);
 
     BResult Initialize(RawDataSlice &rawDataSlice, const SliceCreateMeta &meta, const MemManagerRef &memManager,
-                       bool &forceEvict);
+                       bool &forceEvict, SliceTableManagerRef sliceTable);
 
     /**
      * Obtain the value by using the keys from slice
@@ -451,10 +413,11 @@ private:
                              StateIdInterval stateIdInterval);
 
     BResult CreateAndInitBuffer(const SliceCreateMeta &meta, RawDataSlice &rawDataSlice,
-                                std::vector<std::pair<BinaryKey, uint32_t>> &sortedKeySlotList, bool &forceEvict);
+        std::vector<std::pair<BinaryKey, uint32_t>> &sortedKeySlotList, bool &forceEvict,
+        SliceTableManagerRef sliceTable);
 
-    BResult FillBuffer(RawDataSlice &rawDataSlice,
-                       std::vector<std::pair<BinaryKey, uint32_t>> &sortedKeySlotList);
+    BResult FillBuffer(RawDataSlice &rawDataSlice, std::vector<std::pair<BinaryKey, uint32_t>> &sortedKeySlotList,
+        SliceTableManagerRef sliceTable);
 
     BResult BinarySearchBound(uint32_t targetMixedHashCode, uint32_t startSlot, uint32_t indexCount,
                               uint32_t &lowerBound, uint32_t &upperBound);

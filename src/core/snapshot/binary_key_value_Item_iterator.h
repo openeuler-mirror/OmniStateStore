@@ -85,13 +85,18 @@ public:
     std::vector<uint8_t> mValueVector;
 };
 using BinaryKeyValueItemRef = std::shared_ptr<BinaryKeyValueItem>;
+using BlobValueTransformFunc = std::function<BResult(uint64_t, uint32_t, uint64_t, Value &)>;
 
 class BinaryKeyValueItemIterator : public Iterator<BinaryKeyValueItemRef> {
 public:
     BinaryKeyValueItemIterator(const StateIdProviderRef &stateIdProvider, uint32_t maxParallelism,
-                               const KeyValueIteratorRef &binaryIterator, const MemManagerRef &memManager)
-        : mStateIdProvider(stateIdProvider), mMaxParallelism(maxParallelism), mBinaryIterator(binaryIterator),
-          mMemManager(memManager)
+                               const KeyValueIteratorRef &binaryIterator, const MemManagerRef &memManager,
+                               const BlobValueTransformFunc &func)
+        : mStateIdProvider(stateIdProvider),
+          mMaxParallelism(maxParallelism),
+          mBinaryIterator(binaryIterator),
+          mMemManager(memManager),
+          mTransFunc(func)
     {
     }
 
@@ -105,6 +110,7 @@ public:
     KeyValueIteratorRef mBinaryIterator = nullptr;
     BinaryKeyValueItemRef mCurrentItem = nullptr;
     MemManagerRef mMemManager = nullptr;
+    std::function<BResult(uint64_t, uint32_t, uint64_t, Value &)> mTransFunc;
 
 private:
     void Advance();

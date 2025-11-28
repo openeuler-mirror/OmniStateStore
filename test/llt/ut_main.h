@@ -16,6 +16,10 @@ extern int32_t g_testSeed;
 
 extern void CleanupSstFiles();
 
+extern void CleanupBlobFiles();
+
+extern void CleanupTombstoneFiles(void);
+
 extern std::string GetCurrentWorkingDirectory();
 
 extern int RemoveFile(const char *fpath, const struct stat *sb, int typeflag, struct FTW *ftwbuf);

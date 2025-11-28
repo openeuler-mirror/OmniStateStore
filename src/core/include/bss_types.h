@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
  * You can use this software according to the terms and conditions of the Mulan PSL v2.
  * You may obtain a copy of Mulan PSL v2 at:
  *          http://license.coscl.org.cn/MulanPSL2
@@ -31,11 +31,22 @@ enum class BlockType : uint8_t {
     FILTER = 0,
     INDEX = 1,
     DATA = 2,
-    BUTT = 3
+    BLOB = 3,
+    BUTT = 4
 };
 
 constexpr uint32_t BYTE4_MAX_SLOT_SIZE = 65535;
 constexpr uint32_t VALUE_INDICATOR_OFFSET = 28;
+constexpr uint32_t BLOB_FILE_MAGIC_NUM = 102030405;
+
+// blob config
+constexpr uint32_t BLOB_INDEX_ENTRY_STRUCT_SIZE = 20;
+constexpr uint32_t BLOB_INDEX_ENTRY_BUFFER_OFFSET = 8;
+constexpr uint32_t BLOB_INDEX_ENTRY_NUMS_OFFSET = 4;
+constexpr uint32_t BLOB_DATA_BLOCK_HEADER_SIZE = 8;
+constexpr uint32_t BLOB_DATA_BLOCK_META_STRUCT_SIZE = 24;
+constexpr char BLOB_FILE_NAME_PREFIX[] = "blob_file_";
+constexpr uint32_t TOMBSTONE_MEMTABLE_SIZE = 200000;
 
 constexpr uint64_t MAX_TIMESTAMP = 140737488355327L;
 constexpr uint64_t CURRENTTS_WARNING = 58981;  // 65535 * 0.9
@@ -149,6 +160,8 @@ constexpr uint32_t NO_0 = 0;
 constexpr float NO_0_6 = 0.6;
 constexpr double NO_0_0_1 = 0.01;
 constexpr double NO_2_0 = 2.0;
+constexpr double NO_0_5 = 0.5;
+constexpr double NO_0_8 = 0.8;
 constexpr int NO_777 = 0777;
 
 constexpr uint64_t NO_U64_0 = 0;
@@ -159,6 +172,7 @@ constexpr uint32_t ONE_MINUTE = 60 * 1000;
 
 constexpr uint32_t IP_SIZE = 32;
 constexpr uint32_t DEVICE_SIZE = 16;
+constexpr int32_t NO_PQ_DATA = 2;
 
 constexpr size_t IO_SIZE_1K = 1024;
 constexpr size_t IO_SIZE_2K = 2 * 1024;
@@ -174,6 +188,7 @@ constexpr size_t IO_SIZE_512K = 512 * 1024;
 constexpr size_t IO_SIZE_1M = 1024 * 1024;
 constexpr size_t IO_SIZE_2M = 2 * 1024 * 1024;
 constexpr size_t IO_SIZE_4M = 4 * 1024 * 1024;
+constexpr size_t IO_SIZE_8M = 8 * 1024 * 1024;
 constexpr size_t IO_SIZE_16M = 16 * 1024 * 1024;
 constexpr size_t IO_SIZE_32M = 32 * 1024 * 1024;
 constexpr size_t IO_SIZE_64M = 64 * 1024 * 1024;

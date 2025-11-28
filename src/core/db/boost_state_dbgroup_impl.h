@@ -53,21 +53,25 @@ public:
     inline void UpdateSliceEvictWaterMark() override
     {
         uint64_t totalSliceMem = mMemManager->GetMemoryTypeMaxSize(MemoryType::SLICE_TABLE);
-        mEvictHighWaterMark = static_cast<int64_t>(totalSliceMem * mConfig->GetTotalMemHighMarkRatio());
+        float totalMemHighMarkRatio = mConfig->GetTotalMemHighMarkRatio();
+        mEvictHighWaterMark = static_cast<int64_t>(totalSliceMem * totalMemHighMarkRatio);
         mEvictLowWaterMark = static_cast<int64_t>(mEvictHighWaterMark * 0.85f);
         for (const auto &boostStateDb : mBoostStateDb) {
             boostStateDb->UpdateSliceEvictWaterMark(mEvictHighWaterMark);
         }
+        auto dbNums = mBoostStateDb.size();
+        if (UNLIKELY(dbNums < NO_1)) {
+            return;
+        }
+        float normalEvictRatio = totalMemHighMarkRatio >= 0.5f ? totalMemHighMarkRatio : 0.8f;
+        auto normalEvictWaterMark = static_cast<int64_t>(totalSliceMem * normalEvictRatio);
+        auto avgDbSliceSize = normalEvictWaterMark / static_cast<int64_t>(dbNums);
+        while (static_cast<uint64_t>(avgDbSliceSize) < mEvictMinSize) {
+            mEvictMinSize = mEvictMinSize >> NO_1;
+        }
         LOG_INFO("Update slice table evict water mark, highWaterMark: " << mEvictHighWaterMark << ", lowWaterMark: "
-            << mEvictLowWaterMark);
+            << mEvictLowWaterMark << ", min evict size: " << mEvictMinSize);
     }
-
-    inline bool LockEvicting(bool isLock) override
-    {
-        bool expected = !isLock;
-        return mIsEvicting.compare_exchange_strong(expected, isLock);
-    }
-
 private:
     BResult GetEvictFlushInfo(int64_t &useTotal, int64_t &flushingTotal);
     void SelectEvictBoostDb(uint32_t fileSize, BoostStateDB* &boostDb, BucketGroupRef &minGroup);

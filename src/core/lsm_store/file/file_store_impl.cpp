@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
  * You can use this software according to the terms and conditions of the Mulan PSL v2.
  * You may obtain a copy of Mulan PSL v2 at:
  *          http://license.coscl.org.cn/MulanPSL2
@@ -98,7 +98,7 @@ BResult LsmStore::InitializeCompaction()
         LOG_ERROR("Make compaction executor memory failed.");
         return BSS_ALLOC_FAIL;
     }
-    mCompactionExecutor->SetThreadName("LsmStoreCompactionExecutor");
+    mCompactionExecutor->SetThreadName("LsmCompactionExecutor");
     if (!mCompactionExecutor->Start()) {
         LOG_ERROR("Start compaction executor failed.");
         return BSS_ALLOC_FAIL;
@@ -180,6 +180,10 @@ void LsmStore::FinalizeVersionEdit(const CompactionProcessorRef &processor, std:
 BResult LsmStore::AddEntry(const CompactionProcessorRef &compactionProcessor, const KeyValueRef &keyValue,
                            FileProcHolder holder) const
 {
+    if (compactionProcessor->mFileBuilder != nullptr &&
+        compactionProcessor->mFileBuilder->IsStateChange(keyValue)) {
+        return FinishCompactionOutputFile(compactionProcessor);
+    }
     BResult ret = InitNewFileIfNecessary(compactionProcessor, holder);
     RETURN_NOT_OK_NO_LOG(ret);
     ret = compactionProcessor->mFileBuilder->Add(keyValue);
@@ -314,6 +318,9 @@ Compaction::Result LsmStore::BackgroundCompaction()
     if (ret == BSS_OK) {
         CountCompaction(processor);
     }
+    if (mTombstoneService != nullptr) {
+        mTombstoneService->Commit(ret == BSS_OK);
+    }
     // 清理并关闭compaction.
     CleanupCompaction(processor);
     CloseCompactionWithMutex(compaction);
@@ -350,7 +357,9 @@ BResult LsmStore::DoCompaction(const CompactionProcessorRef &processor)
     MergingIteratorRef iterator;
     {
         std::lock_guard<std::mutex> lock(mMutex);  // 从versionSet中获取merge迭代器时需要加锁互斥.
-        iterator = mVersionSet->MakeInputIterator(processor->mCompaction, mMemManager, holder);
+        iterator = mVersionSet->MakeInputIterator(processor->mCompaction, mMemManager, holder, mTombstoneService);
+        std::string str = mTombstoneService == nullptr? "true" : "false";
+        LOG_INFO("LsmStore::DoCompaction tombstone service is null:" << str);
         RETURN_ERROR_AS_NULLPTR(iterator);
     }
 
@@ -378,7 +387,6 @@ BResult LsmStore::DoCompaction(const CompactionProcessorRef &processor)
         RETURN_NOT_OK_NO_LOG(AddEntry(processor, current, FileProcHolder::FILE_STORE_COMPACTION));
     }
     RETURN_NOT_OK_NO_LOG(FinishCompactionOutputFile(processor));  // 输出compactions的文件.
-
     // 3. 创建新的version并替换versionSet中的current version.
     std::vector<FileMetaDataRef> outputs;
     FinalizeVersionEdit(processor, outputs);
@@ -406,7 +414,7 @@ BResult LsmStore::BuildLsmStoreFlushFile(const IteratorRef<std::vector<DataSlice
     RETURN_ERROR_AS_NULLPTR(fileInfo);
     FileProcHolder holder = FileProcHolder::FILE_STORE_FLUSH;  // 标记该流程是Flush写流程
     auto fileBuilder = mFileCache->CreateBuilder(fileInfo->GetFilePath(), 0, holder);
-    SliceKVIterator iterator(dataSliceVectorIterator, mMemManager);
+    SliceKVIterator iterator(dataSliceVectorIterator, mMemManager, mTombstoneService);
     Iterator_Result result;
     uint32_t keyCount = 0;
     while ((result = iterator.HasNext()) == Iterator_Result_Continue) {
@@ -440,7 +448,7 @@ BResult LsmStore::BuildLsmStoreFlushFile(const IteratorRef<std::vector<DataSlice
         return BSS_INNER_ERR;
     }
 
-    // create file cache by file meta data.
+    // create file cache by file metaData.
     uint64_t fileSeqId = GetNextSeqNumber();
     FullKeyRef smallest = FullKeyUtil::CopyInternalKey(fileMeta->GetStartKey(), mMemManager, holder);
     FullKeyRef largest = FullKeyUtil::CopyInternalKey(fileMeta->GetEndKey(), mMemManager, holder);
@@ -458,19 +466,79 @@ BResult LsmStore::BuildLsmStoreFlushFile(const IteratorRef<std::vector<DataSlice
     return BSS_OK;
 }
 
+BResult LsmStore::BuildLsmStoreFlushFile(const PQTableIteratorRef &iter, FileMetaDataRef &fileMetaData)
+{
+    FileInfoRef fileInfo = mFileCacheManager->AllocateFile(mFileDirectory, FileName::CreateFileName);
+    RETURN_ERROR_AS_NULLPTR(fileInfo);
+    FileProcHolder holder = FileProcHolder::FILE_STORE_FLUSH;  // 标记该流程是Flush写流程
+    auto fileBuilder = mFileCache->CreateBuilder(fileInfo->GetFilePath(), 0, holder);
+    Iterator_Result result;
+    while (iter->HasNext()) {
+        auto ret = fileBuilder->Add(iter->Next());
+        if (UNLIKELY(ret != BSS_OK)) {
+            mFileCacheManager->DiscardFile(FileAddressUtil::GetFileAddressWithZeroOffset(fileInfo->GetFileId()->Get()));
+            return BSS_INNER_ERR;
+        }
+    }
+    if (UNLIKELY(result == Iterator_Result_Failed)) {
+        mFileCacheManager->DiscardFile(FileAddressUtil::GetFileAddressWithZeroOffset(fileInfo->GetFileId()->Get()));
+        return BSS_INNER_ERR;
+    }
+
+    FileBlockMetaRef fileMeta;
+    auto retVal = fileBuilder->Finish(fileMeta);
+    if (UNLIKELY(retVal != BSS_OK)) {
+        mFileCacheManager->DiscardFile(FileAddressUtil::GetFileAddressWithZeroOffset(fileInfo->GetFileId()->Get()));
+        return BSS_INNER_ERR;
+    }
+
+    // create file cache by file meta data.
+    uint64_t fileSeqId = GetNextSeqNumber();
+    FullKeyRef smallest = FullKeyUtil::CopyInternalKey(fileMeta->GetStartKey(), mMemManager, holder);
+    FullKeyRef largest = FullKeyUtil::CopyInternalKey(fileMeta->GetEndKey(), mMemManager, holder);
+    if (UNLIKELY(smallest == nullptr || largest == nullptr)) {
+        mFileCacheManager->DiscardFile(FileAddressUtil::GetFileAddressWithZeroOffset(fileInfo->GetFileId()->Get()));
+        return BSS_ALLOC_FAIL;
+    }
+    fileMetaData =
+        std::make_shared<FileMetaData>(FileAddressUtil::GetFileAddressWithZeroOffset(fileInfo->GetFileId()->Get()),
+                                       fileSeqId, static_cast<uint64_t>(fileMeta->GetFileSize()), smallest, largest,
+                                       mGroupRange, mOrderRange, fileInfo->GetFilePath()->Name(),
+                                       fileMeta->GetStateIdInterval());
+    mFileCache->FinishBuilder(fileInfo->GetFileId()->Get(), fileMetaData);
+    return BSS_OK;
+}
+
+BResult LsmStore::Put(const PQTableIteratorRef &iterator)
+{
+    // create file builder.
+    FileMetaDataRef fileMetaData = nullptr;
+    auto result = BuildLsmStoreFlushFile(iterator, fileMetaData);
+    RETURN_NOT_OK_NO_LOG(result);
+    CreateVersion(fileMetaData);
+    return BSS_OK;
+}
+
 BResult LsmStore::Put(const IteratorRef<std::vector<DataSliceRef>> &dataSliceVectorIterator)
 {
     // create file builder.
     FileMetaDataRef fileMetaData = nullptr;
     bool flag = false;
     auto result = BuildLsmStoreFlushFile(dataSliceVectorIterator, fileMetaData, flag);
+    if (mTombstoneService != nullptr) {
+        mTombstoneService->Commit(result == BSS_OK);
+    }
     RETURN_NOT_OK_NO_LOG(result);
     // 当前淘汰的数据已全部过期，无需继续淘汰
     if (!flag) {
         return BSS_OK;
     }
+    CreateVersion(fileMetaData);
+    return BSS_OK;
+}
 
-    // create version and add it to version set.
+void LsmStore::CreateVersion(const FileMetaDataRef &fileMetaData)
+{  // create version and add it to version set.
     VersionEdit::Builder editBuilder = VersionEdit::Builder();
     editBuilder.AddFile(mGroupRange, 0, fileMetaData);
     VersionEditRef edit = editBuilder.Build();
@@ -481,7 +549,9 @@ BResult LsmStore::Put(const IteratorRef<std::vector<DataSliceRef>> &dataSliceVec
     innerVersionBuilder->Apply(edit);
     VersionPtr newVersion = innerVersionBuilder->Build();
     AppendNewVersion(newVersion);
-    mFileCacheManager->ConfirmAllocationOnFlushOrCompaction({fileMetaData});
+    std::vector<FileMetaDataRef> vec;
+    vec.emplace_back(fileMetaData);
+    mFileCacheManager->ConfirmAllocationOnFlushOrCompaction(vec);
 
     // trigger compaction.
     RunnablePtr compactionTask = std::make_shared<LsmStoreCompactionTask>(shared_from_this());
@@ -492,7 +562,6 @@ BResult LsmStore::Put(const IteratorRef<std::vector<DataSliceRef>> &dataSliceVec
              << mSeqId << ", versionId:" << newVersion->GetVersionSeqId()
              << ", fileAddress:" << fileMetaData->GetFileAddress() << ", fileSize:" << fileMetaData->GetFileSize()
              << ", filePath:" << PathTransform::ExtractFileName(fileMetaData->GetIdentifier()));
-    return BSS_OK;
 }
 
 uint64_t LsmStore::GetNextSeqNumber()
@@ -717,7 +786,7 @@ KeyValueIteratorRef LsmStore::CreateMergingIterator(
 
     auto cleaner = [this](VersionPtr versionPtr) { return this->ReleaseVersionFinally(versionPtr); };
     auto result = std::make_shared<MergingIterator>(iterators, mMemManager, cleaner, version, reverseOrder, holder,
-                                                    sectionRead);
+                                                    sectionRead, nullptr);
     ReleaseVersionFinally(version);
     return result;
 }
@@ -737,7 +806,6 @@ void LsmStore::Close()
     mFileCacheManager->CleanResource();
     mCompactionAbort.store(true);
     ExitCompaction();
-    mFileFactory->Close();
 }
 
 SnapshotMetaRef LsmStore::WriteMeta(const FileOutputViewRef &localFileOutputView, FileOutputViewRef &remoteOutView,

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
  * You can use this software according to the terms and conditions of the Mulan PSL v2.
  * You may obtain a copy of Mulan PSL v2 at:
  *          http://license.coscl.org.cn/MulanPSL2
@@ -91,7 +91,7 @@ BResult FileWriter::WriteBlock(const ByteBufferRef &buffer, BlockHandleRef &bloc
     }
     ret = mFileOutputView->WriteBuffer(headData, static_cast<int64_t>(sizeToCheck), HEAD_BLOCK_SIZE);
     if (UNLIKELY(ret != BSS_OK)) {
-        LOG_ERROR("write block head failed, ret:" << ret << ", writeSize:" << HEAD_BLOCK_SIZE);
+        LOG_ERROR("Write block head failed, ret:" << ret << ", writeSize:" << HEAD_BLOCK_SIZE);
         return ret;
     }
 

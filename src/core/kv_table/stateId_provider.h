@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
  * You can use this software according to the terms and conditions of the Mulan PSL v2.
  * You may obtain a copy of Mulan PSL v2 at:
  *          http://license.coscl.org.cn/MulanPSL2
@@ -36,14 +36,17 @@ struct TableDescriptionEqual {
     {
         RETURN_FALSE_AS_NULLPTR(a);
         RETURN_FALSE_AS_NULLPTR(b);
-        return a == b;
+        return a->Equals(*b);
     }
 };
 
 struct TableDescriptionHash {
     uint32_t operator()(const TableDescriptionRef ref) const
     {
-        return std::hash<TableDescriptionRef>()(ref);
+        if (ref == nullptr) {
+            return 0;
+        }
+        return ref->HashCode();
     }
 };
 
@@ -105,13 +108,16 @@ public:
         for (uint32_t i = 0; i < count; i++) {
             std::string tableName;
             RETURN_NOT_OK_AS_READ_ERROR(inputView->ReadUTF(tableName));
+            uint16_t stateId = 0;
+            RETURN_NOT_OK_AS_READ_ERROR(inputView->Read(stateId));
             TableDescriptionRef tableDescription = tableDescriptionMap[tableName];
+            if (tableDescription == nullptr && StateId::GetStateType(stateId) == PQ) {
+                continue;
+            }
             if (tableDescription == nullptr) {
                 LOG_ERROR("error in restoring map for GTableDescription. No GTableDescription found.");
                 return BSS_ERR;
             }
-            uint16_t stateId = 0;
-            RETURN_NOT_OK_AS_READ_ERROR(inputView->Read(stateId));
             restoreGroupMapInstance->mStateIdMap.emplace(tableDescription, stateId);
             restoreGroupMapInstance->mReverseMap.emplace(stateId, tableDescription);
         }

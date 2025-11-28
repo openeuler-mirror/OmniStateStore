@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
  * You can use this software according to the terms and conditions of the Mulan PSL v2.
  * You may obtain a copy of Mulan PSL v2 at:
  *          http://license.coscl.org.cn/MulanPSL2
@@ -205,7 +205,8 @@ void FullKeyUtil::ReadPrimary(PriKeyNode &priKey, const FileInputViewRef &inputV
         return;
     }
     uint16_t stateId = ReadStateId(inputView);
-    priKey.Init(stateId, primaryUserKeyHash, priBuffer->Data(), keyLen);
+    uint32_t nsHashcode = StateId::HasNameSpace(stateId) ? *reinterpret_cast<const uint32_t *>(priBuffer->Data()) : 0;
+    priKey.Init(stateId, primaryUserKeyHash ^ nsHashcode, priBuffer->Data(), keyLen);
 }
 
 void FullKeyUtil::ReadSecondaryKey(SecKeyNode &secKey, const FileInputViewRef &inputView,

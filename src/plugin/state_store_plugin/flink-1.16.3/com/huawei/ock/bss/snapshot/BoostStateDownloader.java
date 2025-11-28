@@ -92,12 +92,16 @@ public class BoostStateDownloader extends BoostStateDataTransfer {
 
         // 无论是不是懒加载，都要将远程和本地的sst文件映射传下去，否则version中的远端文件找不到本地文件地址
         for (HandleAndLocalPath sstFile : sstFiles) {
-            String localPath = dest.resolve(sstFile.getLocalPath()).normalize().toUri().getPath();
-
+            Path normalizedPath = dest.resolve(sstFile.getLocalPath()).normalize();
+            String localPath = normalizedPath.toUri().getPath();
             if (localPath.endsWith("slice")) {
                 if (isLazyRestore) {
                     miscFiles.add(sstFile);
                 }
+                continue;
+            }
+            if (normalizedPath.getFileName().toString().startsWith("blob_")) {
+                miscFiles.add(sstFile);
                 continue;
             }
             if (localPath.endsWith("/")) {

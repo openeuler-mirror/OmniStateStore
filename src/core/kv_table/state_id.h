@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
  * You can use this software according to the terms and conditions of the Mulan PSL v2.
  * You may obtain a copy of Mulan PSL v2 at:
  *          http://license.coscl.org.cn/MulanPSL2
@@ -27,7 +27,7 @@ struct StateId {
 
     inline static uint16_t Of(uint32_t seq, StateType type)
     {
-        return (seq & 0x7FF) | static_cast<uint32_t>(type) << NO_11;  // todo: NO_13
+        return (seq & 0x1FFF) | static_cast<uint32_t>(type) << NO_13;
     }
 
     inline bool operator==(const StateId &other) const
@@ -37,7 +37,7 @@ struct StateId {
 
     inline static StateType GetStateType(uint16_t stateId)
     {
-        return static_cast<StateType>((stateId >> NO_11) & 0x7);
+        return static_cast<StateType>((stateId >> NO_13) & 0x7);
     }
 
     inline static bool HasSecKey(uint16_t stateId)

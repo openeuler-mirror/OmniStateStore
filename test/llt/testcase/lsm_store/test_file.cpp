@@ -29,7 +29,7 @@ std::vector<std::pair<SliceKey, Value>> TestFile::GenerateKeyValue(uint64_t size
     std::set<uint32_t> prKeyHash;
     while (currentSize < size) {
         // state id;
-        uint16_t stateId = VALUE << NO_11;
+        uint16_t stateId = VALUE << NO_13;
 
         SliceKey sglKey = mGenerator->GenerateSglKey(NO_10, stateId);
         Value value = mGenerator->GenerateValue(NO_1024, mSeqGenerator->Next());
@@ -64,7 +64,7 @@ std::vector<std::pair<SliceKey, Value>> TestFile::GenerateListKeyValue(uint64_t 
     std::vector<std::pair<SliceKey, Value>> result;
     while (currentSize < size) {
         // state id;
-        uint16_t stateId = LIST << NO_11;
+        uint16_t stateId = LIST << NO_13;
 
         SliceKey sglKey = mGenerator->GenerateSglKey(NO_10, stateId);
         // 2、生成value

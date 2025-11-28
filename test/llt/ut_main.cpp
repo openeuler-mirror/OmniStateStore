@@ -66,3 +66,39 @@ void CleanupSstFiles()
         closedir(dirp);
     }
 }
+
+void CleanupBlobFiles()
+{
+    std::string currentDir = GetCurrentWorkingDirectory();
+    std::string currentBlobDir = currentDir + "/blobFile";
+    DIR *dirp = opendir(currentBlobDir.c_str());
+    if (dirp) {
+        struct dirent *entry;
+        while ((entry = readdir(dirp)) != nullptr) {
+            std::string fileName = entry->d_name;
+            if (fileName.find("sst") != std::string::npos) {
+                std::string filePath = currentBlobDir + "/" + fileName;
+                remove(filePath.c_str());
+            }
+        }
+        closedir(dirp);
+    }
+}
+
+void CleanupTombstoneFiles()
+{
+    std::string currentDir = GetCurrentWorkingDirectory();
+    std::string currentBlobDir = currentDir + "/blobFile";
+    DIR *dirp = opendir(currentBlobDir.c_str());
+    if (dirp) {
+        struct dirent *entry;
+        while ((entry = readdir(dirp)) != nullptr) {
+            std::string fileName = entry->d_name;
+            if (fileName.find("sst") != std::string::npos) {
+                std::string filePath = currentBlobDir + "/" + fileName;
+                remove(filePath.c_str());
+            }
+        }
+        closedir(dirp);
+    }
+}

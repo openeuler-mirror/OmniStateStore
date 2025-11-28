@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
  * You can use this software according to the terms and conditions of the Mulan PSL v2.
  * You may obtain a copy of Mulan PSL v2 at:
  *          http://license.coscl.org.cn/MulanPSL2
@@ -31,10 +31,13 @@
 #include "include/bss_types.h"
 #include "include/config.h"
 #include "lsm_store/key/full_key_filter.h"
+#include "memory/skiplist.h"
 #include "order_range.h"
 #include "sections_read_meta.h"
 #include "snapshot/abstract_snapshot_operator.h"
+#include "transform/pq_iterator.h"
 #include "version/version_set.h"
+#include "tombstone/tombstone_service.h"
 
 namespace ock {
 namespace bss {
@@ -146,19 +149,12 @@ public:
                                      FileProcHolder::FILE_STORE_SAVEPOINT);
     }
 
-    KeyValueIteratorRef Iterator()
+    KeyValueIteratorRef Iterator(uint16_t stateId)
     {
         FileProcHolder holder = FileProcHolder::FILE_STORE_ITERATOR;
         VersionPtr current = CurrentVersion();
-        auto filesGetter = [](Level level) -> std::vector<FileMetaDataRef> {
-            auto groups = level.GetFileMetaDataGroups();
-            std::vector<FileMetaDataRef> result;
-            for (auto &group : groups) {
-                for (auto &fileMetaData : group->GetFiles()) {
-                    result.push_back(fileMetaData);
-                }
-            }
-            return result;
+        auto filesGetter = [stateId](Level level) -> std::vector<FileMetaDataRef> {
+            return level.GetFilesContainingStateId(stateId);
         };
         auto buildFunc = [this, holder](const FileMetaDataRef &fileMetaData) -> KeyValueIteratorRef {
             FullKeyFilterRef keyFilter = IsGroupAndOrderRangeAligned() ?
@@ -172,7 +168,31 @@ public:
         return CreateMergingIterator(current, fileIteratorBuilder, filesGetter, false);
     }
 
+    KeyValueIteratorRef IteratorForPQ(uint32_t stateId, const BinaryData &data)
+
+    {
+        VersionPtr current = GetCurrentVersion();
+        auto buildFunc = [this, stateId, data](const FileMetaDataRef &fileMetaData) -> KeyValueIteratorRef {
+            FileProcHolder holder = FileProcHolder::FILE_STORE_ITERATOR;
+            FullKeyFilterRef keyFilter = IsGroupAndOrderRangeAligned() ?
+                                             std::static_pointer_cast<FullKeyFilter>(mStateFilterManager) :
+                                             std::make_shared<FileMetaStateFilter>(fileMetaData->GetGroupRange(),
+                                                                                   fileMetaData->GetOrderRange(),
+                                                                                   mStateFilterManager);
+            Key prefixKey = QueryKey(stateId, HashCode::Hash(data.Data(), data.Length()), data);
+            return mFileCache->PrefixIterator(keyFilter, fileMetaData->GetFileAddress(), prefixKey, false, holder);
+        };
+        auto fileIteratorBuilder = InputSortedRun::FileIteratorWriter::Of(buildFunc);
+
+        auto filesGetter = [stateId, current](Level level) -> std::vector<FileMetaDataRef> {
+            return level.GetFilesContainingStateId(stateId);
+        };
+        return CreateMergingIterator(current, fileIteratorBuilder, filesGetter, false);
+    }
+
     BResult Put(const IteratorRef<std::vector<DataSliceRef>> &dataSliceVectorIterator);
+
+    BResult Put(const PQTableIteratorRef &iterator);
 
     BResult Get(const Key &key, std::deque<Value> &values, SectionsReadMetaRef &sectionsReadMeta, bool flag);
 
@@ -250,7 +270,9 @@ public:
         VersionPtr current = GetCurrentVersion();
         mSnapshotVersions.emplace(snapshotId, current);
         LOG_DEBUG("FileStore version, checkpointId:" << snapshotId << ", version info:" << current->ToString());
-
+        if (mTombstoneService != nullptr) {
+            mTombstoneService->TriggerSnapshot(snapshotId);
+        }
         // 2. 查找当前version下的所有文件信息.
         auto fileMetaDatas = current->GetFileMetaDatas();
         std::unordered_map<std::string, std::pair<uint64_t, uint64_t>> result(fileMetaDatas.size());
@@ -287,6 +309,12 @@ public:
     BResult GetByReadSection(uint64_t fileAddress, Key &key, Value &value);
 
     void ReleaseVersionFinally(VersionPtr &version);
+
+    void RegisterTombstoneService(TombstoneServiceRef &tombstoneService)
+    {
+        mTombstoneService = tombstoneService;
+        LOG_INFO("Register tombstone service success");
+    }
 
 private:
     BResult InitializeCompaction();
@@ -326,6 +354,8 @@ private:
 
     BResult BuildLsmStoreFlushFile(const IteratorRef<std::vector<DataSliceRef>> &dataSliceVectorIterator,
                                    FileMetaDataRef &fileMetaData, bool &flag);
+
+    BResult BuildLsmStoreFlushFile(const PQTableIteratorRef &iter, FileMetaDataRef &fileMetaData);
 
     inline void NotifyStop() override
     {
@@ -416,6 +446,7 @@ private:
         }
     }
 
+    void CreateVersion(const FileMetaDataRef &fileMetaData);
 private:
     FileStoreIDRef mFileStoreID = nullptr;
     ConfigRef mConf = nullptr;
@@ -439,6 +470,7 @@ private:
     uint32_t mSeqId = 0;
     std::unordered_map<std::string, RestoreFileInfo> mRestoredFileMapping;
     BoostNativeMetricPtr mBoostNativeMetric = nullptr;
+    TombstoneServiceRef mTombstoneService = nullptr;
 };
 
 }  // namespace bss

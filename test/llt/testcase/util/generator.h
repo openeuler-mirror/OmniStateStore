@@ -95,7 +95,7 @@ public:
         priKeyBuffer->Write(priKeyData, priKeyLen);
         BinaryData prikey(priKeyBuffer->Data(), priKeyLen);
         uint32_t KeyHashCode = test::HashForTest(priKeyData, priKeyLen);
-        uint16_t stateId = MAP << NO_11;
+        uint16_t stateId = MAP << NO_13;
         // secondary key.
         uint8_t *secKeyData = new uint8_t[secKeyLen];
         for (uint32_t i = 0; i < secKeyNum; ++i) {
@@ -142,7 +142,7 @@ public:
         uint32_t priKeyHashCode = test::HashForTest(priKeyData, priKeyLen);
 
         // state id;
-        uint16_t stateId = MAP << NO_11;
+        uint16_t stateId = MAP << NO_13;
 
         // prepare dual key.
         BinaryData priKey(priKeyBuffer->Data(), priKeyLen);
@@ -164,7 +164,7 @@ public:
         ByteBufferRef secKeyBuffer = MakeRef<ByteBuffer>(secKeyLen, MemoryType::SLICE_TABLE, mMemManager);
         secKeyBuffer->Write(secKeyData, secKeyLen);
         // state id;
-        uint16_t stateId = MAP << NO_11;
+        uint16_t stateId = MAP << NO_13;
         uint32_t c = index & 0x3FF;
         std::random_device rd;
         std::mt19937 gen(rd());

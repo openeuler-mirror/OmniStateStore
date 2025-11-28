@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
  * You can use this software according to the terms and conditions of the Mulan PSL v2.
  * You may obtain a copy of Mulan PSL v2 at:
  *          http://license.coscl.org.cn/MulanPSL2
@@ -14,12 +14,13 @@
 
 #include <functional>
 
-#include "include/config.h"
+#include "blob_store/blob_file_meta.h"
 #include "file_cache_type.h"
 #include "file_directory.h"
 #include "file_info.h"
 #include "file_manager.h"
 #include "file_meta_data.h"
+#include "include/config.h"
 #include "lazy/lazy_download_strategy.h"
 #include "lazy/restore_file_info.h"
 #include "primary_address.h"
@@ -47,14 +48,14 @@ public:
         std::unordered_map<std::string, PrimaryAddressRef>().swap(mRestoredFileIdentifierMapping);
     }
 
-    void Init(BoostNativeMetricPtr& metricPtr)
+    void Init(BoostNativeMetricPtr *metricPtrAddr)
     {
         // 此处循环引用,需要手动置空
         auto self = shared_from_this();
         std::function<bool(uint64_t)> function = [self](uint64_t address) { return self->IsFileInCompaction(address); };
         mLazyDownloadStrategy = std::make_shared<LazyDownloadRestore>(mLocalFileManager, mIoExecutor,
                                                                       mPrimaryFileManager, function);
-        mLazyDownloadStrategy->RegisterLazyDownloadMetric(metricPtr);
+        mLazyDownloadStrategy->RegisterLazyDownloadMetric(metricPtrAddr);
     }
 
     void Close()
@@ -69,7 +70,14 @@ public:
         return mLocalFileManager->AllocateFile(fileDirectory, fileNameGenerator);
     }
 
-    inline void ConfirmAllocationOnFlushOrCompaction(const std::vector<FileMetaDataRef> &fileMetaDatas) const
+    inline FileInfoRef AllocatePrefixFile(const std::string &prefix, const FileDirectoryRef &fileDirectory,
+                                const std::function<std::string(std::string)> &fileNameGenerator) const
+    {
+        return mLocalFileManager->AllocatePrefixFile(prefix, fileDirectory, fileNameGenerator);
+    }
+
+    template <class T>
+    inline void ConfirmAllocationOnFlushOrCompaction(const std::vector<std::shared_ptr<T>> &fileMetaDatas) const
     {
         for (const auto &item : fileMetaDatas) {
             auto primaryAddress = std::make_shared<PrimaryAddress>(item->GetFileAddress(),
@@ -83,7 +91,8 @@ public:
         return mLocalFileManager->GetBasePath();
     }
 
-    inline void ReleaseFilesForCompaction(const std::vector<FileMetaDataRef> &fileMetaList)
+    template <class T>
+    inline void ReleaseFilesForCompaction(const std::vector<std::shared_ptr<T>> &fileMetaList)
     {
         std::lock_guard<std::mutex> lk(mCompactionLock);
         for (auto &metaData : fileMetaList) {
@@ -101,7 +110,8 @@ public:
         mPrimaryFileManager->DecPrimaryAddressRef(fileAddress);
     }
 
-    void RegisterFilesForCompaction(std::vector<FileMetaDataRef> &fileMetaList)
+    template <class T>
+    void RegisterFilesForCompaction(std::vector<std::shared_ptr<T>> &fileMetaList)
     {
         std::lock_guard<std::mutex> lk(mCompactionLock);
         for (auto &metaData : fileMetaList) {
@@ -125,6 +135,23 @@ public:
         FileDirectoryRef subDir = std::make_shared<FileDirectory>(GetPrimaryDataBasePath());
         auto ret = subDir->CreateDirInFileSystem();
         if (UNLIKELY(!ret)) {
+            return nullptr;
+        }
+        RETURN_NULLPTR_AS_NULLPTR(subDir->GetDirectoryPath());
+        LOG_INFO("Create file directory success, path:" << subDir->GetDirectoryPath()->ExtractFileName());
+        return subDir;
+    }
+
+    inline FileDirectoryRef CreateFileSubDirectory(const std::string &name) const
+    {
+        auto basePath = GetPrimaryDataBasePath();
+        RETURN_NULLPTR_AS_NULLPTR(basePath);
+        auto subFile = basePath->Name() + "/" + name;
+        PathRef subPath = std::make_shared<Path>(subFile);
+        FileDirectoryRef subDir = std::make_shared<FileDirectory>(subPath);
+        auto ret = subDir->CreateDirInFileSystem();
+        if (UNLIKELY(!ret)) {
+            LOG_ERROR("Create file directory failed, path:" << subPath->ExtractFileName());
             return nullptr;
         }
         LOG_INFO("Create file directory success, path:" << subDir->GetDirectoryPath()->ExtractFileName());
@@ -165,7 +192,6 @@ public:
     {
         mLazyDownloadStrategy->StartDownload(mFileHolders);
     }
-
 private:
     BResult RestoreFromLocal(const std::string &fileName, const RestoreFileInfo &restoreInfo);
 

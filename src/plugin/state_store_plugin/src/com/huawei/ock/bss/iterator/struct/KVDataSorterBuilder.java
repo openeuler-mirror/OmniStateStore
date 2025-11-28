@@ -24,8 +24,11 @@ import org.apache.flink.api.common.typeutils.TypeSerializer;
 import org.apache.flink.api.common.typeutils.base.ListSerializer;
 import org.apache.flink.api.common.typeutils.base.MapSerializer;
 import org.apache.flink.core.fs.Path;
+import org.apache.flink.runtime.state.CompositeKeySerializationUtils;
 import org.apache.flink.runtime.state.KeyGroupRange;
 import org.apache.flink.runtime.state.RegisteredKeyValueStateBackendMetaInfo;
+import org.apache.flink.runtime.state.RegisteredPriorityQueueStateBackendMetaInfo;
+import org.apache.flink.runtime.state.RegisteredStateMetaInfoBase;
 import org.apache.flink.runtime.state.StateSnapshotTransformer;
 import org.apache.flink.util.Preconditions;
 import org.slf4j.Logger;
@@ -56,6 +59,8 @@ public class KVDataSorterBuilder<K> {
 
     private final Map<String, FullBoostSnapshotResources.KvMetaData> kvStateMetaDataMap;
 
+    private final int keyGroupPrefixBytes;
+
     public KVDataSorterBuilder(int totalKeyGroups, KeyGroupRange keyGroupRange, TypeSerializer<K> keySerializer,
         SavepointConfiguration savepointConfiguration,
         Map<String, FullBoostSnapshotResources.KvMetaData> kvStateMetaDataMap, SavepointDBResult savepointDBResult) {
@@ -64,6 +69,7 @@ public class KVDataSorterBuilder<K> {
         this.kvStateMetaDataMap = kvStateMetaDataMap;
         this.savepointDBResult = savepointDBResult;
         this.binaryDataBuilder = new BinaryDataBuilder<>(keySerializer, totalKeyGroups);
+        this.keyGroupPrefixBytes = CompositeKeySerializationUtils.computeRequiredBytesInKeyGroupPrefix(totalKeyGroups);
     }
 
     /**
@@ -132,7 +138,7 @@ public class KVDataSorterBuilder<K> {
         }
 
         BoostStateType stateType = binaryKeyValueItem.getStateType();
-        RegisteredKeyValueStateBackendMetaInfo<?, ?> metaInfo = kvMetaData.metaInfo;
+        RegisteredStateMetaInfoBase metaInfo = kvMetaData.metaInfo;
 
         byte[] key = buildKey(binaryKeyValueItem, stateType, metaInfo);
         binaryValue = buildValue(binaryValue, stateType, metaInfo);
@@ -146,27 +152,30 @@ public class KVDataSorterBuilder<K> {
     }
 
     private byte[] buildKey(BinaryKeyValueItem binaryKeyValueItem, BoostStateType stateType,
-        RegisteredKeyValueStateBackendMetaInfo<?, ?> metaInfo) throws IOException {
-        int keyGroup = binaryKeyValueItem.getKeyGroup();
+        RegisteredStateMetaInfoBase metaInfo) throws IOException {
         byte[] binaryKey = binaryKeyValueItem.getKey();
-
+        if (metaInfo instanceof RegisteredPriorityQueueStateBackendMetaInfo) {
+            return binaryKey;
+        }
+        int keyGroup = binaryKeyValueItem.getKeyGroup();
+        RegisteredKeyValueStateBackendMetaInfo<?, ?> kvMeta = (RegisteredKeyValueStateBackendMetaInfo<?, ?>) metaInfo;
         switch (stateType) {
             case VALUE:
             case LIST:
                 return this.binaryDataBuilder.formatValueAndListKey(keyGroup, binaryKey);
             case MAP:
-                return this.binaryDataBuilder.formatMapKey(keyGroup, binaryKey, getUserKeySerializer(metaInfo),
+                return this.binaryDataBuilder.formatMapKey(keyGroup, binaryKey, getUserKeySerializer(kvMeta),
                     binaryKeyValueItem.getMapKey());
 
             case SUB_VALUE:
             case SUB_LIST:
-                return this.binaryDataBuilder.formatValueAndListKey(keyGroup, binaryKey, metaInfo
+                return this.binaryDataBuilder.formatValueAndListKey(keyGroup, binaryKey, kvMeta
 
                     .getNamespaceSerializer(), binaryKeyValueItem.getNamespace());
             case SUB_MAP:
-                return this.binaryDataBuilder.formatNSMapKey(keyGroup, binaryKey, metaInfo
+                return this.binaryDataBuilder.formatNSMapKey(keyGroup, binaryKey, kvMeta
 
-                        .getNamespaceSerializer(), binaryKeyValueItem.getNamespace(), getUserKeySerializer(metaInfo),
+                        .getNamespaceSerializer(), binaryKeyValueItem.getNamespace(), getUserKeySerializer(kvMeta),
                     binaryKeyValueItem.getMapKey());
         }
 
@@ -174,17 +183,21 @@ public class KVDataSorterBuilder<K> {
     }
 
     private byte[] buildValue(byte[] value, BoostStateType stateType,
-        RegisteredKeyValueStateBackendMetaInfo<?, ?> metaInfo) throws IOException {
+        RegisteredStateMetaInfoBase metaInfo) throws IOException {
+        if (!(metaInfo instanceof RegisteredKeyValueStateBackendMetaInfo)) {
+            return new byte[0];
+        }
+        RegisteredKeyValueStateBackendMetaInfo<?, ?> kvMeta = (RegisteredKeyValueStateBackendMetaInfo<?, ?>) metaInfo;
         switch (stateType) {
             case VALUE:
             case SUB_VALUE:
                 return value;
             case LIST:
             case SUB_LIST:
-                return this.binaryDataBuilder.formatListValue(getElementSerializer(metaInfo), value);
+                return this.binaryDataBuilder.formatListValue(getElementSerializer(kvMeta), value);
             case MAP:
             case SUB_MAP:
-                return this.binaryDataBuilder.formatUserValueForMapState(getUserValueSerializer(metaInfo), value);
+                return this.binaryDataBuilder.formatUserValueForMapState(getUserValueSerializer(kvMeta), value);
         }
         throw new UnsupportedOperationException("Unsupported state type " + stateType);
     }

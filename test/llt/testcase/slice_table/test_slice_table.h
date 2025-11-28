@@ -133,7 +133,7 @@ public:
     KVPair PrepareKvPairForKv(uint32_t seed)
     {
         // state id;
-        uint16_t stateId = VALUE << NO_11;
+        uint16_t stateId = VALUE << NO_13;
 
         SliceKey sglKey = mGenerator->GenerateSglKey(NO_10, stateId);
         Value value = mGenerator->GenerateValue(NO_1024);

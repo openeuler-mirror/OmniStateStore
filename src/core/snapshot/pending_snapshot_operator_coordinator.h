@@ -12,9 +12,10 @@
 #ifndef BOOST_SS_PENDING_SNAPSHOT_OPERATOR_COORDINATOR_H
 #define BOOST_SS_PENDING_SNAPSHOT_OPERATOR_COORDINATOR_H
 
-#include "include/config.h"
 #include "fresh_table/fresh_table.h"
+#include "include/config.h"
 #include "lsm_store/file/file_manager.h"
+#include "pq_table.h"
 #include "snapshot_operator_coordinator.h"
 #include "snapshot_stat.h"
 
@@ -30,21 +31,29 @@ public:
                                        const PathRef &localSnapshotPath, const FileManagerRef &localFileManager,
                                        const FileManagerRef &remoteFileManager, const ConfigRef &config,
                                        const FreshTableRef &freshTable, const SliceTableManagerRef &sliceTable,
-                                       const MemManagerRef &memManager)
+                                       const MemManagerRef &memManager, const std::vector<PQTableRef> &pqTable)
 
         : mSnapshotId(snapshotId), mStartKeyGroup(startKeyGroup), mEndKeyGroup(endKeyGroup), mSeqId(seqId),
           mStateIdProvider(stateIdProvider), mLocalSnapshotPath(localSnapshotPath), mLocalFileManager(localFileManager),
           mRemoteFileManager(localFileManager), mConfig(config), mFreshTable(freshTable), mSliceTable(sliceTable),
-          mSnapshotStat(std::make_shared<SnapshotStat>()), mMemManager(memManager)
+          mSnapshotStat(std::make_shared<SnapshotStat>()), mMemManager(memManager), mPqTables(pqTable)
     {
     }
 
     BResult Start() override;
 
+    BResult DoBlobStoreSnapshot();
+
     void RegisterSnapshotOperator(const AbstractSnapshotOperatorRef &snapshotOperator) override
     {
         std::lock_guard<std::mutex> lock(mMutex);
         mRegisteredSnapshotOperators.emplace(snapshotOperator->GetOperatorId(), snapshotOperator);
+    }
+
+    void UnregisterSnapshotOperator(const AbstractSnapshotOperatorRef &snapshotOperator) override
+    {
+        std::lock_guard<std::mutex> lock(mMutex);
+        mRegisteredSnapshotOperators.erase(snapshotOperator->GetOperatorId());
     }
 
     std::map<uint32_t, AbstractSnapshotOperatorRef> GetRegisterSnapshotOperator() override
@@ -139,6 +148,7 @@ private:
     SliceTableManagerRef mSliceTable = nullptr;
     SnapshotStatRef mSnapshotStat = nullptr;
     MemManagerRef mMemManager = nullptr;
+    std::vector<PQTableRef> mPqTables;
 };
 using PendingSnapshotOperatorCoordinatorRef = Ref<PendingSnapshotOperatorCoordinator>;
 

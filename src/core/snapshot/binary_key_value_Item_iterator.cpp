@@ -11,12 +11,23 @@
 
 #include "binary_key_value_Item_iterator.h"
 
+#include "blob_store.h"
+
 namespace ock {
 namespace bss {
 bool BinaryKeyValueItemIterator::HasNext()
 {
     Advance();
-    return (mCurrentItem != nullptr);
+    if (mCurrentItem == nullptr) {
+        return false;
+    }
+    auto keyValue = mCurrentItem->mKeyValue;
+    if (UNLIKELY(!BlobStore::ToBlobValue(keyValue->key, keyValue->value, mTransFunc))) {
+        LOG_ERROR("Get value from blob failed, KeyHashCode: " << keyValue->key.KeyHashCode());
+        return false;
+    }
+    mCurrentItem->SetValue(const_cast<uint8_t *>(keyValue->value.ValueData()), keyValue->value.ValueLen());
+    return true;
 }
 
 BinaryKeyValueItemRef BinaryKeyValueItemIterator::Next()
@@ -71,6 +82,7 @@ void BinaryKeyValueItemIterator::BuildKey(const Key &key, const std::string &sta
     auto primaryKey = key.PriKey();
     uint32_t keyLen = primaryKey.RealKeyLen();
     switch (stateType) {
+        case StateType::PQ:
         case StateType::VALUE:
         case StateType::LIST:
         case StateType::MAP:

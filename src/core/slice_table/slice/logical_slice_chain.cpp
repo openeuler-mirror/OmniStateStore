@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
  * You can use this software according to the terms and conditions of the Mulan PSL v2.
  * You may obtain a copy of Mulan PSL v2 at:
  *          http://license.coscl.org.cn/MulanPSL2
@@ -10,6 +10,7 @@
  */
 
 #include "logical_slice_chain.h"
+#include "blob_store/blob_store.h"
 #include "common/bss_log.h"
 
 namespace ock {
@@ -37,12 +38,6 @@ BResult LogicalSliceChainImpl::Initialize(
 {
     if (UNLIKELY(logicalSliceChain == nullptr)) {
         LOG_ERROR("Input current logical slice chain is nullptr.");
-        return BSS_INVALID_PARAM;
-    }
-    if (UNLIKELY(static_cast<int32_t>(logicalSliceChain->GetBaseSliceIndex()) < startIndex)) {
-        LOG_ERROR("Verify logical slice chain invalid range failed, baseSliceIndex:"
-                  << logicalSliceChain->GetBaseSliceIndex() << ", startIndex:" << startIndex
-                  << ", endIndex:" << endIndex);
         return BSS_INVALID_PARAM;
     }
 
@@ -91,7 +86,8 @@ BResult LogicalSliceChainImpl::Initialize(
     return BSS_OK;
 }
 
-IORsult LogicalSliceChainImpl::Get(const Key &key, Value &value, BoostNativeMetricPtr &metricPtr)
+IOResult LogicalSliceChainImpl::Get(const Key &key, Value &value, BlobValueTransformFunc getFromBlobFunc,
+    BoostNativeMetricPtr &metricPtr)
 {
     bool found;
     // 1. get from slice chain.
@@ -119,7 +115,8 @@ IORsult LogicalSliceChainImpl::Get(const Key &key, Value &value, BoostNativeMetr
                 value.Init(DELETE, 0, nullptr, value.SeqId(), nullptr);
                 return SLICE_FOUND_DELETE;
             }
-            return SLICE_FOUND;
+            auto findBlobValue = BlobStore::ToBlobValue(key, value, getFromBlobFunc);
+            return findBlobValue ? SLICE_FOUND : NOT_FOUND;
         }
     }
     if (metricPtr != nullptr && metricPtr->IsSliceMetricEnabled()) {
@@ -130,7 +127,8 @@ IORsult LogicalSliceChainImpl::Get(const Key &key, Value &value, BoostNativeMetr
     for (const auto &filePage : mFilePage) {
         found = filePage->Get(key, value);
         if (found) {
-            return LSM_FOUND;
+            auto findBlobValue = BlobStore::ToBlobValue(key, value, getFromBlobFunc);
+            return findBlobValue ? LSM_FOUND : NOT_FOUND;
         }
     }
     return NOT_FOUND;

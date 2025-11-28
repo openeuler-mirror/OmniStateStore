@@ -89,11 +89,16 @@ public class BoostStateDownloader extends BoostStateDataTransfer {
         }
 
         for (Map.Entry<StateHandleID, StreamStateHandle> entry : sstFiles.entrySet()) {
-            String localPath = dest.resolve(entry.getKey().toString()).normalize().toUri().getPath();
+            Path normalizedPath = dest.resolve(entry.getKey().toString()).normalize();
+            String localPath = normalizedPath.toUri().getPath();
             if (localPath.endsWith("slice")) {
                 if (isLazyRestore) {
                     miscFiles.put(entry.getKey(), entry.getValue());
                 }
+                continue;
+            }
+            if (normalizedPath.getFileName().toString().startsWith("blob_")) {
+                miscFiles.put(entry.getKey(), entry.getValue());
                 continue;
             }
             if (localPath.endsWith("/")) {

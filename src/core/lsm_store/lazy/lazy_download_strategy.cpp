@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
  * You can use this software according to the terms and conditions of the Mulan PSL v2.
  * You may obtain a copy of Mulan PSL v2 at:
  *          http://license.coscl.org.cn/MulanPSL2
@@ -57,9 +57,7 @@ void LazyDownloadRestore::BatchDownloadThenMigrate(std::vector<FileHolderRef> &f
     if (mStopped.load()) {
         LOG_INFO("No need to lazy download files.");
         NotifyStop(fileHolders);
-        if (mBoostNativeMetric != nullptr && mBoostNativeMetric->IsRestoreMetricEnabled()) {
-            mBoostNativeMetric->SetLazyDownloadTime(0);
-        }
+        UpdateMetric();
         return;
     }
     {
@@ -68,15 +66,7 @@ void LazyDownloadRestore::BatchDownloadThenMigrate(std::vector<FileHolderRef> &f
         if (mWaitingDownload.empty()) {
             mStopped.store(true, std::memory_order_relaxed);
             NotifyStop(fileHolders);
-            if (mBoostNativeMetric != nullptr && mBoostNativeMetric->IsRestoreMetricEnabled()) {
-                mLazyDownloadEndTime = std::chrono::duration_cast<std::chrono::milliseconds>(
-                                           std::chrono::system_clock::now().time_since_epoch())
-                                           .count();
-                if (mLazyDownloadEndTime > mLazyDownloadStartTime) {
-                    mBoostNativeMetric->SetLazyDownloadTime(mLazyDownloadEndTime - mLazyDownloadStartTime);
-                }
-                mBoostNativeMetric->SetLazyDownloadTime(0);
-            }
+            UpdateMetric();
             LOG_INFO("Finish lazy download all files.");
             return;
         }
@@ -153,6 +143,24 @@ void LazyDownloadRestore::DoDownloadFile(std::vector<std::tuple<FileInfoRef, Res
         }
         LOG_ERROR("Download remote file fail:" << PathTransform::ExtractFileName(restoreInfo.remoteFileName));
         ++item;
+    }
+}
+
+void LazyDownloadRestore::UpdateMetric()
+{
+    if (UNLIKELY(mMetricPtrAddr == nullptr)) {
+        LOG_WARN("Metric pointer address is nullptr.");
+        return;
+    }
+    if ((*mMetricPtrAddr) != nullptr && (*mMetricPtrAddr)->IsRestoreMetricEnabled()) {
+        mLazyDownloadEndTime = std::chrono::duration_cast<std::chrono::milliseconds>(
+                                   std::chrono::system_clock::now().time_since_epoch())
+                                   .count();
+        if (mLazyDownloadEndTime > mLazyDownloadStartTime) {
+            (*mMetricPtrAddr)->SetLazyDownloadTime(mLazyDownloadEndTime - mLazyDownloadStartTime);
+        } else {
+            (*mMetricPtrAddr)->SetLazyDownloadTime(0);
+        }
     }
 }
 

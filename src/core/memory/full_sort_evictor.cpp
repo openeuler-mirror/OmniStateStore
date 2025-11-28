@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
  * You can use this software according to the terms and conditions of the Mulan PSL v2.
  * You may obtain a copy of Mulan PSL v2 at:
  *          http://license.coscl.org.cn/MulanPSL2
@@ -58,9 +58,9 @@ BResult FullSortEvictor::Initialize(uint32_t evictMinSize, const BucketGroupMana
     }
 
     mService = std::make_shared<ExecutorService>(NO_1, NO_100);
-    mService->SetThreadName("SliceTableEvictor");
+    mService->SetThreadName("SliceEvictExecutor");
     if (!mService->Start()) {
-        LOG_ERROR("failed to start executor!");
+        LOG_ERROR("Failed to start slice evict executor!");
         return BSS_ERR;
     }
 
@@ -339,7 +339,8 @@ BResult FullSortEvictor::InitFlushQueues()
         if (mFlushQueueForBucketGroupMap.find(bucketGroup) == mFlushQueueForBucketGroupMap.end()) {
             // 新建
             FlushQueueForBucketGroupRef flushQueue = std::make_shared<FlushQueueForBucketGroup>();
-            flushQueue->Initialize(shared_from_this(), mService, bucketGroup, mBoostNativeMetric);
+            // 此时mBoostNativeMetric还未被注册，需要传递该指针的地址来保证flushQueue调用mBoostNativeMetric时能够调用到对象
+            flushQueue->Initialize(shared_from_this(), mService, bucketGroup, &mBoostNativeMetric);
             mFlushQueueForBucketGroupMap[bucketGroup] = flushQueue;
         }
     }
@@ -349,7 +350,7 @@ BResult FullSortEvictor::InitFlushQueues()
 BResult FullSortEvictor::FlushQueueForBucketGroup::Initialize(const FullSortEvictorRef &fullSortEvictor,
                                                               const ExecutorServicePtr &service,
                                                               const BucketGroupRef &bucketGroup,
-                                                              BoostNativeMetricPtr &metricPtr)
+                                                              BoostNativeMetricPtr *metricPtrAddr)
 {
     if (fullSortEvictor == nullptr) {
         LOG_ERROR("fullSortEvictor is nullptr");
@@ -366,7 +367,7 @@ BResult FullSortEvictor::FlushQueueForBucketGroup::Initialize(const FullSortEvic
     mBucketGroup = bucketGroup;
     mService = service;
     mFullSortEvictor = fullSortEvictor;
-    mQueueNativeMetric = metricPtr;
+    mMetricPtrAddr = metricPtrAddr;
     return BSS_OK;
 }
 
@@ -374,9 +375,10 @@ bool FullSortEvictor::FlushQueueForBucketGroup::SubmitJob(std::vector<SliceScore
                                                           const FullSortEvictorRef &fullSortEvictor,
                                                           bool isSync)
 {
+    BoostNativeMetricPtr metricPtr = mMetricPtrAddr == nullptr ? nullptr : *mMetricPtrAddr;
     RunnablePtr bucketGroupFlushTask =
         std::make_shared<BucketGroupFlushTask>(entryList, mBucketGroup->GetBucketGroupId(), fullSortEvictor,
-                                               shared_from_this(), mBucketGroup->GetLsmStore());
+                                               shared_from_this(), mBucketGroup->GetLsmStore(), metricPtr);
     if (isSync) {
         bucketGroupFlushTask->Run();  // 直接在当前线程上下文中同步执行.
         return true;

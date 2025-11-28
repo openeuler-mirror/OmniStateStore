@@ -9,6 +9,7 @@ set(DEPEND_LIBS
         slice_table
         bss_memory
         bss_db
+        blob_store
         bss_kv_table
         snapshot
         lsm_store

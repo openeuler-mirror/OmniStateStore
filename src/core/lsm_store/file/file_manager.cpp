@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
  * You can use this software according to the terms and conditions of the Mulan PSL v2.
  * You may obtain a copy of Mulan PSL v2 at:
  *          http://license.coscl.org.cn/MulanPSL2
@@ -31,6 +31,21 @@ FileInfoRef FileManager::AllocateFile(const FileDirectoryRef &fileDirectory,
     return AllocateFile(fileId, path, true);
 }
 
+FileInfoRef FileManager::AllocatePrefixFile(const std::string &prefix, const FileDirectoryRef &fileDirectory,
+                                            const std::function<std::string(std::string)> &fileNameGenerator)
+{
+    FileIdRef fileId = mFileIdGenerator->Generate();
+    if (UNLIKELY(fileId == nullptr)) {
+        return nullptr;
+    }
+    std::ostringstream suffixOss;
+    suffixOss << prefix << mBackendUid << "_" << mFileSuffix.fetch_add(1);
+    std::string prefixName = suffixOss.str();
+    Uri uri(fileNameGenerator(prefixName));
+    PathRef path = std::make_shared<Path>(fileDirectory->GetDirectoryPath(), std::make_shared<Path>(uri));
+    return AllocateFile(fileId, path, true);
+}
+
 FileInfoRef FileManager::AllocateFile(const FileIdRef &fileId, const PathRef &path, bool canDelete)
 {
     if (UNLIKELY(fileId == nullptr)) {
@@ -48,7 +63,7 @@ FileInfoRef FileManager::AllocateFile(const FileIdRef &fileId, const PathRef &pa
     // 2. 创建新的文件.
     FileMetaRef fileMeta = std::make_shared<FileMeta>(path, fileId, canDelete);
     fileMeta->AddDbRef(1);
-    LOG_DEBUG("add new fileId to file mapping:" << fileId->Get());
+    LOG_DEBUG("Add new fileId to file mapping:" << fileId->Get() << ", path:" << path->ExtractFileName());
     mFileMapping.emplace(fileId->Get(), fileMeta);  // 将创建出来的文件放到fileMapping中进行管理.
     return std::make_shared<FileInfo>(path, fileId);
 }
@@ -150,7 +165,8 @@ void FileManager::DeleteFiles(const std::vector<FileMetaRef> &deleteFiles)
     }
 }
 
-BResult FileManager::StartRestore(const std::vector<SnapshotFileMappingRef> &restoredFileMappings)
+BResult FileManager::StartRestore(const std::vector<SnapshotFileMappingRef> &restoredFileMappings,
+    bool isExcludeSSTFiles)
 {
     WriteLocker<ReadWriteLock> lk(&mRwLock);
     RETURN_NOT_OK(CheckCloseStatus());
@@ -164,17 +180,36 @@ BResult FileManager::StartRestore(const std::vector<SnapshotFileMappingRef> &res
         return BSS_ERR;
     }
 
+    RETURN_NOT_OK(RestoreFileMapping(restoredFileMappings, isExcludeSSTFiles));
+    LOG_DEBUG("Restore file manager success, working path:" << mWorkingBasePath->ExtractFileName());
+    return BSS_OK;
+}
+
+BResult FileManager::RestoreFileMapping(const std::vector<SnapshotFileMappingRef> &restoredFileMappings,
+    bool isExcludeSSTFiles)
+{
     mRestoreState = RestoreState::RESTORING;
     for (const SnapshotFileMappingRef &mapping : restoredFileMappings) {
         PathRef restoredBasePath = mapping->GetBasePath();
+        PathRef currentBlobPath = std::make_shared<Path>(restoredBasePath->Name() + "/blobFile");
         bool canDeleted = mWorkingBasePath->Name() == restoredBasePath->Name();
-        for (SnapshotFileInfoRef &fileIno : mapping->GetFileMapping()) {
-            uint32_t fileId = fileIno->GetFileId();
+        for (SnapshotFileInfoRef &fileInfo : mapping->GetFileMapping()) {
+            uint32_t fileId = fileInfo->GetFileId();
             if (UNLIKELY(fileId == 0)) { // fileId是0说明不是sst文件.
                 continue;
             }
 
-            PathRef filePath = std::make_shared<Path>(restoredBasePath, fileIno->GetFileName());
+            std::string fileName = fileInfo->GetFileName();
+            PathRef targetPath;
+            if (isExcludeSSTFiles && fileName.find(BLOB_FILE_NAME_PREFIX) == std::string::npos) {
+                continue;
+            }
+            if (fileName.find(BLOB_FILE_NAME_PREFIX) != std::string::npos) {
+                targetPath = currentBlobPath;
+            } else {
+                targetPath = restoredBasePath;
+            }
+            PathRef filePath = std::make_shared<Path>(targetPath, fileName);
             FileMetaRef fileMeta = nullptr;
             auto it = mFileMapping.find(fileId);
             if (it == mFileMapping.end()) { // 新建一个fileMeta插入到fileMapping中.
@@ -193,15 +228,14 @@ BResult FileManager::StartRestore(const std::vector<SnapshotFileMappingRef> &res
                 }
             }
             // 更新文件的大小.
-            if (fileMeta->GetFileSize() < fileIno->GetFileSize()) {
-                fileMeta->AddFileSize(fileIno->GetFileSize() - fileMeta->GetFileSize());
+            if (fileMeta->GetFileSize() < fileInfo->GetFileSize()) {
+                fileMeta->AddFileSize(fileInfo->GetFileSize() - fileMeta->GetFileSize());
             }
             if (mSnapshotStorage) { // 如果是本地fileManager则为false, 如果是远端fileManager的则为true.
                 fileMeta->AddSnapshotRef(1);
             }
         }
     }
-    LOG_DEBUG("Restore file manager success, working path:" << mWorkingBasePath->ExtractFileName());
     return BSS_OK;
 }
 
@@ -238,7 +272,6 @@ BResult FileManager::EndRestore()
 
 FileInfoRef FileManager::AllocateFile()
 {
-    ReadLocker<ReadWriteLock> lk(&mRwLock);
     FileIdRef fileId = mFileIdGenerator->Generate();
     uint64_t prefix = mPrefix.fetch_add(1);
     std::ostringstream suffixOss;

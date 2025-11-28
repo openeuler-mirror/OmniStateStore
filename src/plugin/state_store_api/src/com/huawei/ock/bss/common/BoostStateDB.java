@@ -18,8 +18,10 @@ import com.huawei.ock.bss.metric.BoostNativeMetric;
 import com.huawei.ock.bss.metric.BoostNativeMetricImpl;
 import com.huawei.ock.bss.metric.BoostNativeMetricOptions;
 import com.huawei.ock.bss.table.AbstractTable;
+import com.huawei.ock.bss.table.BoostPQTable;
 import com.huawei.ock.bss.table.api.Table;
 import com.huawei.ock.bss.table.api.TableDescription;
+import com.huawei.ock.bss.table.description.PQTableDescription;
 
 import org.apache.flink.metrics.MetricGroup;
 import org.apache.flink.util.IOUtils;
@@ -40,6 +42,7 @@ public class BoostStateDB extends AbstractNativeHandleReference {
 
     @SuppressWarnings("rawtypes")
     private final Map<String, Table> tables;
+    private Map<String, BoostPQTable> pqTables;
 
     private BoostNativeMetric boostNativeMetric;
 
@@ -49,6 +52,7 @@ public class BoostStateDB extends AbstractNativeHandleReference {
         Preconditions.checkArgument(nativeHandle != 0);
         this.config = config;
         this.tables = new ConcurrentHashMap<>();
+        this.pqTables = new ConcurrentHashMap<>();
     }
 
     public BoostConfig getConfig() {
@@ -220,7 +224,22 @@ public class BoostStateDB extends AbstractNativeHandleReference {
      * closeInternal 关闭实例，释放资源
      */
     protected void closeInternal() {
-        IOUtils.closeQuietly(this.boostNativeMetric);
         super.closeInternal();
+        IOUtils.closeQuietly(this.boostNativeMetric);
+    }
+
+    /**
+     * create Pq table.
+     *
+     * @param kpqTableDescription kpqTableDescription
+     * @return BoostPQTable
+     */
+    public <K> BoostPQTable createPQTable(PQTableDescription<K> kpqTableDescription) {
+        BoostPQTable pqTable = pqTables.get(kpqTableDescription.getStateName());
+        if (pqTable == null) {
+            pqTable = new BoostPQTable(this, kpqTableDescription);
+            pqTables.put(kpqTableDescription.getStateName(), pqTable);
+        }
+        return pqTable;
     }
 }

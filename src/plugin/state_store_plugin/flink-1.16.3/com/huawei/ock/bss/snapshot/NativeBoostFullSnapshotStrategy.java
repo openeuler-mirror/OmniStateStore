@@ -27,7 +27,7 @@ import org.apache.flink.runtime.state.IncrementalRemoteKeyedStateHandle;
 import org.apache.flink.runtime.state.KeyGroupRange;
 import org.apache.flink.runtime.state.KeyedStateHandle;
 import org.apache.flink.runtime.state.LocalRecoveryConfig;
-import org.apache.flink.runtime.state.RegisteredKeyValueStateBackendMetaInfo;
+import org.apache.flink.runtime.state.RegisteredStateMetaInfoBase;
 import org.apache.flink.runtime.state.SnapshotResult;
 import org.apache.flink.runtime.state.StreamStateHandle;
 import org.apache.flink.runtime.state.heap.HeapPriorityQueueSnapshotRestoreWrapper;
@@ -122,7 +122,7 @@ public class NativeBoostFullSnapshotStrategy<K> extends BoostSnapshotStrategyBas
         @Nonnull final List<NSKeyedStateDescriptor> nsKeyedStateDescriptors,
         final Map<String, HeapPriorityQueueSnapshotRestoreWrapper<?>> registeredPQStates,
         final Map<String, HeapPriorityQueueStateSnapshot<?>> pqStateSnapshots) {
-        for (Map.Entry<String, RegisteredKeyValueStateBackendMetaInfo<?, ?>> stateMetaInfoEntry
+        for (Map.Entry<String, RegisteredStateMetaInfoBase> stateMetaInfoEntry
             : this.metaInfoMap.entrySet()) {
             stateMetaInfoSnapshots.add(stateMetaInfoEntry.getValue().snapshot());
         }

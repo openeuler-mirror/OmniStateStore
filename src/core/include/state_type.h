@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
  * You can use this software according to the terms and conditions of the Mulan PSL v2.
  * You may obtain a copy of Mulan PSL v2 at:
  *          http://license.coscl.org.cn/MulanPSL2
@@ -15,12 +15,13 @@
 namespace ock {
 namespace bss {
 enum StateType : uint8_t {
-    VALUE = 0,
-    LIST = 1,
-    MAP = 2,
-    SUB_VALUE = 3,
-    SUB_LIST = 4,
-    SUB_MAP = 5,
+    PQ = 0,
+    VALUE = 1,
+    LIST = 2,
+    MAP = 3,
+    SUB_VALUE = 4,
+    SUB_LIST = 5,
+    SUB_MAP = 6,
 };
 
 class StateTypeUtil {

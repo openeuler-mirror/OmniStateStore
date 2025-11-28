@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
  * You can use this software according to the terms and conditions of the Mulan PSL v2.
  * You may obtain a copy of Mulan PSL v2 at:
  *          http://license.coscl.org.cn/MulanPSL2
@@ -58,9 +58,9 @@ public:
         }
     }
 
-    void RegisterLazyDownloadMetric(BoostNativeMetricPtr& metricPtr)
+    void RegisterLazyDownloadMetric(BoostNativeMetricPtr* metricPtrAddr)
     {
-        mBoostNativeMetric = metricPtr;
+        mMetricPtrAddr = metricPtrAddr;
     }
 
 protected:
@@ -70,8 +70,7 @@ protected:
     PrimaryAddressManagerRef mPrimaryAddressManager;
     FileManagerRef mLocalFileManager;
     std::atomic<bool> mStopped{ true };
-    // 由于是指针的引用, 析构时不置空
-    BoostNativeMetricPtr mBoostNativeMetric = nullptr;
+    BoostNativeMetricPtr* mMetricPtrAddr = nullptr;
 };
 using LazyDownloadStrategyRef = std::shared_ptr<LazyDownloadStrategy>;
 
@@ -99,12 +98,14 @@ private:
 
     void DoDownloadFile(std::vector<std::tuple<FileInfoRef, RestoreFileInfo>> &fileInfos, bool &downloaded);
 
+    void UpdateMetric();
+
 private:
     std::unordered_map<uint64_t, std::tuple<RestoreFileInfo, PathRef>> mWaitingDownload;
     std::mutex mWaitingLock;
     uint32_t mVersion;
-    uint64_t mLazyDownloadStartTime = 0;
-    uint64_t mLazyDownloadEndTime = 0;
+    long mLazyDownloadStartTime = 0L;
+    long mLazyDownloadEndTime = 0L;
 };
 
 }  // namespace bss

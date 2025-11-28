@@ -19,12 +19,13 @@ import com.huawei.ock.bss.common.exception.BSSRuntimeException;
  * @since BeiMing 25.0.T1
  */
 public enum BoostStateType {
-    VALUE(0),
-    LIST(1),
-    MAP(2),
-    SUB_VALUE(3),
-    SUB_LIST(4),
-    SUB_MAP(5);
+    PQ(0),
+    VALUE(1),
+    LIST(2),
+    MAP(3),
+    SUB_VALUE(4),
+    SUB_LIST(5),
+    SUB_MAP(6);
 
     BoostStateType(int code) {
         this.code = code;
@@ -59,16 +60,18 @@ public enum BoostStateType {
     public static BoostStateType of(int code) {
         switch (code) {
             case 0:
-                return VALUE;
+                return PQ;
             case 1:
-                return LIST;
+                return VALUE;
             case 2:
-                return MAP;
+                return LIST;
             case 3:
-                return SUB_VALUE;
+                return MAP;
             case 4:
-                return SUB_LIST;
+                return SUB_VALUE;
             case 5:
+                return SUB_LIST;
+            case 6:
                 return SUB_MAP;
             default:
                 throw new BSSRuntimeException("NOT a valid state type for raw value: " + code);

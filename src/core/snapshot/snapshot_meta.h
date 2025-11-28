@@ -14,7 +14,9 @@
 
 #include <unordered_set>
 #include <vector>
+
 #include "common/path.h"
+#include "blob_store/blob_file_meta.h"
 
 namespace ock {
 namespace bss {
@@ -63,6 +65,11 @@ public:
         mLocalFileIds.insert(mLocalFileIds.end(), localFileIds.begin(), localFileIds.end());
     }
 
+    inline void AddLocalFileId(uint32_t fileId)
+    {
+        mLocalFileIds.emplace_back(fileId);
+    }
+
     inline uint64_t GetLocalFullSize() const
     {
         return mLocalFullSize;
@@ -89,6 +96,15 @@ public:
         AddLocalFilePaths(snapshotMeta->GetLocalFilePaths());
         AddLocalFullSize(snapshotMeta->GetLocalFullSize());
         AddLocalIncrementalSize(snapshotMeta->GetLocalIncrementalSize());
+    }
+
+    inline void AddSnapshotBlobMeta(const BlobFileMetaRef &blobFileMeta)
+    {
+        AddLocalFileId(FileAddressUtils::GetFileId(blobFileMeta->GetFileAddress()));
+        PathRef filePath = std::make_shared<Path>(Uri(blobFileMeta->GetIdentifier()));
+        AddLocalFilePath(filePath);
+        AddLocalFullSize(blobFileMeta->GetFileSize());
+        AddLocalIncrementalSize(blobFileMeta->GetFileSize());
     }
 
 private:

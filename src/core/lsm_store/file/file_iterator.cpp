@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
  * You can use this software according to the terms and conditions of the Mulan PSL v2.
  * You may obtain a copy of Mulan PSL v2 at:
  *          http://license.coscl.org.cn/MulanPSL2
@@ -73,7 +73,15 @@ KeyValueRef FileSubIterator::Advance()
             BlockHandleRef blockHandle = mBlockHandleIterator->Next();
             auto dataBlock = std::dynamic_pointer_cast<DataBlock>(mFileReader->GetOrLoadDataBlock(*blockHandle));
             RETURN_NULLPTR_AS_NULLPTR(dataBlock);
-            mDataBlockIterator = dataBlock->SubIterator(mStartKey, mEndKey, mReverseOrder);
+            if (mStartKey.IsPqKey()) {
+                auto keyFilter = [this](const Key &key) -> bool {
+                    return PQBinaryDataComparator::ComparePrefix(key.PriKey().KeyData(), key.PriKey().KeyLen(),
+                    mStartKey.PriKey().KeyData(), mStartKey.PriKey().KeyLen()) != 0;
+                };
+                mDataBlockIterator = dataBlock->Iterator(keyFilter);
+            } else {
+                mDataBlockIterator = dataBlock->SubIterator(mStartKey, mEndKey, mReverseOrder);
+            }
             if (mDataBlockIterator == nullptr || !mDataBlockIterator->HasNext()) {
                 mDataBlockIterator = nullptr;
                 continue;

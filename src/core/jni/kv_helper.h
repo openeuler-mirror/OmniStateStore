@@ -289,14 +289,31 @@ inline int32_t GetTaskSlotFlag(JNIEnv *env, jclass boostConfigClass, jobject jBo
     return static_cast<int32_t>(env->CallIntMethod(jBoostConfig, getTaskSlotFlag));
 }
 
-
 inline bool GetEnableLocalRecovery(JNIEnv *env, jclass boostConfigClass, jobject jBoostConfig)
 {
     jmethodID isEnableLocalRecovery = env->GetMethodID(boostConfigClass, "isEnableLocalRecovery", "()Z");
     if (isEnableLocalRecovery == nullptr) {
-        return JNI_FALSE;
+        return false;
     }
     return static_cast<bool>(env->CallBooleanMethod(jBoostConfig, isEnableLocalRecovery));
+}
+
+inline bool GetEnableKVSeparate(JNIEnv *env, jclass boostConfigClass, jobject jBoostConfig)
+{
+    jmethodID getKVSeparateSwitch = env->GetMethodID(boostConfigClass, "isKVSeparate", "()Z");
+    if (getKVSeparateSwitch == nullptr) {
+        return false;
+    }
+    return static_cast<bool>(env->CallBooleanMethod(jBoostConfig, getKVSeparateSwitch));
+}
+
+inline int32_t GetKVSeparateThreshold(JNIEnv *env, jclass boostConfigClass, jobject jBoostConfig)
+{
+    jmethodID getKVSeparateThreshold = env->GetMethodID(boostConfigClass, "getKVSeparateThreshold", "()I");
+    if (getKVSeparateThreshold == nullptr) {
+        return 0;
+    }
+    return static_cast<int32_t>(env->CallIntMethod(jBoostConfig, getKVSeparateThreshold));
 }
 
 inline bool CheckNumInValidRange(float arg)
@@ -513,6 +530,11 @@ inline ConfigRef CreateConfig(JNIEnv *env, jobject jBoostConfig)
         return nullptr;
     }
     LOG_INFO("Parse configuration item taskSlotFlag:" << taskSlotFlag);
+    auto isEnableKVSeparate = GetEnableKVSeparate(env, boostConfigClass, jBoostConfig);
+    LOG_INFO("Parse configuration item kvSeparateSwitch:" << isEnableKVSeparate);
+
+    auto kVSeparateThreshold = GetKVSeparateThreshold(env, boostConfigClass, jBoostConfig);
+    LOG_INFO("Parse configuration item kVSeparateThreshold:" << kVSeparateThreshold);
 
     bool isEnableLocalRecovery = GetEnableLocalRecovery(env, boostConfigClass, jBoostConfig);
     std::string backupPath = "";
@@ -548,6 +570,8 @@ inline ConfigRef CreateConfig(JNIEnv *env, jobject jBoostConfig)
     config->SetPeakFilterElemNum(peakFilterElemNum);
     config->SetEnableLocalRecovery(isEnableLocalRecovery);
     config->SetBackupPath(backupPath);
+    config->SetEnableKVSeparate(isEnableKVSeparate);
+    config->SetBlobValueSizeThreshold(kVSeparateThreshold);
     return config;
 }
 
@@ -756,16 +780,6 @@ inline jobject ConvertKeyValueItem(JNIEnv *env, jobject object, const BinaryKeyV
 
     // 6. 返回 Java 对象
     return javaItem;
-}
-
-inline bool GetFlag(uint8_t pos, uint32_t flags)
-{
-    // Java侧避免了对int类型的符号位操作，因此cpp侧同步
-    if (UNLIKELY(pos >= 31)) {
-        LOG_ERROR("Failed to get flag, pos out of range.");
-        return false;
-    }
-    return (flags & (1 << pos)) != 0;
 }
 
 }  // namespace bss

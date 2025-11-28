@@ -106,7 +106,7 @@ BResult BoostStateDbGroupImpl::TryEvict(bool isSync, bool isForce, uint32_t minS
     while (isForce || (useTotal - evictWaterMark) > flushingTotal) {
         SelectEvictBoostDb(minSize != UINT32_MAX ? minSize : mEvictMinSize, boostDb, minGroup);
         if (UNLIKELY(boostDb == nullptr)) {
-            LOG_INFO("Select boost db for evict process failed.");
+            LOG_DEBUG("Select boost db for evict process failed.");
             return BSS_OK;
         }
         if (UNLIKELY(minGroup == nullptr)) {
@@ -173,6 +173,16 @@ BResult BoostStateDbGroupMgr::Remove(uint32_t dbGroupId, BoostStateDB *boostStat
 
         MemManagerRef localMemManager = iter->second->GetMemManager();
         localMemManager->DecDbRefCount();
+    }
+    return BSS_OK;
+}
+
+void BoostStateDbGroupMgr::DeleteDbGroupPtr(uint32_t dbGroupId)
+{
+    WriteLocker<ReadWriteLock> lock(&mRwLock);
+    auto iter = mBoostStateDbGroup.find(dbGroupId);
+    if (iter != mBoostStateDbGroup.end()) {
+        auto dbGroupPtr = iter->second;
         if (dbGroupPtr->IsEmpty()) {
             mBoostStateDbGroup.erase(iter);
             LOG_INFO("Delete db group success, groupId:" << dbGroupId);
@@ -180,7 +190,6 @@ BResult BoostStateDbGroupMgr::Remove(uint32_t dbGroupId, BoostStateDB *boostStat
             dbGroupPtr = nullptr;
         }
     }
-    return BSS_OK;
 }
 
 BoostStateDbGroupPtr BoostStateDbGroupMgr::GetBoostStateDbGroup(uint32_t dbGroupId)
@@ -204,7 +213,7 @@ BResult BoostStateDbGroupMgr::Create(uint32_t dbGroupId, ConfigRef config)
             return BSS_ERR;
         }
         MemManagerRef localMemManager = iter->second->GetMemManager();
-        localMemManager->AddDbRefCount();
+        RETURN_NOT_OK(localMemManager->AddDbRefCount());
         return BSS_OK;
     }
 

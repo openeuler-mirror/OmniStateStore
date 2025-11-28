@@ -249,6 +249,18 @@ public class NativeUtil {
     }
 
     /**
+     * createPQTable
+     *
+     * @return BoostPQTable
+     * @throws IOException IO异常
+     */
+    public BoostPQTable createPQTable() throws IOException {
+        int numberOfKeyGroups = 2;
+        BoostStateDB db = createBoostStateDB(numberOfKeyGroups, 0.8F);
+        return new BoostPQTable(db, "_timer_state/event_window-timers");
+    }
+
+    /**
      * createBoostStateDB
      *
      * @param numberOfKeyGroups numberOfKeyGroups
@@ -271,6 +283,8 @@ public class NativeUtil {
         boostConfig.setLsmStoreCompressionLevelPolicy("lz4,lz4,lz4");
         boostConfig.setTtlFilterSwitch(false);
         boostConfig.setCacheFilterAndIndexSwitch(true);
+        boostConfig.setKVSeparateSwitch(false);
+        boostConfig.setKVSeparateThreshold(200);
         boostConfig.setCacheFilterAndIndexRatio(0.0F);
         boostConfig.setEnableBloomFilter(true);
         boostConfig.setExpectedKeyCount(8000000);
@@ -283,7 +297,7 @@ public class NativeUtil {
         // 设置写LSM的水位线
         boostConfig.setSliceMemWaterMark(sliceMemWaterMark);
         // 设置允许借用的heap大小
-        boostConfig.setBorrowHeapSize(32 * 1024 * 1024);
+        boostConfig.setBorrowHeapSize(512 * 1024 * 1024);
         return new BoostStateDB(boostConfig);
     }
 

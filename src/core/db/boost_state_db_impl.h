@@ -38,6 +38,8 @@ public:
 
     TableRef GetTableOrCreate(TableDescriptionRef tableDesc) override;
 
+    PQTableRef CreatePQTable(const std::string &str) override;
+
     BResult UpdateTtlConfig(TableDescriptionRef tableDesc) override;
 
     SnapshotOperatorCoordinator *CreateSyncCheckpoint(const std::string &checkpointPath,
@@ -121,6 +123,7 @@ private:
 
 private:
     std::unordered_map<std::string, TableRef> mTables{};
+    std::unordered_map<std::string, PQTableRef> mPQTable;
     ConfigRef mConfig;
     MemManagerRef mMemManager;
     FileCacheManagerRef mFileCache;

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
  * You can use this software according to the terms and conditions of the Mulan PSL v2.
  * You may obtain a copy of Mulan PSL v2 at:
  *          http://license.coscl.org.cn/MulanPSL2
@@ -132,6 +132,16 @@ public:
         metricPtr->SetUsedMemoryGetter([this](MemoryType type) -> uint64_t { return GetMemoryUseSize(type); });
         metricPtr->SetMaxMemoryGetter([this](MemoryType type) -> uint64_t { return GetMemoryTypeMaxSize(type); });
         mDBsMetricMap.emplace(dbAddr, metricPtr);
+        // update memory type max value to metric
+        for (const auto &pair : mDBsMetricMap) {
+            BoostNativeMetricPtr metric = pair.second;
+            metric->SetMemoryTotalMax(mMemoryLimit);
+            metric->SetMemoryFreshMax(mTypeMaxSize[static_cast<size_t>(MemoryType::FRESH_TABLE)]);
+            metric->SetMemorySliceMax(mTypeMaxSize[static_cast<size_t>(MemoryType::SLICE_TABLE)]);
+            metric->SetMemoryFileMax(mTypeMaxSize[static_cast<size_t>(MemoryType::FILE_STORE)]);
+            metric->SetMemorySnapshotMax(mTypeMaxSize[static_cast<size_t>(MemoryType::SNAPSHOT)]);
+            LOG_INFO("Set memory limit info to metric.");
+        }
         LOG_INFO("Register metric to memory manager success.");
     }
 

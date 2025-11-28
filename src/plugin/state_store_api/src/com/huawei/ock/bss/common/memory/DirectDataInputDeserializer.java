@@ -23,20 +23,24 @@ package com.huawei.ock.bss.common.memory;
 
 import org.apache.flink.core.memory.DataInputView;
 import org.apache.flink.core.memory.MemoryUtils;
-
-import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.EOFException;
 import java.io.IOException;
 import java.io.UTFDataFormatException;
 import java.nio.ByteOrder;
 
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
+
 /**
  * A simple and efficient deserializer for the {@link java.io.DataInput} interface.
  */
 public class DirectDataInputDeserializer implements DataInputView, java.io.Serializable {
     private static final long serialVersionUID = 1L;
+
+    private static final Logger LOG = LoggerFactory.getLogger(DirectDataInputDeserializer.class);
 
     // ------------------------------------------------------------------------
 
@@ -152,6 +156,7 @@ public class DirectDataInputDeserializer implements DataInputView, java.io.Seria
             this.position += 4;
             return value;
         } else {
+            LOG.error("early EOF, current position: {}, end: {}", position, end);
             throw new EOFException();
         }
     }
@@ -168,6 +173,7 @@ public class DirectDataInputDeserializer implements DataInputView, java.io.Seria
             this.position += 4;
             return value;
         } else {
+            LOG.error("early EOF, current position: {}, end: {}", position, end);
             throw new EOFException();
         }
     }

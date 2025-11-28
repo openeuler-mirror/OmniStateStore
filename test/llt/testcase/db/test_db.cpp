@@ -8,22 +8,52 @@
  * MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
  * See the Mulan PSL v2 for more details.
  */
-#include <ftw.h>
 #include <dirent.h>
+#include <ftw.h>
 
 #include "gtest/gtest.h"
-#include "include/boost_state_table.h"
 #include "common/bss_log.h"
+#include "include/boost_state_db.h"
+#include "include/boost_state_table.h"
 #include "kv_table/kv_table_iterator.h"
-#include "slice_table/slice_table.h"
+#include "kv_table/pq_table.h"
 #include "slice_table/test_slice_table_manager.h"
 #include "test_utils.h"
-#include "include/boost_state_db.h"
 
 namespace ock {
 namespace bss {
 namespace test {
 namespace test_kv_table {
+
+struct DataComparator {
+    bool operator()(const std::vector<uint8_t> &a, const std::vector<uint8_t> &b) const
+    {
+        uint32_t minLen = std::min(a.size(), b.size());
+        for (uint32_t i = 0; i < minLen; ++i) {
+            uint8_t aByte = a[i];
+            uint8_t bByte = b[i];
+            if (aByte != bByte) {
+                return aByte < bByte;  // 直接比较
+            }
+        }
+        return a.size() < b.size();
+    }
+    static int Compare(const std::vector<uint8_t> &a, const BinaryData &b)
+    {
+        if (a.size() != b.Length()) {
+            return 1;
+        }
+        for (uint32_t i = 0; i < b.Length(); ++i) {
+            uint8_t aByte = a[i];
+            uint8_t bByte = b.Data()[i];
+            if (aByte != bByte) {
+                return 1;
+            }
+        }
+        return 0;
+    }
+};
+
 BoostStateDB *mDB;
 BoostStateDB *mDB1;
 KVTableRef kVTable;
@@ -39,6 +69,8 @@ NsKMapTableRef nsKMapTable1;
 KListTableRef kListTable1;
 NsKListTableRef nsKListTable1;
 BoostNativeMetric *metric = nullptr;
+PQTableRef pqTable;
+PQTableRef pqTable1;
 std::vector<std::string> compressionLevelPolicy = {"lz4", "lz4", "lz4"};
 std::string lsmStoreCompressionPolicy = "lz4";
 
@@ -48,6 +80,7 @@ std::map<std::vector<uint8_t>, std::map<std::vector<uint8_t>, std::vector<uint8_
 std::map<NsKey, std::map<std::vector<uint8_t>, std::vector<uint8_t>>> mNsKMap;
 std::map<std::vector<uint8_t>, std::vector<std::vector<uint8_t>>> mKList;
 std::map<NsKey, std::vector<std::vector<uint8_t>>> mNsKList;
+std::map<uint32_t, std::set<std::vector<uint8_t>, DataComparator>> mPQ;
 
 std::vector<std::vector<uint8_t>> sourceKey;
 std::vector<std::vector<uint8_t>> sourceSubKey;
@@ -55,9 +88,10 @@ std::vector<std::vector<uint8_t>> sourceNS;
 std::vector<uint8_t> fixed2MSizeValue;
 std::string ToString(const std::vector<uint8_t> &data)
 {
+    uint32_t printLen = std::min(NO_20, static_cast<uint32_t>(data.size()));
     std::ostringstream oss;
     oss << "[";
-    for (uint32_t i = 0; i < data.size(); i++) {
+    for (uint32_t i = 0; i < printLen; i++) {
         oss << std::hex << std::uppercase << std::setw(NO_2) << std::setfill('0') << static_cast<int>(data[i]);
     }
     oss << "]" << std::endl;
@@ -541,6 +575,41 @@ void ValidateMetric()
     }
 }
 
+std::vector<uint8_t> GetPrefix(uint32_t groupId)
+{
+    std::vector<uint8_t> prefix;
+    for (int i = 4; --i >= 0;) {
+        prefix.emplace_back((groupId >> (i << 3)));
+    }
+    return prefix;
+}
+void PQTableAdd(uint32_t groupStart = 0, uint32_t groupEnd = UINT32_MAX, bool useMDb = true)
+{
+    std::vector<uint8_t> randomData = GetRandomData();
+    uint32_t hashcode = HashForTest(randomData.data(), randomData.size());
+    uint32_t groupId = hashcode % 128;
+    std::vector<uint8_t> prefix = GetPrefix(groupId);
+    randomData.insert(randomData.begin(), prefix.begin(), prefix.end());
+    BinaryData key(randomData.data(), randomData.size());
+    std::set<std::vector<uint8_t>, DataComparator> &set = mPQ[groupId];
+    set.emplace(randomData);
+    pqTable->AddKey(key, hashcode);
+    LOG_DEBUG("add " << key.ToString() << " groupId: " << groupId);
+}
+
+void PQTableRemove(uint32_t groupStart = 0, uint32_t groupEnd = UINT32_MAX, bool useMDb = true)
+{
+    std::vector<uint8_t> randomData = GetRandomData();
+    uint32_t hashcode = HashForTest(randomData.data(), randomData.size());
+    uint32_t groupId = hashcode % 128;
+    std::vector<uint8_t> prefix = GetPrefix(groupId);
+    randomData.insert(randomData.begin(), prefix.begin(), prefix.end());
+    BinaryData key(randomData.data(), randomData.size());
+    mPQ[groupId].erase(randomData);
+    pqTable->RemoveKey(key, hashcode);
+    LOG_DEBUG("remove " << key.ToString() << " groupId: " << groupId);
+}
+
 void ValidateKV()
 {
     for (auto &it : mKV) {
@@ -549,7 +618,8 @@ void ValidateKV()
 
         BinaryData testKey(key.data(), key.size());
         BinaryData result = {};
-        auto retVal = kVTable->Get(HashForTest(key.data(), key.size()), testKey, result);
+        uint32_t hashcode = HashForTest(key.data(), key.size());
+        auto retVal = kVTable->Get(hashcode, testKey, result);
         ASSERT_EQ(retVal, BSS_OK);
         ASSERT_EQ(result.Length(), value.size());
         auto cmp = memcmp(result.Data(), value.data(), value.size());
@@ -1021,6 +1091,38 @@ void ValidateNsKList(bool flag = false)
     }
 }
 
+void ValidatePQ()
+{
+    uint32_t total = 0;
+    uint32_t realTotal = 0;
+    for (const auto &item : mPQ) {
+        std::vector<uint8_t> prefix = GetPrefix(item.first);
+        BinaryData data1(prefix.data(), prefix.size());
+        auto iter = pqTable->KeyIterator(data1);
+        auto iter1 = pqTable1->KeyIterator(data1);
+        ASSERT_FALSE(iter1->HasNext());
+        auto keys = item.second;
+        auto key1 = keys.begin();
+        total += keys.size();
+        while (iter->HasNext()) {
+            BinaryData key2 = iter->Next();
+            int cmp = DataComparator::Compare(*key1, key2);
+            if (cmp != 0) {
+                LOG_INFO("EXPECT: " << ToString(*key1) << ", fact: " << key2.ToString() << "groupId: " << item.first);
+            }
+            ASSERT_EQ(cmp, 0);
+            ++key1;
+            realTotal++;
+        }
+        if (total != realTotal) {
+            LOG_INFO("Total: " << total);
+        }
+        ASSERT_EQ(total, realTotal);
+        delete iter;
+        delete iter1;
+    }
+}
+
 // 定义操作配置
 struct OperationConfig {
     double probability;                                  // 操作的概率（0~1）
@@ -1108,6 +1210,7 @@ public:
     void SetUp() override;
     void TearDown() override;
     void PrepareForScaleIn();
+    void PrepareDbWithBlob();
     void PrepareForTTL(int64_t ttlTime);
     void RestoreDb(std::string basePth, uint64_t cpId, std::string &restorePath);
 
@@ -1124,6 +1227,7 @@ public:
             delete mDB1;
             mDB1 = nullptr;
         }
+        pqTable = nullptr;
     }
 
     bool DeleteCpFile()
@@ -1220,6 +1324,47 @@ void TestDB::PrepareForScaleIn()
         std::dynamic_pointer_cast<NsKListTable>(CreateFromDB(StateType::SUB_LIST, "nsKListTable", mDB1));
 }
 
+void TestDB::PrepareDbWithBlob()
+{
+    CloseAllDb();
+    std::string backupPath = GetCurrentWorkingDirectory() + "/backup";
+    ConfigRef config = std::make_shared<Config>();
+    config->mMemorySegmentSize = IO_SIZE_32M;
+    config->SetEvictMinSize(IO_SIZE_32M);
+    config->Init(NO_0, NO_127, NO_128);
+    config->SetFileStoreL0NumTrigger(NO_2);
+    config->SetLsmStoreCompactionSwitch(true);
+    config->SetHeapAvailableSize(IO_SIZE_2G * NO_3);
+    config->SetLsmStoreCompressionPolicy(lsmStoreCompressionPolicy);
+    config->SetCompressionLevelPolicy(compressionLevelPolicy);
+    config->SetBackupPath(backupPath);
+    config->SetEnableKVSeparate(true);
+    config->SetBlobDefaultBlockSize(IO_SIZE_16K);
+    config->SetBlobFileSize(IO_SIZE_64K);
+    config->mEnableTombstone = true;
+    config->mMaxBlobNumInMemCache = 1000;
+    config->mTombstoneDataBlockSize = IO_SIZE_64K;
+    config->mTombstoneFileSize = IO_SIZE_256K;
+    config->mTombstoneLevel0CompactionFileNum = 4;
+    config->mBlobMinCompactionThreshold = 0;
+    mkdir(backupPath.c_str(), mode_t(NO_777));
+
+    mDB = BoostStateDBFactory::Create();
+    mDB->Open(config);
+    metric = new BoostNativeMetric(NO_31);
+    metric->Init();
+    mDB->RegisterMetric(metric);
+
+    kVTable = std::dynamic_pointer_cast<KVTable>(CreateFromDB(StateType::VALUE, "kVTable", mDB));
+    nsKVTable = std::dynamic_pointer_cast<NsKVTable>(CreateFromDB(StateType::SUB_VALUE, "nsKVTable", mDB));
+    kMapTable = std::dynamic_pointer_cast<KMapTable>(CreateFromDB(StateType::MAP, "kMapTable", mDB));
+    nsKMapTable =
+        std::dynamic_pointer_cast<NsKMapTable>(CreateFromDB(StateType::SUB_MAP, "nsKMapTable", mDB));
+    kListTable = std::dynamic_pointer_cast<KListTable>(CreateFromDB(StateType::LIST, "kListTable", mDB));
+    nsKListTable =
+        std::dynamic_pointer_cast<NsKListTable>(CreateFromDB(StateType::SUB_LIST, "nsKListTable", mDB));
+}
+
 void TestDB::PrepareForTTL(int64_t ttlTime)
 {
     auto boostStateDbImpl = reinterpret_cast<BoostStateDBImpl*>(mDB);
@@ -1305,6 +1450,8 @@ void TestDB::SetUp()
     kListTable = std::dynamic_pointer_cast<KListTable>(CreateFromDB(StateType::LIST, "kListTable", mDB));
     nsKListTable =
         std::dynamic_pointer_cast<NsKListTable>(CreateFromDB(StateType::SUB_LIST, "nsKListTable", mDB));
+    pqTable1 = mDB->CreatePQTable("stateName1");
+    pqTable = mDB->CreatePQTable("stateName");
 
     // 从一个有限大小的随机数据源获取key和subKey和namespace, 增大相同的概率，方便测试
     const uint32_t KEY_NUM = 30;
@@ -1325,6 +1472,8 @@ void TestDB::SetUp()
         sourceNS.push_back(tempNS);
     }
     CleanupSstFiles();
+    CleanupBlobFiles();
+    CleanupTombstoneFiles();
 }
 
 void TestDB::TearDown()
@@ -1335,6 +1484,7 @@ void TestDB::TearDown()
     nsKMapTable.reset();
     kListTable.reset();
     nsKListTable.reset();
+    pqTable.reset();
 
     mKV.clear();
     mNsKV.clear();
@@ -1342,6 +1492,7 @@ void TestDB::TearDown()
     mNsKMap.clear();
     mKList.clear();
     mNsKList.clear();
+    mPQ.clear();
 
     sourceKey.clear();
     sourceSubKey.clear();
@@ -1358,6 +1509,8 @@ void TestDB::TearDown()
     }
 
     CleanupSstFiles();
+    CleanupBlobFiles();
+    CleanupTombstoneFiles();
     DeleteCpFile();
 
     LOG_INFO("TestDB::TearDownTestCase finish.");
@@ -2236,7 +2389,8 @@ TEST_F(TestDB, test_all_states_to_lsm_store_and_get_return_ok)
 TEST_F(TestDB, test_cp_and_get_return_ok)
 {
     mDB->GetConfig().SetEnableLocalRecovery(false);
-    std::vector<OperationConfig> operationsConfig = { { 0.9, KVPut }, { 0.1, KVRemove } };
+    std::vector<OperationConfig> operationsConfig = { { 0.9, KVPut }, { 0.1, KVRemove },
+        {0.9, PQTableAdd},  {0.1, PQTableRemove }};
     uint64_t cpId = 0;
     std::string currentDir = GetCurrentWorkingDirectory();
     std::string basePth = currentDir + "/cp/";
@@ -2269,6 +2423,8 @@ TEST_F(TestDB, test_cp_and_get_return_ok)
         config->SetLocalPath(basePth + std::to_string(cpId) + "/sst");
         mDB = BoostStateDBFactory::Create();
         mDB->Open(config);
+        pqTable1 = mDB->CreatePQTable("stateName1");
+        pqTable = mDB->CreatePQTable("stateName");
         kVTable = std::dynamic_pointer_cast<KVTable>(CreateFromDB(StateType::VALUE, "kVTable", mDB));
         nsKVTable =
             std::dynamic_pointer_cast<NsKVTable>(CreateFromDB(StateType::SUB_VALUE, "nsKVTable", mDB));
@@ -2278,12 +2434,15 @@ TEST_F(TestDB, test_cp_and_get_return_ok)
         kListTable = std::dynamic_pointer_cast<KListTable>(CreateFromDB(StateType::LIST, "kListTable", mDB));
         nsKListTable =
             std::dynamic_pointer_cast<NsKListTable>(CreateFromDB(StateType::SUB_LIST, "nsKListTable", mDB));
+        pqTable = mDB->CreatePQTable("stateName");
+        pqTable1 = mDB->CreatePQTable("stateName1");
         std::string restorePath = basePth + std::to_string(cpId);
         std::unordered_map<std::string, std::string> pathMap;
         std::vector<std::string> restorePaths;
         restorePaths.emplace_back(restorePath);
         ASSERT_EQ(mDB->Restore(restorePaths, pathMap), BSS_OK);
         ValidateKV();
+        ValidatePQ();
         DeleteCpFile();
     }
 }
@@ -2337,6 +2496,8 @@ TEST_F(TestDB, test_cp_local_recovery_ok)
         kListTable = std::dynamic_pointer_cast<KListTable>(CreateFromDB(StateType::LIST, "kListTable", mDB));
         nsKListTable =
             std::dynamic_pointer_cast<NsKListTable>(CreateFromDB(StateType::SUB_LIST, "nsKListTable", mDB));
+        pqTable = mDB->CreatePQTable("stateName");
+        pqTable1 = mDB->CreatePQTable("stateName1");
         std::string restorePath = basePth + std::to_string(cpId);
         std::unordered_map<std::string, std::string> pathMap;
         std::vector<std::string> restorePaths;
@@ -2390,6 +2551,8 @@ TEST_F(TestDB, test_cp_lsm_and_get_return_ok)
         kListTable = std::dynamic_pointer_cast<KListTable>(CreateFromDB(StateType::LIST, "kListTable", mDB));
         nsKListTable =
             std::dynamic_pointer_cast<NsKListTable>(CreateFromDB(StateType::SUB_LIST, "nsKListTable", mDB));
+        pqTable = mDB->CreatePQTable("stateName");
+        pqTable1 = mDB->CreatePQTable("stateName1");
         std::vector<std::string> restorePaths;
         restorePaths.emplace_back(restorePath);
         ASSERT_EQ(mDB->Restore(restorePaths, pathMap), BSS_OK);
@@ -2409,7 +2572,8 @@ TEST_F(TestDB, test_cp_lsm_and_get_return_ok)
 
 TEST_F(TestDB, test_sp_lsm_and_get_return_ok)
 {
-    std::vector<OperationConfig> operationsConfig = { { 0.9, KVPut }, { 0.1, KVRemove } };
+    std::vector<OperationConfig> operationsConfig = { { 0.9, KVPut }, { 0.1, KVRemove },
+        {0.9, PQTableAdd}, {0.1, PQTableRemove} };
     for (uint32_t j = 0; j < NO_10000; j++) {
         executeOperation(operationsConfig);
     }
@@ -2425,6 +2589,7 @@ TEST_F(TestDB, test_sp_lsm_and_get_return_ok)
     config->SetTaskSlotFlag(NO_1);
     BoostStateDBPtr nDB = BoostStateDBFactory::Create();
     nDB->Open(config);
+    pqTable = mDB->CreatePQTable("stateName");
     kVTable = nullptr;
     kVTable = std::dynamic_pointer_cast<KVTable>(CreateFromDB(StateType::VALUE, "kVTable", nDB));
     while (iterator->HasNext()) {
@@ -2432,8 +2597,13 @@ TEST_F(TestDB, test_sp_lsm_and_get_return_ok)
         uint32_t keyHashCode = HashForTest(item->mKey, item->mKeyLength);
         BinaryData priKey(item->mKey, item->mKeyLength);
         BinaryData val(item->mValue, item->mValueLength);
-        kVTable->Put(keyHashCode, priKey, val);
+        if (item->mStateType == PQ) {
+            pqTable->AddKey(priKey, keyHashCode);
+        } else {
+            kVTable->Put(keyHashCode, priKey, val);
+        }
     }
+    ValidatePQ();
     ValidateKV();
     nDB->Close();
     delete nDB;
@@ -2621,6 +2791,169 @@ TEST_F(TestDB, test_put_add_map)
         uint32_t old = *reinterpret_cast<uint32_t *>(const_cast<uint8_t *>(val.Data()));
         ASSERT_EQ(old, *reinterpret_cast<uint32_t *>(mKMap[key][subKey].data()));
     }
+}
+
+TEST_F(TestDB, test_put_kv_kmap_to_lsm_store_and_get_return_ok_with_blob)
+{
+    PrepareDbWithBlob();
+    // Q4 Q7 Q9 Q11 Q15 Q16
+    std::vector<OperationConfig> operationsConfig = {
+        { 0.9, KVPut },   { 0.1, KVRemove },   { 0.9, NsKVPut },   { 0.1, NsKVRemove },
+        { 0.9, KMapPut }, { 0.1, KMapRemove }, { 0.9, NsKMapPut }, { 0.1, NsKMapRemove },
+    };
+    for (uint32_t i = 0; i < NO_5; i++) {
+        for (uint32_t j = 0; j < NO_5000; j++) {
+            executeOperation(operationsConfig);
+        }
+        ForceEvictToLsm();
+        ValidateKV();
+        ValidateNsKV();
+        ValidateKMap();
+        ValidateNsKMap();
+    }
+    CleanCurrentVersion();
+    ValidateFiles();
+}
+
+TEST_F(TestDB, test_put_kv_kmap_nskv_to_all_table_and_get_return_ok_with_blob)
+{
+    PrepareDbWithBlob();
+    // Q7
+    std::vector<OperationConfig> operationsConfig = {
+        { 0.9, KVPut }, { 0.1, KVRemove }, { 0.9, NsKVPut }, { 0.1, NsKVRemove }, { 0.9, KMapPut }, { 0.1, KMapRemove },
+    };
+    for (uint32_t i = 0; i < NO_5; i++) {
+        for (uint32_t j = 0; j < NO_5000; j++) {
+            executeOperation(operationsConfig);
+        }
+        if (i < NO_2) {
+            ForceEvictToLsm();
+        } else if (i < NO_3) {
+            ForceFlushToSlice();
+        }
+        ValidateKV();
+        ValidateNsKV();
+        ValidateKMap();
+    }
+    CleanCurrentVersion();
+    ValidateFiles();
+}
+
+TEST_F(TestDB, test_put_kmap_to_all_table_and_get_return_ok_with_blob)
+{
+    PrepareDbWithBlob();
+    // Q7
+    std::vector<OperationConfig> operationsConfig = {
+        { 0.5, KMapPut }, { 0.8, KMapRemove }
+    };
+    for (uint32_t i = 0; i < NO_5; i++) {
+        for (uint32_t j = 0; j < NO_5000; j++) {
+            executeOperation(operationsConfig);
+        }
+        if (i < NO_2) {
+            ForceEvictToLsm();
+        } else if (i < NO_3) {
+            ForceFlushToSlice();
+        }
+        ValidateKMap();
+    }
+    CleanCurrentVersion();
+    ValidateFiles();
+}
+
+TEST_F(TestDB, test_pqTable_add)
+{
+    std::vector<OperationConfig> operationsConfig = {
+        { 0.9, PQTableAdd },
+        { 0.1, PQTableRemove },
+    };
+    for (uint32_t i = 0; i < NO_3; i++) {
+        for (uint32_t j = 0; j < NO_10000; j++) {
+            executeOperation(operationsConfig);
+        }
+        ValidatePQ();
+    }
+}
+
+TEST_F(TestDB, test_pqTable_add_lsm)
+{
+    std::vector<OperationConfig> operationsConfig = {
+        { 0.9, PQTableAdd },
+        { 0.1, PQTableRemove },
+    };
+    for (uint32_t i = 0; i < NO_7; i++) {
+        for (uint32_t j = 0; j < NO_10000; j++) {
+            executeOperation(operationsConfig);
+        }
+        if (i < NO_3) {
+            pqTable->TriggerSegmentFlush(true);
+        }
+        ValidatePQ();
+    }
+}
+
+TEST_F(TestDB, test_cp_lsm_and_get_return_ok_with_blob)
+{
+    PrepareDbWithBlob();
+    std::vector<OperationConfig> operationsConfig = { { 0.9, KVPut }, { 0.1, KVRemove } };
+    uint64_t cpId = 0;
+    std::string currentDir = GetCurrentWorkingDirectory();
+    std::string basePth = currentDir + "/cp/";
+    mkdir(basePth.c_str(), mode_t(NO_777));
+    for (int k = 0; k < NO_3; ++k) {
+        cpId++;
+        for (uint32_t j = 0; j < NO_10000; j++) {
+            executeOperation(operationsConfig);
+        }
+        ForceEvictToLsm();
+
+        // 测试同步snapshot流程
+        std::string cpPth = basePth + std::to_string(cpId);
+        mkdir(cpPth.c_str(), mode_t(NO_777));
+        ASSERT_NE(mDB->CreateSyncCheckpoint(cpPth, cpId), nullptr);
+        ASSERT_EQ(mDB->CreateAsyncCheckpoint(cpId, false), BSS_OK);
+        if (k < NO_2) {
+            continue;
+        }
+        CloseAllDb();
+        ConfigRef config = std::make_shared<Config>();
+        config->Init(NO_0, NO_127, NO_128);
+        config->mMemorySegmentSize = IO_SIZE_64M;
+        config->SetEvictMinSize(IO_SIZE_1K);
+        config->SetEnableKVSeparate(true);
+        config->SetBlobDefaultBlockSize(IO_SIZE_16K);
+        config->SetBlobFileSize(IO_SIZE_64K);
+        config->SetLocalPath(basePth + std::to_string(cpId) + "/sst");
+        config->SetBackendUID("cp-test");
+        config->SetEnableKVSeparate(true);
+        config->SetBlobDefaultBlockSize(IO_SIZE_16K);
+        config->SetBlobFileSize(IO_SIZE_64K);
+        config->mEnableTombstone = true;
+        config->mMaxBlobNumInMemCache = 1000;
+        config->mTombstoneDataBlockSize = IO_SIZE_64K;
+        config->mTombstoneFileSize = IO_SIZE_256K;
+        config->mTombstoneLevel0CompactionFileNum = 4;
+        config->mBlobMinCompactionThreshold = 0;
+        mDB = BoostStateDBFactory::Create();
+        mDB->Open(config);
+        std::string restorePath = basePth + std::to_string(cpId);
+        std::unordered_map<std::string, std::string> pathMap;
+        kVTable = nullptr;
+        kVTable = std::dynamic_pointer_cast<KVTable>(CreateFromDB(StateType::VALUE, "kVTable", mDB));
+        nsKVTable =
+            std::dynamic_pointer_cast<NsKVTable>(CreateFromDB(StateType::SUB_VALUE, "nsKVTable", mDB));
+        kMapTable = std::dynamic_pointer_cast<KMapTable>(CreateFromDB(StateType::MAP, "kMapTable", mDB));
+        nsKMapTable =
+            std::dynamic_pointer_cast<NsKMapTable>(CreateFromDB(StateType::SUB_MAP, "nsKMapTable", mDB));
+        kListTable = std::dynamic_pointer_cast<KListTable>(CreateFromDB(StateType::LIST, "kListTable", mDB));
+        nsKListTable =
+            std::dynamic_pointer_cast<NsKListTable>(CreateFromDB(StateType::SUB_LIST, "nsKListTable", mDB));
+        std::vector<std::string> restorePaths;
+        restorePaths.emplace_back(restorePath);
+        ASSERT_EQ(mDB->Restore(restorePaths, pathMap), BSS_OK);
+        ValidateKV();
+    }
+    DeleteCpFile();
 }
 }  // namespace test_kv_table
 }  // namespace test

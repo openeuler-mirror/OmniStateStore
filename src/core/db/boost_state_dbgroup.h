@@ -68,13 +68,6 @@ public:
      * Update slice table evict water mark
      */
     virtual void UpdateSliceEvictWaterMark() = 0;
-
-    /**
-        * Lock slot slice evicting status
-        * @param isLock Turn on the evict lock
-        * @return return true if success, else return false.
-    */
-    virtual bool LockEvicting(bool isLock) = 0;
 };
 
 using BoostStateDbGroupPtr = BoostStateDbGroup *;
@@ -104,6 +97,12 @@ public:
         * @return return BSS_OK if success, else return BSS_ERR.
          */
     static BResult Remove(uint32_t dbGroupId, BoostStateDB *boostStateDb);
+
+    /**
+        * Delete db group
+        * @param dbGroupId:boost state db group id(use slot id)
+        */
+    static void DeleteDbGroupPtr(uint32_t dbGroupId);
 
     /**
         * Destroy boost state db group object

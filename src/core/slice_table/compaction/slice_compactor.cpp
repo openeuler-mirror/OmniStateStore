@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
  * You can use this software according to the terms and conditions of the Mulan PSL v2.
  * You may obtain a copy of Mulan PSL v2 at:
  *          http://license.coscl.org.cn/MulanPSL2
@@ -79,7 +79,6 @@ void SliceCompactor::TryCompaction(uint32_t bucketIndex, const CompactCompletedN
         LOG_ERROR("Do compaction failed, ret:" << ret);
         logicalSliceChain->SetCompactionToNormal();
     }
-    LOG_INFO("Finish slice compaction, size: " << selectedSliceContext->Size());
 }
 
 BResult SliceCompactor::DoCompaction(const SliceIndexContextRef &sliceIndexContext,
@@ -98,6 +97,9 @@ BResult SliceCompactor::DoCompaction(const SliceIndexContextRef &sliceIndexConte
     auto compactDataSlice = std::make_shared<DataSlice>();
     auto ret = DoCompactSlice(selectedSliceContext->GetSliceListReversed(), compactDataSlice, false,
         bucketIndex, (logicalSliceChain->HasFilePage() || !selectedSliceContext->IsMajor()));
+    if (mTombstoneService != nullptr) {
+        mTombstoneService->Commit(ret == BSS_OK);
+    }
     if (UNLIKELY(ret == BSS_ALLOC_FAIL)) {
         logicalSliceChain->SetCompactionToNormal();
         return BSS_OK;
@@ -131,7 +133,7 @@ BResult SliceCompactor::DoCompactSlice(const std::vector<DataSliceRef> &canCompa
                                                                      canCompactSliceListReversed, mMemManager,
                                                                      forceFilter, mStateFilterManager,
                                                                      mBucketIndex->GetSlotStateFilter(bucketIndex),
-                                                                     reserveDeleteMarker);
+                                                                     reserveDeleteMarker, mTombstoneService);
     if (UNLIKELY((retVal != BSS_OK) || (resultVec.empty()))) {
         LOG_WARN("Merge slice data for compaction failed or data empty, ret:" << retVal << ".");
         return retVal;

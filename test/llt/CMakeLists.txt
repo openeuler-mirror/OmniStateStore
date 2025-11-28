@@ -12,6 +12,7 @@ set(DEPEND_LIBS
         bss_db
         bss_kv_table
         snapshot
+        blob_store
         lsm_store
         ${LIB_3RD_SECURE}
         ${LIB_3RD_LZ4}

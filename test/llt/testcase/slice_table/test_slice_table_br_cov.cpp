@@ -357,7 +357,8 @@ TEST_F(TestSliceTableBrCov, PrefixIterator_ShouldReturnNull_WhenLogicalSliceChai
 {
     Key prefixKey;
     mSliceTable->mSliceBucketIndex->mMappingTable[0] = nullptr;
-    KeyValueIteratorRef result = mSliceTable->PrefixIterator(prefixKey);
+    BlobValueTransformFunc blobValueTransformFunc;
+    KeyValueIteratorRef result = mSliceTable->PrefixIterator(prefixKey, blobValueTransformFunc);
     EXPECT_EQ(result, nullptr);
 }
 
@@ -370,7 +371,8 @@ TEST_F(TestSliceTableBrCov, PrefixIterator_ShouldReturnNull_WhenLogicalSliceChai
 {
     Key prefixKey;
     mSliceTable->mSliceBucketIndex->mMappingTable[0]->NotifyNoneFlag(true);
-    KeyValueIteratorRef result = mSliceTable->PrefixIterator(prefixKey);
+    BlobValueTransformFunc blobValueTransformFunc;
+    KeyValueIteratorRef result = mSliceTable->PrefixIterator(prefixKey, blobValueTransformFunc);
     EXPECT_EQ(result, nullptr);
 }
 
@@ -385,7 +387,8 @@ TEST_F(TestSliceTableBrCov, PrefixIterator_ShouldReturnNull_WhenIteratorInitFail
     LogicalSliceChainRef logicalSliceChain = mockAddSlice();
     logicalSliceChain->SetSliceAddress(0, nullptr);
     logicalSliceChain->SetSliceChainTailIndex(0);
-    KeyValueIteratorRef result = mSliceTable->PrefixIterator(prefixKey);
+    BlobValueTransformFunc blobValueTransformFunc;
+    KeyValueIteratorRef result = mSliceTable->PrefixIterator(prefixKey, blobValueTransformFunc);
     EXPECT_EQ(result, nullptr);
 }
 
@@ -579,20 +582,6 @@ TEST_F(TestSliceTableBrCov, LogicalSliceChain_Initialize_ShouldReturnInvalidPara
 {
     std::unordered_map<SliceAddressRef, DataSliceRef, SliceAddressHash, SliceAddressEqual> copiedDataSlice;
     EXPECT_EQ(mLogicalSliceChain->Initialize(nullptr, NO_0, NO_10, copiedDataSlice, false, false), BSS_INVALID_PARAM);
-}
-
-/**
- * @tc.name  : LogicalSliceChain_Initialize_ShouldReturnInvalidParam_WhenBaseSliceIndexLessThanStartIndex
- * @tc.number: Initialize_Test_002
- * @tc.desc  : Test Initialize function when mBaseSliceIndex is less than startIndex
- */
-TEST_F(TestSliceTableBrCov,
-    LogicalSliceChain_Initialize_ShouldReturnInvalidParam_WhenBaseSliceIndexLessThanStartIndex)
-{
-    std::unordered_map<SliceAddressRef, DataSliceRef, SliceAddressHash, SliceAddressEqual> copiedDataSlice;
-    mLogicalSliceChain->SetBaseSliceIndex(NO_5);
-    EXPECT_EQ(mLogicalSliceChain->Initialize(mLogicalSliceChain, NO_10, NO_20, copiedDataSlice, false, false),
-              BSS_INVALID_PARAM);
 }
 
 /**

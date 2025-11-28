@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
  * You can use this software according to the terms and conditions of the Mulan PSL v2.
  * You may obtain a copy of Mulan PSL v2 at:
  *          http://license.coscl.org.cn/MulanPSL2
@@ -17,20 +17,22 @@
 #include <stack>
 #include <vector>
 
-#include "include/bss_err.h"
-#include "include/config.h"
 #include "access_recorder.h"
 #include "binary/fresh_binary.h"
 #include "binary/key_value.h"
+#include "blob_store/blob_store.h"
+#include "blob_store_snapshot_operator.h"
+#include "common/bss_metric.h"
 #include "compaction/slice_compaction_trigger.h"
 #include "compaction/slice_compactor.h"
 #include "flushing_bucket_group.h"
+#include "include/bss_err.h"
+#include "include/config.h"
 #include "memory/evict_manager.h"
 #include "slice_table/bucket_group_manager.h"
 #include "slice_table/slice/raw_data_slice.h"
 #include "snapshot/file_store_snapshot_operator.h"
 #include "snapshot/slice_table_snapshot.h"
-#include "common/bss_metric.h"
 
 namespace ock {
 namespace bss {
@@ -40,6 +42,10 @@ public:
     ~SliceTable()
     {
         mBoostNativeMetric = nullptr;
+        if (mNeedReleaseBlockCache) {
+            RETURN_AS_NULLPTR(mConfig);
+            BlockCacheManager::Instance()->DeleteBlockCache(mConfig->GetTaskSlotFlag());
+        }
         LOG_INFO("Delete sliceTableManager object success.");
     }
 
@@ -132,7 +138,10 @@ public:
         AddSliceReadCount();
 
         // get value from slice chain
-        auto ioRes = sliceChain->Get(key, value, mBoostNativeMetric);
+        auto self = shared_from_this();
+        auto getFromBlobFunc = [self](uint64_t blobId, uint32_t keyHashCode, uint64_t seqId, Value &originalValue)
+            -> BResult { return self->GetValueFromBlobStore(blobId, keyHashCode, seqId, originalValue); };
+        auto ioRes = sliceChain->Get(key, value, getFromBlobFunc, mBoostNativeMetric);
         AddSliceListHitMiss(ioRes);
         return ioRes > 0 ? true : false;
     }
@@ -165,18 +174,23 @@ public:
     BResult AddSlice(const SliceIndexContextRef &curSliceIndexContext, RawDataSlice &rawDataSlice, uint32_t &addSize,
         bool &forceEvict);
 
+    BResult WriteValueToBlobStore(FreshValueNodePtr &curVal, uint32_t keyHash, uint16_t stateId, uint64_t &blobId);
+
+    BResult GetValueFromBlobStore(uint64_t blobId, uint32_t keyGroup, uint64_t seqId, Value &value);
+
     /**
      * Iterator all, for savepoint.
      * @return iterator of all kv.
      */
-    KeyValueIteratorRef EntryIterator(const KeyFilter &keyFilter);
+    KeyValueIteratorRef EntryIterator(const KeyFilter &keyFilter, BlobValueTransformFunc &blobValueTransformFunc,
+        uint16_t stateId);
 
     /**
      * Get iterator for prefix.
      * @param prefixKey prefix key.
      * @return iterator of having the same prefix.
      */
-    KeyValueIteratorRef PrefixIterator(const Key &prefixKey);
+    KeyValueIteratorRef PrefixIterator(const Key &prefixKey, BlobValueTransformFunc &blobValueTransformFunc);
 
     /**
      * Obtain memory manager.
@@ -222,6 +236,14 @@ public:
      * @return return operator instance.
      */
     FileStoreSnapshotOperatorRef PrepareFileStoreSnapshot(uint64_t operatorId, uint64_t snapshotId);
+
+    /**
+     * For snapshot, prepare blob store snapshot.
+     * @param operatorId operator id.
+     * @param snapshotId snapshot id.
+     * @return return operator instance.
+     */
+    BlobStoreSnapshotOperatorRef PrepareBlobStoreSnapshot(uint64_t operatorId, uint64_t snapshotId);
 
     /**
      * Add one slice table snapshot to slice table.
@@ -372,7 +394,7 @@ public:
         }
     }
 
-    inline void AddSliceListHitMiss(IORsult& res)
+    inline void AddSliceListHitMiss(IOResult& res)
     {
         if (mBoostNativeMetric == nullptr || !mBoostNativeMetric->IsSliceMetricEnabled()) {
             return;
@@ -415,9 +437,23 @@ public:
         }
     }
 
+    inline bool NeedKvSeparate(uint32_t valueSize) const
+    {
+        return mIsKVSeparate && valueSize > mKvThreshold;
+    }
+
+    BResult RestoreBlobStore(const std::vector<SliceTableRestoreMetaRef> &metaList,
+                             std::unordered_map<std::string, uint32_t> &restorePathFileIdMap);
+
+    TombstoneServiceRef GetTombstoneService()
+    {
+        return mTombstoneService;
+    }
+
 private:
     static uint32_t ComputeIndexBucketNum(uint64_t totalMem, const ConfigRef &config);
     static uint32_t ComputeBucketGroupNum(uint32_t bucketNum, const ConfigRef &config);
+    BResult InitializeBlobStore();
 
     inline SliceKVIteratorPtr GetIterator()
     {
@@ -474,6 +510,8 @@ private:
                       Value &finalResult, SliceAddressRef &sliceAddress, DataSliceRef &dataSlice,
                       bool &isFound) const;
 
+    void RegisterTombstoneService();
+
 private:
     mutable std::mutex mMutex;
     SliceBucketIndexRef mSliceBucketIndex;
@@ -485,11 +523,16 @@ private:
     std::unordered_map<uint64_t, SliceTableSnapshotRef> mRunningSnapshot;
     EvictManagerRef mEvictManager;
     SliceCompactionTriggerRef mCompactManager;
+    TombstoneServiceRef mTombstoneService = nullptr;
     AccessRecorderRef mAccessRecorder;
     std::atomic<uint32_t> mSnapshotVersion{ 0 };
     std::atomic<SliceTableCompaction> mIsCompaction{ SliceTableCompaction::OPEN };
     StateFilterManagerRef mStateFilterManager;
     BoostNativeMetricPtr mBoostNativeMetric = nullptr;
+    bool mIsKVSeparate = false;
+    uint32_t mKvThreshold = 0;
+    bool mNeedReleaseBlockCache = false;
+    BlobStoreRef mBlobStore = nullptr;
 };
 using SliceTableManagerRef = std::shared_ptr<SliceTable>;
 

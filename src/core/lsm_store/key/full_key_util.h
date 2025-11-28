@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
  * You can use this software according to the terms and conditions of the Mulan PSL v2.
  * You may obtain a copy of Mulan PSL v2 at:
  *          http://license.coscl.org.cn/MulanPSL2
@@ -183,7 +183,7 @@ public:
     inline static bool StateHasSecondaryKey(uint16_t stateId)
     {
         StateType stateType = StateId::GetStateType(stateId);
-        return stateType >= MAP && stateType != SUB_LIST;
+        return StateTypeUtil::HasSecKey(stateType);
     }
 
     inline static uint64_t ParseSecondaryKeyLen(const ByteBufferRef& buffer, uint32_t offset)

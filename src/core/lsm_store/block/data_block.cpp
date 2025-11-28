@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
  * You can use this software according to the terms and conditions of the Mulan PSL v2.
  * You may obtain a copy of Mulan PSL v2 at:
  *          http://license.coscl.org.cn/MulanPSL2
@@ -334,7 +334,7 @@ KeyValueIteratorRef DataBlock::SubIterator(const Key &startKey, const Key &endKe
     return std::make_shared<KeyValueVectorIterator>(std::move(keyValues));
 }
 
-KeyValueIteratorRef DataBlock::Iterator()
+KeyValueIteratorRef DataBlock::Iterator(KeyFilter keyFilter)
 {
     // unpack key and value array from data block.
     std::vector<KeyValueRef> keyValues;
@@ -351,7 +351,9 @@ KeyValueIteratorRef DataBlock::Iterator()
         for (uint32_t secKeyIndex = 0; secKeyIndex < numSecKey; ++secKeyIndex) {
             auto keyValue = std::make_shared<KeyValue>();
             RETURN_NULLPTR_AS_READ_BUFFER_ERROR(keyValueInfo.GetKeyAndValue(secKeyIndex, keyValue));
-            keyValues.emplace_back(keyValue);
+            if (keyFilter == nullptr || !keyFilter(keyValue->key)) {
+                keyValues.emplace_back(keyValue);
+            }
         }
     }
     return std::make_shared<KeyValueVectorIterator>(std::move(keyValues));

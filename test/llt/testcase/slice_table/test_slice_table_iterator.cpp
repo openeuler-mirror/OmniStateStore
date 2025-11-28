@@ -76,7 +76,7 @@ TEST_F(TestSliceTableIterator, TestSliceTablePrefixIteratorValidInMapState)
         originValueList.push_back(value);
         uint32_t keyHashCode = test::HashForTest(primaryKeyData, primaryKeyLength);
         KeyValue keyValue;
-        uint16_t stateId = MAP << NO_11;
+        uint16_t stateId = MAP << NO_13;
         QueryKey queryKey(stateId, keyHashCode, priKey, secKey);
         keyValue.key = queryKey;
         Value putVal;

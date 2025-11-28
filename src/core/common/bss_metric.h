@@ -58,6 +58,7 @@ enum class MetricType : int32_t {
     SLICE_MISS_COUNT = 201,
     SLICE_READ_COUNT = 202,
     SLICE_READ_AVG_SIZE = 203,
+    SLICE_EVICT_SIZE = 204,
     SLICE_EVICT_WAITING_COUNT = 205,
     SLICE_COMPACTION_COUNT = 206,
     SLICE_COMPACTION_SLICE_COUNT = 207,
@@ -133,7 +134,7 @@ enum class LayerType : uint8_t {
     LAYER_TYPE_BUTT = 6
 };
 
-using IORsult = int8_t;
+using IOResult = int8_t;
 
 enum SliceReadResult : int8_t {
     NOT_FOUND = -2,
@@ -155,7 +156,7 @@ public:
 
     static inline bool GetFlag(uint8_t pos, uint32_t flags)
     {
-        if (UNLIKELY(pos >= 31)) {
+        if (UNLIKELY(pos >= NO_31)) {
             LOG_ERROR("Failed to get flag, pos out of range.");
             return false;
         }
@@ -235,6 +236,7 @@ public:
             // 向上取整
             return (mSliceReadSize + mSliceReadCount - 1) / mSliceReadCount;
         });
+        mMetrics.emplace(MetricType::SLICE_EVICT_SIZE, [this]() -> uint64_t { return mSliceEvictSize; });
         mMetrics.emplace(MetricType::SLICE_EVICT_WAITING_COUNT, [this]() -> uint64_t {
             if (mSliceEvictWaitingCount == nullptr) {
                 return 0;
@@ -505,6 +507,20 @@ public:
         mSliceReadSize += size;
     }
 
+    void AddSliceEvictSize(uint64_t sliceEvictSize)
+    {
+        mSliceEvictSize += sliceEvictSize;
+    }
+
+    void SubSliceEvictSize(uint64_t sliceEvictSize)
+    {
+        if (mSliceEvictSize > sliceEvictSize) {
+            mSliceEvictSize -= sliceEvictSize;
+        } else {
+            mSliceEvictSize = 0;
+        }
+    }
+
     void SetSliceEvictWaitingCount(std::function<uint64_t()> computeSliceEvictWaitingCount)
     {
         mSliceEvictWaitingCount = computeSliceEvictWaitingCount;
@@ -534,7 +550,7 @@ public:
     // 转换为秒数
     void SetLazyDownloadTime(uint64_t lazyDownloadTime)
     {
-        mLazyDownloadTime = lazyDownloadTime / 1000;
+        mLazyDownloadTime = lazyDownloadTime / NO_1000;
     }
 
     void AddHitStat(BlockType type, uint64_t size)
@@ -651,6 +667,7 @@ public:
             mLsmFileSize += fileSize;
             if (levelId == 0) {
                 mLsmFlushCount++;
+                mLsmFlushSize += fileSize;
             }
             mLsmFileCount++;
             return;
@@ -703,22 +720,34 @@ public:
 
     uint64_t GetMemoryFreshUsed()
     {
-        return mUsedMemoryGetter(MemoryType::FRESH_TABLE);
+        if (LIKELY(mUsedMemoryGetter != nullptr)) {
+            return mUsedMemoryGetter(MemoryType::FRESH_TABLE);        
+        }
+        return 0;
     }
 
     uint64_t GetMemorySliceUsed()
     {
-        return mUsedMemoryGetter(MemoryType::SLICE_TABLE);
+        if (LIKELY(mUsedMemoryGetter != nullptr)) {
+            return mUsedMemoryGetter(MemoryType::SLICE_TABLE);
+        }
+        return 0;
     }
 
     uint64_t GetMemoryFileUsed()
     {
-        return mUsedMemoryGetter(MemoryType::FILE_STORE);
+        if (LIKELY(mUsedMemoryGetter != nullptr)) {
+            return mUsedMemoryGetter(MemoryType::FILE_STORE);
+        }
+        return 0;
     }
 
     uint64_t GetMemorySnapshotUsed()
     {
-        return mUsedMemoryGetter(MemoryType::SNAPSHOT);
+        if (LIKELY(mUsedMemoryGetter != nullptr)) {
+            return mUsedMemoryGetter(MemoryType::SNAPSHOT);
+        }
+        return 0;
     }
 
     uint64_t GetMemoryTotalUsed()
@@ -798,6 +827,7 @@ private:
     uint64_t mSliceHitCount = 0;
     uint64_t mSliceMissCount = 0;
     uint64_t mSliceReadCount = 0;
+    uint64_t mSliceEvictSize = 0;
     std::function<uint64_t()> mSliceEvictWaitingCount = nullptr;
     uint64_t mSliceCompactionCount = 0;
     uint64_t mSliceCompactionSliceCount = 0;
@@ -820,16 +850,16 @@ private:
     uint64_t mLsmFileSize = 0;
     std::vector<uint64_t> mLevelCompactionRead;
     std::vector<uint64_t> mLevelCompactionWrite;
-    uint64_t mTotalCompactionRead;
-    uint64_t mTotalCompactionWrite;
+    uint64_t mTotalCompactionRead = 0;
+    uint64_t mTotalCompactionWrite = 0;
     uint64_t mLsmFileCount = 0;
 
     // *** memory manager metrics *** //
-    uint64_t mMemoryFreshMax;
-    uint64_t mMemorySliceMax;
-    uint64_t mMemoryFileMax;
-    uint64_t mMemorySnapshotMax;
-    uint64_t mMemoryTotalMax;
+    uint64_t mMemoryFreshMax = 0;
+    uint64_t mMemorySliceMax = 0;
+    uint64_t mMemoryFileMax = 0;
+    uint64_t mMemorySnapshotMax = 0;
+    uint64_t mMemoryTotalMax = 0;
     std::function<uint64_t(MemoryType)> mUsedMemoryGetter = nullptr;
     std::function<uint64_t(MemoryType)> mMaxMemoryGetter = nullptr;
     // *** memory manager metrics *** //

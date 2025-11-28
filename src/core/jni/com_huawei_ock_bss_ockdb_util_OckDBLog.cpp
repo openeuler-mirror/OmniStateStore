@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
  * You can use this software according to the terms and conditions of the Mulan PSL v2.
  * You may obtain a copy of Mulan PSL v2 at:
  *          http://license.coscl.org.cn/MulanPSL2
@@ -10,6 +10,7 @@
  */
 #include "com_huawei_ock_bss_ockdb_util_OckDBLog.h"
 
+#include <iostream>
 #include <string>
 
 #include "bss_def.h"
@@ -26,34 +27,35 @@ JNIEXPORT jlong JNICALL Java_com_huawei_ock_bss_ockdb_OckDBLog_initial(JNIEnv *e
                                                                        jint jloglevel, jint jsize, jint jcount)
 {
     if (UNLIKELY(env == nullptr)) {
-        LOG_ERROR("Input env is nullptr.");
+        std::cout << "Input env is nullptr." << std::endl;
         return 0;
     }
     if (UNLIKELY(jlogPath == nullptr)) {
-        LOG_ERROR("LogPath is invalid.");
+        std::cout << "LogPath is invalid." << std::endl;
         return 0;
     }
     if (UNLIKELY(jloglevel < 0 || jloglevel > MIN_LOG_LEVEL_MAX)) {
-        LOG_ERROR("LogLevel is out of bounds.");
+        std::cout << "LogLevel is out of bounds." << std::endl;
         return 0;
     }
     if (UNLIKELY(jsize <= 0)) {
-        LOG_ERROR("LogSize less than zero.");
+        std::cout << "LogSize less than zero." << std::endl;
         return 0;
     }
     if (UNLIKELY(jcount <= 0)) {
-        LOG_ERROR("LogCount less than zero.");
+        std::cout << "LogCount less than zero." << std::endl;
         return 0;
     }
     const char *logPath = env->GetStringUTFChars(jlogPath, nullptr);
     if (UNLIKELY(logPath == nullptr)) {
-        LOG_ERROR("Path is null.");
+        std::cout <<"Path is null." << std::endl;
         return 0;
     }
     std::string logPathStr(logPath);
     env->ReleaseStringUTFChars(jlogPath, logPath);
     if (UNLIKELY(!CheckPathValid(PathTransform::ExtractDirectory(logPathStr)))) {
-        LOG_ERROR("Invalid Log Paths, check whether the log path configuration items comply with the specifications.");
+        std::cout <<"Invalid Log Paths, check whether the log path configuration items comply with the specifications."
+            << std::endl;
         return 0;
     }
     const LoggerOptions loggerOption = { 1, static_cast<int32_t>(jloglevel), static_cast<uint32_t>(jsize),
@@ -65,7 +67,7 @@ JNIEXPORT jlong JNICALL Java_com_huawei_ock_bss_ockdb_OckDBLog_initial(JNIEnv *e
     }
     Logger::Instance(loggerOption);
     if (UNLIKELY(Logger::gInstance == nullptr)) {
-        LOG_ERROR("gInstance is nullptr.");
+        std::cout <<"gInstance is nullptr." << std::endl;
         return 0;
     }
     Logger::gInstance->Init();

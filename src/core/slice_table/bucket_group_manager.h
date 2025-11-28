@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
  * You can use this software according to the terms and conditions of the Mulan PSL v2.
  * You may obtain a copy of Mulan PSL v2 at:
  *          http://license.coscl.org.cn/MulanPSL2
@@ -21,6 +21,7 @@
 #include "slice_table/bucket_group.h"
 #include "slice_table/index/slice_bucket_index.h"
 #include "snapshot/snapshot_restore_utils.h"
+#include "blob_store.h"
 
 namespace ock {
 namespace bss {
@@ -42,8 +43,8 @@ class BucketGroupManager {
 public:
     class SliceFileStoreIterator : public Iterator<KeyValueRef> {
     public:
-        explicit SliceFileStoreIterator(BucketGroupManager *bucketGroupManager)
-            : mBucketGroupManager(bucketGroupManager)
+        explicit SliceFileStoreIterator(BucketGroupManager *bucketGroupManager, uint16_t stateId)
+            : mBucketGroupManager(bucketGroupManager), mStateId(stateId)
         {
         }
         bool HasNext() override;
@@ -54,6 +55,7 @@ public:
         BucketGroupManager *mBucketGroupManager;
         uint32_t mIndex = 0;
         KeyValueIteratorRef mInnerIterator;
+        uint16_t mStateId;
     };
     using SliceFileStoreIteratorRef = Ref<SliceFileStoreIterator>;
 
@@ -74,7 +76,7 @@ public:
                        const FileCacheManagerRef &fileCache, uint32_t bucketGroupNum, uint32_t bucketNum,
                        const MemManagerRef &memManager, const StateFilterManagerRef &stateFilterManager);
 
-    KeyValueIteratorRef IteratorFileStoreData();
+    KeyValueIteratorRef IteratorFileStoreData(uint16_t stateId);
     std::vector<BucketGroupRef> GetBucketGroupVector();
     void MarkLogicalSliceChainFlushed(const LogicalSliceChainRef &logicalSliceChain, BucketGroupRef bucketGroup);
     void SnapshotMeta(const FileOutputViewRef &localOutputView);
@@ -113,6 +115,16 @@ public:
     {
         for (const auto &item : mBucketGroups) {
             item->RegisterMetric(metricPtr);
+        }
+    }
+
+    void RegisterTombstoneService(BlobStoreRef &blobStore)
+    {
+        for (const auto &item : mBucketGroups) {
+            auto lsmStore = item->GetLsmStore();
+            auto name = lsmStore->GetName();
+            auto tombstoneService = blobStore->CreateTombstoneService(name);
+            lsmStore->RegisterTombstoneService(tombstoneService);
         }
     }
 

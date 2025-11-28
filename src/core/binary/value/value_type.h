@@ -18,7 +18,8 @@ enum ValueType : unsigned char {
     DELETE = 1,
     PUT = 2,
     APPEND = 3,
-    TYPE_BUTT = 4,
+    SEPARATE = 4,
+    TYPE_BUTT = 5,
 };
 }
 }  // namespace ock

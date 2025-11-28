@@ -28,7 +28,7 @@ public:
 
     ~FreshHandler() = default;
 
-    BResult Handle(BoostSegmentRef segment);
+    BResult Handle(const BoostSegmentRef &segment);
 
     /**
      * divide data of fresh table into groups.
@@ -74,20 +74,34 @@ public:
 
     void Run() override
     {
+        BResult result;
+        int64_t times = NO_10;
+        do {
+            result = Handle();
+            if (LIKELY(result == BSS_OK)) {
+                break;
+            }
+            if (UNLIKELY(times <= NO_0)) {
+                LOG_ERROR("Fresh table transform retry over than 10 times, ret:" << result);
+                return;
+            }
+            times--;
+            LOG_WARN("Fresh table transform handle failed, need to inner retry, times:" << times
+                << ", ret:" << result);
+        } while (UNLIKELY(result != BSS_OK) && (usleep(NO_100), 1));
+        mFreshTable->EndSegmentFlush();
+    }
+
+    BResult Handle() const
+    {
         BoostSegmentRef segment;
         bool ret = mFreshTable->QueueFront(segment);
         if (!ret) {
             LOG_DEBUG("fresh snapshot queue is empty.");
-            return;
+            return BSS_OK;
         }
         LOG_INFO("begin to flush fresh segment:" << segment->GetSegmentId());
-        BResult result = mHandle->Handle(segment);
-        if (result == BSS_OK) {
-            mFreshTable->EndSegmentFlush();
-            LOG_INFO("finish to flush fresh segment:" << segment->GetSegmentId());
-        } else {
-            LOG_WARN("Fresh table transform handle failed, need to inner retry, ret:" << ret);
-        }
+        return mHandle->Handle(segment);
     }
 
 private:
@@ -111,7 +125,7 @@ public:
         mTransformExecutor = std::make_shared<ExecutorService>(NO_1, NO_2048);
         mTransformExecutor->SetThreadName("FreshTransformerExecutor");
         if (!mTransformExecutor->Start()) {
-            LOG_ERROR("failed to start transform executor.");
+            LOG_ERROR("Failed to start transform executor.");
             return BSS_ERR;
         }
         auto self = shared_from_this();
@@ -126,6 +140,11 @@ public:
         }
         mFreshTable = nullptr;
         LOG_INFO("Transformer exit.");
+    }
+
+    ExecutorServicePtr GetTransformExecutor()
+    {
+        return mTransformExecutor;
     }
 
     /**

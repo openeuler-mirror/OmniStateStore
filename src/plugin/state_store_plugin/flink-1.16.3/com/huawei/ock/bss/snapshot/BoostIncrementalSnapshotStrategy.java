@@ -29,7 +29,7 @@ import org.apache.flink.runtime.state.IncrementalRemoteKeyedStateHandle;
 import org.apache.flink.runtime.state.KeyGroupRange;
 import org.apache.flink.runtime.state.KeyedStateHandle;
 import org.apache.flink.runtime.state.LocalRecoveryConfig;
-import org.apache.flink.runtime.state.RegisteredKeyValueStateBackendMetaInfo;
+import org.apache.flink.runtime.state.RegisteredStateMetaInfoBase;
 import org.apache.flink.runtime.state.SnapshotResult;
 import org.apache.flink.runtime.state.StreamStateHandle;
 import org.apache.flink.runtime.state.heap.HeapPriorityQueueSnapshotRestoreWrapper;
@@ -196,7 +196,7 @@ public class BoostIncrementalSnapshotStrategy<K> extends BoostSnapshotStrategyBa
                 + "This snapshot is based on last completed checkpoint {} "
                 + "assuming the following (shared) files as base: {}.", checkpointID, lastCompletedCheckpoint,
             confirmedSstFiles);
-        for (Map.Entry<String, RegisteredKeyValueStateBackendMetaInfo<?, ?>> stateMetaInfoEntry
+        for (Map.Entry<String, RegisteredStateMetaInfoBase> stateMetaInfoEntry
             : this.metaInfoMap.entrySet()) {
             LOG.debug("RegisteredKeyValueStateBackendMetaInfo snapshot, key = {}", stateMetaInfoEntry.getKey());
             stateMetaInfoSnapshots.add(stateMetaInfoEntry.getValue().snapshot());
@@ -367,14 +367,7 @@ public class BoostIncrementalSnapshotStrategy<K> extends BoostSnapshotStrategyBa
         private void createUploadFilePaths(Path[] localDirList, List<HandleAndLocalPath> sstFiles,
             List<Path> sstFilePaths, List<Path> miscFilePaths) {
             if (snapshotMetric != null) {
-                snapshotMetric.setSnapshotIncrementalSize(0L);
-                snapshotMetric.setSnapshotFileSize(0L);
-                snapshotMetric.setSnapshotSliceFileCount(0L);
-                snapshotMetric.setSnapshotSliceIncrementalSize(0L);
-                snapshotMetric.setSnapshotSliceFileSize(0L);
-                snapshotMetric.setSnapshotSstFileCount(0L);
-                snapshotMetric.setSnapshotSstIncrementalSize(0L);
-                snapshotMetric.setSnapshotSstFileSize(0L);
+                snapshotMetric.clearPreviousMetric();
             }
             for (Path filePath : localDirList) {
                 if (filePath == null) {

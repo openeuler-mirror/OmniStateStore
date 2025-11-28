@@ -19,6 +19,8 @@ import com.huawei.ock.bss.common.conf.BoostConfig;
 import com.huawei.ock.bss.common.exception.BSSRuntimeException;
 import com.huawei.ock.bss.metric.BoostNativeMetricOptions;
 import com.huawei.ock.bss.metric.BoostSnapshotMetric;
+import com.huawei.ock.bss.queue.DeepCopyHeapPriorityQueueSetFactory;
+import com.huawei.ock.bss.queue.OckDBPriorityQueueSetFactory;
 import com.huawei.ock.bss.resource.HeapMonitor;
 import com.huawei.ock.bss.resource.ResourceContainer;
 import com.huawei.ock.bss.restore.BoostIncrementalRestoreOperation;
@@ -48,7 +50,7 @@ import org.apache.flink.runtime.state.KeyGroupRange;
 import org.apache.flink.runtime.state.KeyedStateHandle;
 import org.apache.flink.runtime.state.LocalRecoveryConfig;
 import org.apache.flink.runtime.state.PriorityQueueSetFactory;
-import org.apache.flink.runtime.state.RegisteredKeyValueStateBackendMetaInfo;
+import org.apache.flink.runtime.state.RegisteredStateMetaInfoBase;
 import org.apache.flink.runtime.state.SavepointKeyedStateHandle;
 import org.apache.flink.runtime.state.StreamCompressionDecorator;
 import org.apache.flink.runtime.state.heap.HeapPriorityQueueSetFactory;
@@ -65,9 +67,14 @@ import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Paths;
+import java.nio.file.attribute.FileAttribute;
+import java.nio.file.attribute.PosixFilePermission;
+import java.nio.file.attribute.PosixFilePermissions;
 import java.util.Collection;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 import javax.annotation.Nonnull;
@@ -176,17 +183,27 @@ public abstract class AbstractOckDBKeyedStateBackendBuilder<K> extends AbstractK
     public abstract OckDBKeyedStateBackend<K> build() throws BackendBuildingException;
 
     private HeapPriorityQueueSetFactory createHeapQueueFactory() {
-        return new HeapPriorityQueueSetFactory(keyGroupRange, numberOfKeyGroups, 128);
+        return new DeepCopyHeapPriorityQueueSetFactory(keyGroupRange, numberOfKeyGroups, 128);
     }
 
-    protected PriorityQueueSetFactory initPriorityQueueFactory() {
+    /**
+     * initPriorityQueueFactory
+     *
+     * @param db db
+     * @param map map
+     * @return PriorityQueueSetFactory
+     */
+    protected PriorityQueueSetFactory initPriorityQueueFactory(BoostStateDB db,
+        Map<String, RegisteredStateMetaInfoBase> map) {
         PriorityQueueSetFactory priorityQueueFactory;
         switch (priorityQueueStateType) {
             case HEAP:
                 priorityQueueFactory = createHeapQueueFactory();
                 break;
             case OCKDB:
-                throw new IllegalArgumentException("Unsupported priority queue state type: " + priorityQueueStateType);
+                LOG.info("init native PriorityQueue Factory.");
+                priorityQueueFactory = new OckDBPriorityQueueSetFactory(keyGroupRange, db, numberOfKeyGroups, map);
+                break;
             default:
                 throw new IllegalArgumentException("Unknown priority queue state type: " + priorityQueueStateType);
         }
@@ -194,7 +211,7 @@ public abstract class AbstractOckDBKeyedStateBackendBuilder<K> extends AbstractK
     }
 
     protected BoostRestoreOperation<K> initRestoreOperation(String jobID, BoostStateDB db, int keyGroupPrefixBytes,
-        Map<String, RegisteredKeyValueStateBackendMetaInfo<?, ?>> registeredKvStateMetaInfos,
+        Map<String, RegisteredStateMetaInfoBase> registeredKvStateMetaInfos,
         Map<String, HeapPriorityQueueSnapshotRestoreWrapper<?>> registeredPQStates,
         PriorityQueueSetFactory priorityQueueSetFactory, Map<String, Table> tables,
         Map<String, KeyedStateDescriptor> keyedStateDescriptorMap,
@@ -314,6 +331,20 @@ public abstract class AbstractOckDBKeyedStateBackendBuilder<K> extends AbstractK
         return splitPath[1];
     }
 
+    protected void initInstanceBasePath() throws BackendBuildingException {
+        // 1. 定义权限集合：750 (rwxr-x---)
+        Set<PosixFilePermission> permissions = PosixFilePermissions.fromString("rwxr-x---");
+        // 2. 将权限集合转换为FileAttribute
+        FileAttribute<Set<PosixFilePermission>> attr = PosixFilePermissions.asFileAttribute(permissions);
+        // 3. 创建目录（及其所有不存在的父目录）并应用权限
+        try {
+            Files.createDirectories(instanceBasePath.toPath(), attr);
+        } catch (IOException e) {
+            LOG.error("Failed to create instance base path.");
+            throw new BackendBuildingException("Failed to create instance base path.", e);
+        }
+    }
+
     protected BoostConfig createBoostConfig() {
         BoostConfig boostConfig = new BoostConfig(this.keyGroupRange);
         boostConfig.setMaxParallelism(this.numberOfKeyGroups);
@@ -322,6 +353,8 @@ public abstract class AbstractOckDBKeyedStateBackendBuilder<K> extends AbstractK
         boostConfig.setLsmCompactionSwitch(this.config.get(OckDBOptions.OCKDB_JNI_LSM_CMPCT_SWITCH));
         boostConfig.setTtlFilterSwitch(this.config.get(OckDBOptions.OCKDB_TTL_FILTER_SWITCH));
         boostConfig.setCacheFilterAndIndexSwitch(this.config.get(OckDBOptions.OCKDB_CACHE_FILTER_AND_INDEX_SWITCH));
+        boostConfig.setKVSeparateSwitch(this.config.get(OckDBOptions.OCKDB_KV_SEPARATE_SWITCH));
+        boostConfig.setKVSeparateThreshold(this.config.get(OckDBOptions.OCKDB_KV_SEPARATE_THRESHOLD));
         boostConfig.setCacheFilterAndIndexRatio(this.config.get(OckDBOptions.OCKDB_FILTER_AND_INDEX_OWN_CACHE_RATIO));
         boostConfig.setLsmStoreCompressionPolicy(this.config.get(OckDBOptions.OCKDB_LSM_COMPRESSION_POLICY));
         boostConfig.setLsmStoreCompressionLevelPolicy(this.config.get(OckDBOptions.OCKDB_LSM_COMPRESSION_LEVEL_POLICY));
@@ -381,7 +414,7 @@ public abstract class AbstractOckDBKeyedStateBackendBuilder<K> extends AbstractK
     }
 
     protected void releaseResource(BoostStateDB db,
-        Map<String, RegisteredKeyValueStateBackendMetaInfo<?, ?>> registeredKvStateMetaInfos,
+        Map<String, RegisteredStateMetaInfoBase> registeredKvStateMetaInfos,
         CloseableRegistry cancelStreamRegistryForBackend, BoostSnapshotStrategyBase<K> checkpointSnapshotStrategy,
         Throwable e) throws BackendBuildingException {
         IOUtils.closeQuietly(cancelStreamRegistryForBackend);
@@ -407,19 +440,7 @@ public abstract class AbstractOckDBKeyedStateBackendBuilder<K> extends AbstractK
             return;
         }
         MetricGroup childGroup = metricGroup.addGroup("snapshot");
-        childGroup.gauge("ockdb.snapshot_total_time", this.boostSnapshotMetric::getTotalTime);
-        childGroup.gauge("ockdb.snapshot_upload_time", this.boostSnapshotMetric::getUploadTime);
-        childGroup.gauge("ockdb.snapshot_file_count", this.boostSnapshotMetric::getSnapshotFileCount);
-        childGroup.gauge("ockdb.snapshot_incremental_size", this.boostSnapshotMetric::getSnapshotIncrementalSize);
-        childGroup.gauge("ockdb.snapshot_file_size", this.boostSnapshotMetric::getSnapshotFileSize);
-        childGroup.gauge("ockdb.snapshot_slice_file_count", this.boostSnapshotMetric::getSnapshotSliceFileCount);
-        childGroup.gauge("ockdb.snapshot_slice_incremental_file_size",
-            this.boostSnapshotMetric::getSnapshotSliceIncrementalSize);
-        childGroup.gauge("ockdb.snapshot_slice_file_size", this.boostSnapshotMetric::getSnapshotSliceFileSize);
-        childGroup.gauge("ockdb.snapshot_sst_file_count", this.boostSnapshotMetric::getSnapshotSstFileCount);
-        childGroup.gauge("ockdb.snapshot_sst_incremental_file_size",
-            this.boostSnapshotMetric::getSnapshotSstIncrementalSize);
-        childGroup.gauge("ockdb.snapshot_sst_file_size", this.boostSnapshotMetric::getSnapshotSstFileSize);
+        this.boostSnapshotMetric.registerMetric(childGroup);
     }
 
     private void setDBMemoryConfig(BoostConfig boostConfig) {

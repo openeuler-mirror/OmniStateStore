@@ -11,6 +11,8 @@
 
 package com.huawei.ock.bss.metric;
 
+import org.apache.flink.metrics.MetricGroup;
+
 /**
  * 收集snapshot监控信息
  *
@@ -169,6 +171,42 @@ public class BoostSnapshotMetric implements AutoCloseable {
 
     public long getSnapshotSstIncrementalSize() {
         return snapshotSstIncrementalSize;
+    }
+
+    /**
+     * 为snapshot注册Metric
+     *
+     * @param metricGroup MetricGroup
+     */
+    public void registerMetric(MetricGroup metricGroup) {
+        if (metricGroup == null) {
+            return;
+        }
+        metricGroup.gauge("ockdb.snapshot_total_time", this::getTotalTime);
+        metricGroup.gauge("ockdb.snapshot_upload_time", this::getUploadTime);
+        metricGroup.gauge("ockdb.snapshot_file_count", this::getSnapshotFileCount);
+        metricGroup.gauge("ockdb.snapshot_incremental_size", this::getSnapshotIncrementalSize);
+        metricGroup.gauge("ockdb.snapshot_file_size", this::getSnapshotFileSize);
+        metricGroup.gauge("ockdb.snapshot_slice_file_count", this::getSnapshotSliceFileCount);
+        metricGroup.gauge("ockdb.snapshot_slice_incremental_file_size", this::getSnapshotSliceIncrementalSize);
+        metricGroup.gauge("ockdb.snapshot_slice_file_size", this::getSnapshotSliceFileSize);
+        metricGroup.gauge("ockdb.snapshot_sst_file_count", this::getSnapshotSstFileCount);
+        metricGroup.gauge("ockdb.snapshot_sst_incremental_file_size", this::getSnapshotSstIncrementalSize);
+        metricGroup.gauge("ockdb.snapshot_sst_file_size", this::getSnapshotSstFileSize);
+    }
+
+    /**
+     * 清理上次snapshot的文件监控信息
+     */
+    public void clearPreviousMetric() {
+        setSnapshotIncrementalSize(0L);
+        setSnapshotFileSize(0L);
+        setSnapshotSliceFileCount(0L);
+        setSnapshotSliceIncrementalSize(0L);
+        setSnapshotSliceFileSize(0L);
+        setSnapshotSstFileCount(0L);
+        setSnapshotSstIncrementalSize(0L);
+        setSnapshotSstFileSize(0L);
     }
 
     @Override
