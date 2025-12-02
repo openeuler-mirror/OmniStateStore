@@ -60,7 +60,7 @@ TEST_F(TestSliceCompaction, TestSliceCompactionTestSmallDataIsNotTriggered)
         // 2、生成value
         GenerateValueStateData(valueData, valueLength);
         BinaryData value(valueData, valueLength);
-        uint16_t stateId = MAP << NO_11;
+        uint16_t stateId = MAP << NO_13;
         QueryKey queryKey(stateId, hashCode, priKey);
         Value putVal;
         putVal.Init(ValueType::PUT, keyLength, valueData, num++);
@@ -88,7 +88,7 @@ TEST_F(TestSliceCompaction, TestSliceCompactionTestEnoughDataIsTriggered)
     std::vector<BinaryData> originKeyList;
     uint32_t index = 0;
     uint64_t num = 0;
-    uint16_t stateId = LIST << NO_11;
+    uint16_t stateId = LIST << NO_13;
 
     //  写满32M数据
     while (index <= NO_2 * NO_1024) {

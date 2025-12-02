@@ -70,6 +70,12 @@ public:
         return false;
     }
 
+    std::deque<T> GetDeque()
+    {
+        std::lock_guard<std::mutex> lock(mMutex);
+        return mDeque;
+    }
+
     bool TryPopBack(T &item)
     {
         std::lock_guard<std::mutex> lock(mMutex);

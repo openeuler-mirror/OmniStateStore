@@ -48,8 +48,13 @@ public:
           mSnapshotId(mPendingSavepoint->GetSnapshotId()), mMemManager(mMemManager)
     {
         auto mergingIterator = CreateSortedKeyValueIterator();
+        auto sliceTable = pendingSavepoint->GetSliceTable();
+        auto func = [sliceTable](uint64_t blobId, uint32_t keyHashCode, uint64_t seqId,
+                                 Value &originalValue) -> BResult {
+            return sliceTable->GetValueFromBlobStore(blobId, keyHashCode, seqId, originalValue);
+        };
         mCurrentIterator = MakeRef<BinaryKeyValueItemIterator>(mPendingSavepoint->GetStateIdProviderSnapshot(),
-                                                               mMaxParallelism, mergingIterator, mMemManager);
+                                                               mMaxParallelism, mergingIterator, mMemManager, func);
     }
 
     KeyValueIteratorRef CreateSortedKeyValueIterator();

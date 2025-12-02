@@ -68,18 +68,21 @@ public class BoostNativeMetricImpl implements BoostNativeMetric {
                 return res;
             }
         }
-        LOG.warn("BoostNativeMetricImpl already closed.");
+        LOG.debug("BoostNativeMetricImpl already closed.");
         return 0L;
     }
 
     @Override
     public void close() {
+        long handleToClose = 0L;
         synchronized (lock) {
-            // cpp侧对象声明周期与cpp侧db一致, java侧不做控制
+            handleToClose = this.nativeHandle;
             this.nativeHandle = 0L;
         }
+        close(handleToClose);
     }
 
+    @Override
     public long getNativeHandle() {
         return this.nativeHandle;
     }
@@ -154,5 +157,12 @@ public class BoostNativeMetricImpl implements BoostNativeMetric {
      * @param type Statistics枚举的value
      * @return 监控值
      */
-    public native long getMetric(long nativeHandle, int type);
+    public static native long getMetric(long nativeHandle, int type);
+
+    /**
+     * 关闭cpp监控组件
+     *
+     * @param nativeHandle cpp侧handle
+     */
+    public static native void close(long nativeHandle);
 }

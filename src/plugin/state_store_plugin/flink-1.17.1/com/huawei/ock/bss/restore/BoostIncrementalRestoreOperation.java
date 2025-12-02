@@ -26,7 +26,7 @@ import org.apache.flink.runtime.state.IncrementalRemoteKeyedStateHandle;
 import org.apache.flink.runtime.state.KeyGroupRange;
 import org.apache.flink.runtime.state.KeyedStateHandle;
 import org.apache.flink.runtime.state.PriorityQueueSetFactory;
-import org.apache.flink.runtime.state.RegisteredKeyValueStateBackendMetaInfo;
+import org.apache.flink.runtime.state.RegisteredStateMetaInfoBase;
 import org.apache.flink.runtime.state.StateHandleID;
 import org.apache.flink.runtime.state.StateSerializerProvider;
 import org.apache.flink.runtime.state.StreamStateHandle;
@@ -59,7 +59,7 @@ public class BoostIncrementalRestoreOperation<K> extends AbstractBoostIncrementa
         BoostStateDB db, int keyGroupPrefixBytes, int numberOfTransferringThreads,
         CloseableRegistry cancelStreamRegistry,
         ClassLoader userCodeClassLoader, PriorityQueueSetFactory priorityQueueSetFactory,
-        Map<String, RegisteredKeyValueStateBackendMetaInfo<?, ?>> registeredKvStateMetaInfos,
+        Map<String, RegisteredStateMetaInfoBase> registeredKvStateMetaInfos,
         Map<String, KeyedStateDescriptor> keyedStateDescriptorMap,
         Map<String, NSKeyedStateDescriptor> nsKeyedStateDescriptorMap,
         Map<String, HeapPriorityQueueSnapshotRestoreWrapper<?>> registeredPQStates, Map<String, Table> tables,

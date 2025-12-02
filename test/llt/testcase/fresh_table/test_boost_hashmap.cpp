@@ -95,7 +95,7 @@ TEST_F(TestBoostHashMap, PutOneValueAndGetOneValue)
     BoostHashMap *boostHashMap = new BoostHashMap();
     ASSERT_TRUE(boostHashMap != nullptr);
     boostHashMap->Init(memorySegment, true);
-    uint16_t stateId = VALUE << NO_11;
+    uint16_t stateId = VALUE << NO_13;
     uint64_t seq = 0;
 
     uint32_t keyValueNum = 10000;
@@ -130,7 +130,7 @@ TEST_F(TestBoostHashMap, PutAllValueAndGetValue)
     BoostHashMap *boostHashMap = new BoostHashMap();
     ASSERT_TRUE(boostHashMap != nullptr);
     boostHashMap->Init(memorySegment, true);
-    uint16_t stateId = VALUE << NO_11;
+    uint16_t stateId = VALUE << NO_13;
     uint64_t seq = 0;
 
     std::unordered_map<std::string, std::string> unorderedMap;
@@ -187,7 +187,7 @@ TEST_F(TestBoostHashMap, PutOneMapValueAndGetOneMapValue)
     BoostHashMap *boostHashMap = new BoostHashMap();
     ASSERT_TRUE(boostHashMap != nullptr);
     boostHashMap->Init(memorySegment, true);
-    uint16_t stateId = MAP << NO_11;
+    uint16_t stateId = MAP << NO_13;
     uint64_t seq = 0;
 
     uint32_t keyValueNum = 10000;
@@ -231,7 +231,7 @@ TEST_F(TestBoostHashMap, PutAllMapValueAndGetMapValue)
     BoostHashMap *boostHashMap = new BoostHashMap();
     ASSERT_TRUE(boostHashMap != nullptr);
     boostHashMap->Init(memorySegment, true);
-    uint16_t stateId = MAP << NO_11;
+    uint16_t stateId = MAP << NO_13;
     uint64_t seq = 0;
 
     std::unordered_map<std::string, std::unordered_map<std::string, std::string>> unorderedMap;
@@ -317,7 +317,7 @@ TEST_F(TestBoostHashMap, PutMapValueAndGetFromIterator)
     boostHashMap->Init(memorySegment, true);
 
     std::unordered_map<std::string, std::unordered_map<std::string, std::string>> unorderedMap;
-    uint16_t stateId = MAP << NO_11;
+    uint16_t stateId = MAP << NO_13;
     uint64_t seq = 0;
 
     uint32_t keyValueNum = 10000;

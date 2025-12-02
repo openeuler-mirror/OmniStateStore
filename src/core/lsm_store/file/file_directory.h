@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
  * You can use this software according to the terms and conditions of the Mulan PSL v2.
  * You may obtain a copy of Mulan PSL v2 at:
  *          http://license.coscl.org.cn/MulanPSL2
@@ -33,8 +33,8 @@ public:
         mDirPath = std::make_shared<Path>(primaryBathPath, subDirName);
     }
 
-    // 权限0755：S_IRWXU | S_IRGRP | S_IXGRP | S_IROTH | S_IXOTH
-    bool CreateDirectories(const std::string &path, mode_t mode = S_IRWXU | S_IRGRP | S_IXGRP | S_IROTH | S_IXOTH)
+    // 权限0750：S_IRWXU | S_IRGRP | S_IXGRP
+    bool CreateDirectories(const std::string &path, mode_t mode = S_IRWXU | S_IRGRP | S_IXGRP)
     {
         // 如果路径为空，直接返回成功
         if (path.empty()) {
@@ -95,8 +95,8 @@ public:
 
     bool CreateDirInFileSystem()
     {
-        // 权限0755：S_IRWXU | S_IRGRP | S_IXGRP | S_IROTH | S_IXOTH
-        return CreateDirectories(mDirPath->Name(), S_IRWXU | S_IRGRP | S_IXGRP | S_IROTH | S_IXOTH);
+        // 权限0750：S_IRWXU | S_IRGRP | S_IXGRP
+        return CreateDirectories(mDirPath->Name(), S_IRWXU | S_IRGRP | S_IXGRP);
     }
 
 private:

@@ -27,8 +27,12 @@ enum class SnapshotOperatorType : uint8_t {
     DUMMY_SNAPSHOT_OPERATOR = 0,
     FRESH_TABLE = 1,
     SLICE_TABLE = 2,
-    FILE_STORE = 3
+    FILE_STORE = 3,
+    BLOB_STORE = 4
 };
+
+// <PathString, <FileAddress, FileSize, count>>
+using FileMetaInfoMap = std::unordered_map<std::string, std::tuple<uint64_t, uint32_t, uint32_t>>;
 
 class AbstractSnapshotOperator : public Referable {
 public:
@@ -85,7 +89,7 @@ public:
         return mOperatorId;
     }
 
-    inline void Cancel()
+    virtual inline void Cancel()
     {
         bool shouldRelease = false;
         std::lock_guard<std::mutex> lock(mMutex);
@@ -101,6 +105,11 @@ public:
     inline std::atomic<bool>& GetIsReleased()
     {
         return mIsReleased;
+    }
+
+    virtual inline void Success()
+    {
+        LOG_DEBUG("Snapshot success!");
     }
 
 protected:

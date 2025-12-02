@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
  * You can use this software according to the terms and conditions of the Mulan PSL v2.
  * You may obtain a copy of Mulan PSL v2 at:
  *          http://license.coscl.org.cn/MulanPSL2
@@ -98,18 +98,13 @@ public:
     inline void RegisterMetric(BoostNativeMetricPtr metricPtr)
     {
         if (mBlockCache != nullptr) {
-            mBlockCache->RegisterMetric(metricPtr);
+            mBlockCache->RegisterMetric(mConfig, metricPtr);
         }
-    }
-
-    inline void Close()
-    {
-        BlockCacheManager::Instance()->DeleteBlockCache(mConfig->GetTaskSlotFlag());
     }
 
 private:
     ConfigRef mConfig = nullptr;
-    bool mNeedReleaseBlockCache = true;
+    bool mNeedReleaseBlockCache = false;
     BlockCacheRef mBlockCache = nullptr;
     MemManagerRef mMemManager = nullptr;
 };

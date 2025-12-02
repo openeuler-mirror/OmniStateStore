@@ -67,6 +67,14 @@ void SnapshotManager::CompletePendingSnapshot(uint64_t snapshotId)
     if (UNLIKELY(mClosed)) {
         return;
     }
+    auto iter = mPendingSnapshots.find(snapshotId);
+    if (iter == mPendingSnapshots.end()) {
+        return;
+    }
+    auto coordinator = iter->second;
+    for (const auto &item : coordinator->GetRegisterSnapshotOperator()) {
+        item.second->Success();
+    }
     mPendingSnapshots.erase(snapshotId);
 }
 

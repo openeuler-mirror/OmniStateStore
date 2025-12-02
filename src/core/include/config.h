@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
  * You can use this software according to the terms and conditions of the Mulan PSL v2.
  * You may obtain a copy of Mulan PSL v2 at:
  *          http://license.coscl.org.cn/MulanPSL2
@@ -15,6 +15,7 @@
 #include <cstdint>
 #include <memory>
 #include <string>
+#include <valarray>
 #include <vector>
 
 #include "bss_types.h"
@@ -129,6 +130,18 @@ public:
     inline uint64_t GetFileBaseSize() const
     {
         return mFileBaseSize;
+    }
+
+    // 获取BlobStore单个文件的基本大小，默认值为256MB.
+    inline uint64_t GetBlobFileSize() const
+    {
+        return mBlobFileSize;
+    }
+
+    // 设置BlobStore单个文件的基本大小
+    inline void SetBlobFileSize(uint64_t blobFileSize)
+    {
+        mBlobFileSize = blobFileSize;
     }
 
     // 设置LsmStore单个文件的基本大小.
@@ -427,6 +440,89 @@ public:
         return mIsNewJob;
     }
 
+    inline void SetMaxBlobNumInMemCache(uint32_t maxBlobNumInMemCache)
+    {
+        mMaxBlobNumInMemCache = maxBlobNumInMemCache;
+    }
+
+    inline void SetTombstoneDataBlockSize(uint32_t tombstoneDataBlockSize)
+    {
+        mTombstoneDataBlockSize = tombstoneDataBlockSize;
+    }
+
+    inline void SetTombstoneFileSize(uint32_t tombstoneFileSize)
+    {
+        mTombstoneFileSize = tombstoneFileSize;
+    }
+
+    inline uint64_t GetTombstoneLevelMaxSize(uint32_t levelId) const
+    {
+        if (levelId < 1) {
+            return IO_SIZE_32M;
+        }
+        return IO_SIZE_32M * (uint64_t)std::pow(NO_10, levelId - 1);
+    }
+
+    inline uint32_t GetTombstoneCompactionGroupSize() const
+    {
+        return NO_4;
+    }
+
+    inline void SetEnableKVSeparate(bool IsKVSeparate)
+    {
+        mIsKVSeparate = IsKVSeparate;
+    }
+
+    inline bool GetEnableKVSeparate() const
+    {
+        return mIsKVSeparate;
+    }
+
+    inline void SetBlobValueSizeThreshold(uint32_t blobValueSizeThreshold)
+    {
+        mBlobValueSizeThreshold = blobValueSizeThreshold;
+    }
+
+    inline uint32_t GetBlobValueSizeThreshold() const
+    {
+        return mBlobValueSizeThreshold;
+    }
+
+    inline void SetBlobDefaultBlockSize(uint32_t defaultBlockSize)
+    {
+        mBlobDefaultBlockSize = defaultBlockSize;
+    }
+
+    inline uint32_t GetBlobDefaultBlockSize() const
+    {
+        return mBlobDefaultBlockSize;
+    }
+
+    inline double GetBlobFileCompactionMinDeleteRatio() const
+    {
+        return (mBlobMaxSpaceAmplificationRatio - 1.0) / mBlobMaxSpaceAmplificationRatio;
+    }
+
+    inline double GetBlobMaxSpaceAmplificationRatio() const
+    {
+        return mBlobMaxSpaceAmplificationRatio;
+    }
+
+    inline uint64_t GetBlobMinCompactionThreshold() const
+    {
+        return mBlobMinCompactionThreshold;
+    }
+
+    inline uint64_t GetBlobFileRetainTimeInMill() const
+    {
+        return mBlobFileRetainTimeInMill;
+    }
+
+    inline bool GetEnableTombstone() const
+    {
+        return mEnableTombstone;
+    }
+
     uint64_t mTotalDBSize = IO_SIZE_2G;
     uint32_t mMemorySegmentSize = 0;
     uint64_t mHeapAvailableSize = IO_SIZE_2G;
@@ -450,14 +546,26 @@ public:
 
     int32_t mLsmStoreCompactionSwitch = 1;
     bool mTtlFilterSwitch = false;
+    bool mIsKVSeparate = false;
+    uint32_t mBlobDefaultBlockSize = IO_SIZE_16K;
+    uint32_t mBlobValueSizeThreshold = 200;
     bool mCacheIndexAndFilterSwitch = true;
     float mCacheIndexAndFilterRatio = 0.0f;
     uint64_t mFileBaseSize = IO_SIZE_64M;
+    uint64_t mBlobFileSize = IO_SIZE_128M;
     uint64_t mMaxBaseLevelBytes = IO_SIZE_256M;
     uint32_t mFileStoreMultiple = NO_10;
     uint32_t mFileStoreL0NumTrigger = NO_8;
     std::vector<CompressAlgo> mCompressionLevelPolicy = {CompressAlgo::NONE, CompressAlgo::NONE, CompressAlgo::LZ4};
     CompressAlgo mLsmStoreCompressionPolicy = CompressAlgo::LZ4;
+    uint32_t mMaxBlobNumInMemCache = TOMBSTONE_MEMTABLE_SIZE;
+    uint32_t mTombstoneDataBlockSize = IO_SIZE_64K;
+    uint32_t mTombstoneFileSize = IO_SIZE_64M;
+    uint32_t mTombstoneLevel0CompactionFileNum = 4;
+    uint64_t mBlobMinCompactionThreshold = IO_SIZE_1G;
+    double mBlobMaxSpaceAmplificationRatio = 3.0;
+    uint64_t mBlobFileRetainTimeInMill = 120000;
+    bool mEnableTombstone = true;
 };
 using ConfigRef = std::shared_ptr<Config>;
 }

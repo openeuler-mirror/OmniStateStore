@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
  * You can use this software according to the terms and conditions of the Mulan PSL v2.
  * You may obtain a copy of Mulan PSL v2 at:
  *          http://license.coscl.org.cn/MulanPSL2
@@ -94,6 +94,18 @@ public:
                                                         FileProcHolder holder)
     {
         return std::make_shared<IndexBlockWriter>(config->GetHashIndexLoadRatio(), memManager, holder);
+    }
+
+    inline bool IsStateChange(const KeyValueRef &keyValue) const
+    {
+        RETURN_FALSE_AS_NULLPTR(keyValue);
+        RETURN_FALSE_AS_NULLPTR(mDataBlockWriter);
+        RETURN_FALSE_AS_NULLPTR(mDataBlockWriter->GetEndKeyValue());
+        Key key = mDataBlockWriter->GetEndKeyValue()->key;
+        if (StateId::GetStateType(key.StateId()) == PQ && StateId::GetStateType(keyValue->key.StateId()) != PQ) {
+            return true;
+        }
+        return false;
     }
 
 private:

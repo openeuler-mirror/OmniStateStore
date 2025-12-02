@@ -277,6 +277,7 @@ public class BoostNativeMetricOptions implements Serializable {
         sliceStatistics.add(Statistics.SLICE_MISS_COUNT);
         sliceStatistics.add(Statistics.SLICE_READ_COUNT);
         sliceStatistics.add(Statistics.SLICE_READ_AVG_SIZE);
+        sliceStatistics.add(Statistics.SLICE_EVICT_SIZE);
         sliceStatistics.add(Statistics.SLICE_EVICT_WAITING_COUNT);
         sliceStatistics.add(Statistics.SLICE_COMPACTION_COUNT);
         sliceStatistics.add(Statistics.SLICE_COMPACTION_SLICE_COUNT);

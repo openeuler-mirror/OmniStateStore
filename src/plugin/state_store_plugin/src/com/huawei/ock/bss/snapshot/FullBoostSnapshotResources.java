@@ -26,6 +26,8 @@ import org.apache.flink.runtime.state.FullSnapshotResources;
 import org.apache.flink.runtime.state.KeyGroupRange;
 import org.apache.flink.runtime.state.KeyValueStateIterator;
 import org.apache.flink.runtime.state.RegisteredKeyValueStateBackendMetaInfo;
+import org.apache.flink.runtime.state.RegisteredPriorityQueueStateBackendMetaInfo;
+import org.apache.flink.runtime.state.RegisteredStateMetaInfoBase;
 import org.apache.flink.runtime.state.StateSnapshotTransformer;
 import org.apache.flink.runtime.state.StreamCompressionDecorator;
 import org.apache.flink.runtime.state.heap.HeapPriorityQueueStateSnapshot;
@@ -183,7 +185,7 @@ public class FullBoostSnapshotResources<K> implements FullSnapshotResources<K> {
         /**
          * metaInfo
          */
-        public final RegisteredKeyValueStateBackendMetaInfo<?, ?> metaInfo;
+        public final RegisteredStateMetaInfoBase metaInfo;
 
         /**
          * stateSnapshotTransformer
@@ -199,7 +201,9 @@ public class FullBoostSnapshotResources<K> implements FullSnapshotResources<K> {
             StateDescriptor.Type type,
             StateMetaInfoSnapshot stateMetaInfoSnapshot,
             StateSnapshotTransformer<byte[]> stateSnapshotTransformer) {
-            this.metaInfo = new RegisteredKeyValueStateBackendMetaInfo<>(stateMetaInfoSnapshot);
+            this.metaInfo = type != StateDescriptor.Type.UNKNOWN
+                    ? new RegisteredKeyValueStateBackendMetaInfo<>(stateMetaInfoSnapshot)
+                    : new RegisteredPriorityQueueStateBackendMetaInfo<>(stateMetaInfoSnapshot);
             this.stateSnapshotTransformer = stateSnapshotTransformer;
             this.stateId = stateId;
             this.stateType = type;

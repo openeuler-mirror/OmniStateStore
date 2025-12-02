@@ -67,7 +67,7 @@ public:
             // 2、生成value
             TestSliceTableManager::GenerateData(valueData, valueLength);
             BinaryData value(valueData, valueLength);
-            uint16_t stateId = VALUE << NO_11;
+            uint16_t stateId = VALUE << NO_13;
             QueryKey queryKey(stateId, hashCode, priKey);
             Value putVal;
             putVal.Init(ValueType::PUT, valueLength, valueData, num++);

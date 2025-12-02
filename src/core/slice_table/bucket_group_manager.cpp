@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
  * You can use this software according to the terms and conditions of the Mulan PSL v2.
  * You may obtain a copy of Mulan PSL v2 at:
  *          http://license.coscl.org.cn/MulanPSL2
@@ -91,9 +91,9 @@ std::shared_ptr<BucketGroupIterator> BucketGroupManager::GetBucketGroups()
     return bucketGroupIterator;
 }
 
-KeyValueIteratorRef BucketGroupManager::IteratorFileStoreData()
+KeyValueIteratorRef BucketGroupManager::IteratorFileStoreData(uint16_t stateId)
 {
-    return std::make_shared<SliceFileStoreIterator>(this);
+    return std::make_shared<SliceFileStoreIterator>(this, stateId);
 }
 
 std::vector<BucketGroupRef> BucketGroupManager::GetBucketGroupVector()
@@ -239,7 +239,7 @@ void BucketGroupManager::SliceFileStoreIterator::Advance()
     while (mIndex < mBucketGroupManager->GetBucketGroupVector().size()) {
         LsmStoreRef curLsmStore = mBucketGroupManager->GetBucketGroupVector()[mIndex]->GetLsmStore();
         mIndex++;
-        mInnerIterator = curLsmStore->Iterator();
+        mInnerIterator = curLsmStore->Iterator(mStateId);
         if (mInnerIterator != nullptr && mInnerIterator->HasNext()) {
             break;
         }

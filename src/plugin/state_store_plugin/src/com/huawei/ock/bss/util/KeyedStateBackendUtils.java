@@ -19,6 +19,7 @@ import com.huawei.ock.bss.table.api.Table;
 import com.huawei.ock.bss.table.api.TableDescription;
 
 import org.apache.flink.runtime.state.RegisteredKeyValueStateBackendMetaInfo;
+import org.apache.flink.runtime.state.RegisteredStateMetaInfoBase;
 import org.apache.flink.runtime.state.StateSnapshotTransformer;
 import org.apache.flink.runtime.state.VoidNamespaceSerializer;
 
@@ -58,9 +59,10 @@ public class KeyedStateBackendUtils {
      */
     @SuppressWarnings({"rawtypes", "unchecked"})
     public static void createKeyedStateMetaInfo(KeyedStateDescriptor descriptor,
-        Map<String, RegisteredKeyValueStateBackendMetaInfo<?, ?>> registeredKVStateMetaInfos) {
+        Map<String, RegisteredStateMetaInfoBase> registeredKVStateMetaInfos) {
         String name = descriptor.getName();
-        RegisteredKeyValueStateBackendMetaInfo<?, ?> stateMetaInfo = registeredKVStateMetaInfos.get(name);
+        RegisteredKeyValueStateBackendMetaInfo<?, ?> stateMetaInfo =
+                (RegisteredKeyValueStateBackendMetaInfo<?, ?>) registeredKVStateMetaInfos.get(name);
         if (stateMetaInfo != null) {
             return;
         }
@@ -82,9 +84,10 @@ public class KeyedStateBackendUtils {
      */
     @SuppressWarnings({"rawtypes", "unchecked"})
     public static void createNSKeyedStateMetaInfo(NSKeyedStateDescriptor descriptor,
-        Map<String, RegisteredKeyValueStateBackendMetaInfo<?, ?>> registeredKVStateMetaInfos) {
+        Map<String, RegisteredStateMetaInfoBase> registeredKVStateMetaInfos) {
         String name = descriptor.getName();
-        RegisteredKeyValueStateBackendMetaInfo<?, ?> stateMetaInfo = registeredKVStateMetaInfos.get(name);
+        RegisteredKeyValueStateBackendMetaInfo<?, ?> stateMetaInfo =
+                (RegisteredKeyValueStateBackendMetaInfo<?, ?>) registeredKVStateMetaInfos.get(name);
         if (stateMetaInfo != null) {
             return;
         }

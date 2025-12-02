@@ -33,7 +33,6 @@ public:
 
     BResult Init(FileSystemType type, const PathRef &filePath)
     {
-        RETURN_INVALID_PARAM_AS_NULLPTR(filePath);
         mFilePath = filePath;
         mType = type;
         fileSystem = FileSystem::CreateFileSystem(type, mFilePath);

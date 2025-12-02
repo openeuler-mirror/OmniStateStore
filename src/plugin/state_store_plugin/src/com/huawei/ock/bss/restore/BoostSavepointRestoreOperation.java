@@ -54,11 +54,13 @@ import org.apache.flink.core.memory.DataInputDeserializer;
 import org.apache.flink.runtime.state.CompositeKeySerializationUtils;
 import org.apache.flink.runtime.state.KeyExtractorFunction;
 import org.apache.flink.runtime.state.KeyGroupRange;
+import org.apache.flink.runtime.state.KeyGroupedInternalPriorityQueue;
 import org.apache.flink.runtime.state.KeyedStateHandle;
 import org.apache.flink.runtime.state.ListDelimitedSerializer;
 import org.apache.flink.runtime.state.PriorityQueueSetFactory;
 import org.apache.flink.runtime.state.RegisteredKeyValueStateBackendMetaInfo;
 import org.apache.flink.runtime.state.RegisteredPriorityQueueStateBackendMetaInfo;
+import org.apache.flink.runtime.state.RegisteredStateMetaInfoBase;
 import org.apache.flink.runtime.state.StateSerializerProvider;
 import org.apache.flink.runtime.state.VoidNamespace;
 import org.apache.flink.runtime.state.VoidNamespaceSerializer;
@@ -112,7 +114,7 @@ public class BoostSavepointRestoreOperation<K> extends AbstractBoostRestoreOpera
 
     private final ListDelimitedSerializer listDelimitedSerializer;
 
-    private final HeapPriorityQueueSetFactory priorityQueueSetFactory;
+    private final PriorityQueueSetFactory priorityQueueSetFactory;
 
     private final Map<String, Table> tables;
 
@@ -124,7 +126,7 @@ public class BoostSavepointRestoreOperation<K> extends AbstractBoostRestoreOpera
 
     private final Map<String, NSKeyedStateDescriptor> nsKeyedStateDescriptorMap;
 
-    private final Map<String, RegisteredKeyValueStateBackendMetaInfo<?, ?>> registeredKVStateMetas;
+    private final Map<String, RegisteredStateMetaInfoBase> registeredKVStateMetas;
 
     private final Map<String, HeapPriorityQueueSnapshotRestoreWrapper<?>> registeredPQStates;
 
@@ -135,7 +137,7 @@ public class BoostSavepointRestoreOperation<K> extends AbstractBoostRestoreOpera
         BoostStateDB db,
         @Nonnull Collection<KeyedStateHandle> restoreStateHandles,
         Map<String, Table> tables,
-        Map<String, RegisteredKeyValueStateBackendMetaInfo<?, ?>> registeredKVStateMetas,
+        Map<String, RegisteredStateMetaInfoBase> registeredKVStateMetas,
         Map<String, KeyedStateDescriptor> keyedStateDescriptorMap,
         Map<String, NSKeyedStateDescriptor> nsKeyedStateDescriptorMap,
         Map<String, HeapPriorityQueueSnapshotRestoreWrapper<?>> registeredPQStates,
@@ -151,7 +153,7 @@ public class BoostSavepointRestoreOperation<K> extends AbstractBoostRestoreOpera
         this.keyDeserializer = new DataInputDeserializer();
         this.valueDeserializer = new DataInputDeserializer();
         this.listDelimitedSerializer = new ListDelimitedSerializer();
-        this.priorityQueueSetFactory = (HeapPriorityQueueSetFactory) priorityQueueFactory;
+        this.priorityQueueSetFactory = priorityQueueFactory;
         this.keyGroupRange = keyGroupRange;
         this.db = db;
         this.keyedStateDescriptorMap = keyedStateDescriptorMap;
@@ -167,14 +169,15 @@ public class BoostSavepointRestoreOperation<K> extends AbstractBoostRestoreOpera
         LOG.info("Begin savepoint restore.");
         try (ThrowingIterator<SavepointRestoreResult> restore = this.restoreOperation.restore()) {
             while (restore.hasNext()) {
-                Map<Integer, RegisteredKeyValueStateBackendMetaInfo<?, ?>> restoredKvStates = new HashMap<>();
+                Map<Integer, RegisteredStateMetaInfoBase> restoredKvStates = new HashMap<>();
                 Map<Integer, HeapPriorityQueueSnapshotRestoreWrapper<?>> restoredPQStates = new HashMap<>();
+                Map<Integer, KeyGroupedInternalPriorityQueue<?>> pqStates = new HashMap<>();
                 SavepointRestoreResult restoreResult = restore.next();
                 List<StateMetaInfoSnapshot> restoredMetaInfos = restoreResult.getStateMetaInfoSnapshots();
-                restoreStateMeta(restoredMetaInfos, restoredKvStates, restoredPQStates);
+                restoreStateMeta(restoredMetaInfos, restoredKvStates, restoredPQStates, pqStates);
                 restoreTable();
                 try (ThrowingIterator<KeyGroup> keyGroups = restoreResult.getRestoredKeyGroups()) {
-                    restoreStateData(keyGroups, restoredKvStates, restoredPQStates);
+                    restoreStateData(keyGroups, restoredKvStates, restoredPQStates, pqStates);
                 }
             }
         }
@@ -186,11 +189,12 @@ public class BoostSavepointRestoreOperation<K> extends AbstractBoostRestoreOpera
     private <T extends org.apache.flink.runtime.state.heap.HeapPriorityQueueElement
         & org.apache.flink.runtime.state.PriorityComparable<? super T>> void restoreStateMeta(
         List<StateMetaInfoSnapshot> stateMetaInfoSnapshots,
-        Map<Integer, RegisteredKeyValueStateBackendMetaInfo<?, ?>> restoredKVStates,
-        Map<Integer, HeapPriorityQueueSnapshotRestoreWrapper<?>> restoredPQStates) {
+        Map<Integer, RegisteredStateMetaInfoBase> restoredKVStates,
+        Map<Integer, HeapPriorityQueueSnapshotRestoreWrapper<?>> restoredPQStates,
+        Map<Integer, KeyGroupedInternalPriorityQueue<?>> pqStates) {
         LOG.info("Begin savepoint restore restoreStateMeta.");
         for (int i = 0; i < stateMetaInfoSnapshots.size(); i++) {
-            RegisteredKeyValueStateBackendMetaInfo<?, ?> metaInfo;
+            RegisteredStateMetaInfoBase metaInfo;
             HeapPriorityQueueSnapshotRestoreWrapper<?> pqInfo;
             StateMetaInfoSnapshot stateMetaInfoSnapshot = stateMetaInfoSnapshots.get(i);
             String name = stateMetaInfoSnapshot.getName();
@@ -201,15 +205,33 @@ public class BoostSavepointRestoreOperation<K> extends AbstractBoostRestoreOpera
                     restoredKVStates.put(i, metaInfo);
                     break;
                 case PRIORITY_QUEUE:
-                    RegisteredPriorityQueueStateBackendMetaInfo pqMetaInfo =
-                        new RegisteredPriorityQueueStateBackendMetaInfo<>(stateMetaInfoSnapshot);
-                    HeapPriorityQueueSet<T> priorityQueueSet =
-                        this.priorityQueueSetFactory.create(pqMetaInfo.getName(), pqMetaInfo.getElementSerializer());
-                    pqInfo = registeredPQStates.computeIfAbsent(name,
-                        key -> new HeapPriorityQueueSnapshotRestoreWrapper(priorityQueueSet, pqMetaInfo,
-                            KeyExtractorFunction.forKeyedObjects(), this.keyGroupRange,
-                            this.db.getConfig().getMaxParallelism()));
-                    restoredPQStates.put(i, pqInfo);
+                    if (this.priorityQueueSetFactory instanceof HeapPriorityQueueSetFactory) {
+                        RegisteredPriorityQueueStateBackendMetaInfo pqMetaInfo =
+                                new RegisteredPriorityQueueStateBackendMetaInfo<>(stateMetaInfoSnapshot);
+                        HeapPriorityQueueSet<T> priorityQueueSet =
+                            ((HeapPriorityQueueSetFactory) this.priorityQueueSetFactory).create(pqMetaInfo.getName(),
+                            pqMetaInfo.getElementSerializer());
+                        pqInfo = registeredPQStates.computeIfAbsent(name,
+                                key -> new HeapPriorityQueueSnapshotRestoreWrapper(priorityQueueSet, pqMetaInfo,
+                                        KeyExtractorFunction.forKeyedObjects(), this.keyGroupRange,
+                                        this.db.getConfig().getMaxParallelism()));
+                        restoredPQStates.put(i, pqInfo);
+                        break;
+                    }
+                    Object object = registeredKVStateMetas.computeIfAbsent(name,
+                            key -> new RegisteredPriorityQueueStateBackendMetaInfo<>(stateMetaInfoSnapshot));
+                    RegisteredPriorityQueueStateBackendMetaInfo pqMetaInfo;
+                    if (object instanceof RegisteredPriorityQueueStateBackendMetaInfo) {
+                        pqMetaInfo = (RegisteredPriorityQueueStateBackendMetaInfo) object;
+                    } else {
+                        throw new IllegalStateException("Failed to restore Meta info, invalid pqMetaInfo type: "
+                                + object.getClass().getSimpleName() + ".");
+                    }
+                    KeyGroupedInternalPriorityQueue<?> queue =
+                            priorityQueueSetFactory.create(pqMetaInfo.getName(),
+                                    pqMetaInfo.getPreviousElementSerializer());
+                    restoredKVStates.put(i, pqMetaInfo);
+                    pqStates.put(i, queue);
                     break;
                 default:
                     throw new IllegalStateException("Failed to restore Meta info because of invalid state type: "
@@ -221,11 +243,14 @@ public class BoostSavepointRestoreOperation<K> extends AbstractBoostRestoreOpera
 
     @SuppressWarnings("unchecked")
     private void restoreStateData(ThrowingIterator<KeyGroup> keyGroups,
-        Map<Integer, RegisteredKeyValueStateBackendMetaInfo<?, ?>> restoredKVStates,
-        Map<Integer, HeapPriorityQueueSnapshotRestoreWrapper<?>> restoredPQStates)
+        Map<Integer, RegisteredStateMetaInfoBase> restoredKVStates,
+        Map<Integer, HeapPriorityQueueSnapshotRestoreWrapper<?>> restoredPQStates,
+        Map<Integer, KeyGroupedInternalPriorityQueue<?>> pqStates)
         throws StateMigrationException, IOException {
         RegisteredKeyValueStateBackendMetaInfo<?, ?> kvMetaInfo = null;
+        RegisteredPriorityQueueStateBackendMetaInfo<?> pqNativeMetaInfo = null;
         HeapPriorityQueueSnapshotRestoreWrapper<HeapPriorityQueueElement> pqMetaInfo = null;
+        KeyGroupedInternalPriorityQueue<?> queue = null;
         while (keyGroups.hasNext()) {
             KeyGroup keyGroup = keyGroups.next();
             if (keyGroup == null) {
@@ -243,7 +268,23 @@ public class BoostSavepointRestoreOperation<K> extends AbstractBoostRestoreOpera
                     int kvStateId = entry.getKvStateId();
                     if (kvStateId != prevStateId) {
                         prevStateId = kvStateId;
-                        kvMetaInfo = restoredKVStates.get(kvStateId);
+                        RegisteredStateMetaInfoBase base = restoredKVStates.get(kvStateId);
+                        if (base instanceof RegisteredKeyValueStateBackendMetaInfo) {
+                            kvMetaInfo = (RegisteredKeyValueStateBackendMetaInfo<?, ?>) base;
+                            pqNativeMetaInfo = null;
+                            queue = null;
+                        } else if (base instanceof RegisteredPriorityQueueStateBackendMetaInfo) {
+                            pqNativeMetaInfo = (RegisteredPriorityQueueStateBackendMetaInfo) base;
+                            queue = pqStates.get(kvStateId);
+                            kvMetaInfo = null;
+                        } else if (base == null) {
+                            pqNativeMetaInfo = null;
+                            queue = pqStates.get(kvStateId);
+                            kvMetaInfo = null;
+                        } else {
+                            LOG.error("RegisteredStateMetaInfoBase type not match.");
+                            continue;
+                        }
                         pqMetaInfo =
                             (HeapPriorityQueueSnapshotRestoreWrapper<HeapPriorityQueueElement>)
                                 restoredPQStates.get(kvStateId);
@@ -251,6 +292,10 @@ public class BoostSavepointRestoreOperation<K> extends AbstractBoostRestoreOpera
 
                     if (pqMetaInfo != null) {
                         restoreQueueElement(pqMetaInfo, entry);
+                        continue;
+                    }
+                    if (pqNativeMetaInfo != null && queue != null) {
+                        restoreQueueElement(pqNativeMetaInfo, entry, queue);
                         continue;
                     }
 
@@ -268,12 +313,15 @@ public class BoostSavepointRestoreOperation<K> extends AbstractBoostRestoreOpera
 
     @SuppressWarnings("unchecked")
     private void restoreTable() {
-        for (RegisteredKeyValueStateBackendMetaInfo<?, ?> backendMetaInfo : this.registeredKVStateMetas.values()) {
+        for (RegisteredStateMetaInfoBase backendMetaInfo : this.registeredKVStateMetas.values()) {
             if (backendMetaInfo == null) {
                 LOG.error("backendMetaInfo is null while trying to restoreTable.");
                 continue;
             }
-            switch (backendMetaInfo.getStateType()) {
+            if (!(backendMetaInfo instanceof RegisteredKeyValueStateBackendMetaInfo)) {
+                continue;
+            }
+            switch (((RegisteredKeyValueStateBackendMetaInfo) backendMetaInfo).getStateType()) {
                 case LIST:
                     restoreKeyedListStateTable((RegisteredKeyValueStateBackendMetaInfo) backendMetaInfo);
                     continue;
@@ -283,11 +331,11 @@ public class BoostSavepointRestoreOperation<K> extends AbstractBoostRestoreOpera
                 case VALUE:
                 case REDUCING:
                 case AGGREGATING:
-                    restoreKeyedValueStateTable(backendMetaInfo);
+                    restoreKeyedValueStateTable((RegisteredKeyValueStateBackendMetaInfo) backendMetaInfo);
                     continue;
                 default:
-                    throw new UnsupportedOperationException(
-                        "Restore table failed because of invalid state type " + backendMetaInfo.getStateType());
+                    throw new UnsupportedOperationException("Restore table failed because of invalid state type "
+                            + ((RegisteredKeyValueStateBackendMetaInfo) backendMetaInfo).getStateType());
             }
         }
     }
@@ -392,11 +440,21 @@ public class BoostSavepointRestoreOperation<K> extends AbstractBoostRestoreOpera
 
     private void restoreQueueElement(HeapPriorityQueueSnapshotRestoreWrapper<HeapPriorityQueueElement> restoredPQ,
         KeyGroupEntry groupEntry) throws IOException {
-        this.keyDeserializer.setBuffer(groupEntry.getKey());
-        this.keyDeserializer.skipBytesToRead(this.keyGroupPrefixBytes);
+        this.keyDeserializer.setBuffer(groupEntry.getKey(), this.keyGroupPrefixBytes,
+                groupEntry.getKey().length - this.keyGroupPrefixBytes);
         HeapPriorityQueueElement timer =
             restoredPQ.getMetaInfo().getElementSerializer().deserialize(this.keyDeserializer);
         restoredPQ.getPriorityQueue().add(timer);
+    }
+
+    private void restoreQueueElement(RegisteredPriorityQueueStateBackendMetaInfo<?> metaInfo,
+        KeyGroupEntry groupEntry, KeyGroupedInternalPriorityQueue<?> queue)
+            throws IOException {
+        this.keyDeserializer.setBuffer(groupEntry.getKey());
+        this.keyDeserializer.skipBytesToRead(this.keyGroupPrefixBytes);
+        Object ele = metaInfo.getElementSerializer().deserialize(keyDeserializer);
+        KeyGroupedInternalPriorityQueue<Object> typedQueue = (KeyGroupedInternalPriorityQueue<Object>) queue;
+        typedQueue.add(ele);
     }
 
     private <N> void readKvStateData(RegisteredKeyValueStateBackendMetaInfo<N, ?> backendMetaInfo,

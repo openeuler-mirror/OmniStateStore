@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
  * You can use this software according to the terms and conditions of the Mulan PSL v2.
  * You may obtain a copy of Mulan PSL v2 at:
  *          http://license.coscl.org.cn/MulanPSL2
@@ -127,7 +127,8 @@ public:
         std::unordered_map<SliceAddressRef, DataSliceRef, SliceAddressHash, SliceAddressEqual> &copiedDataSlice,
         bool deepCopySliceAddress, bool hasFilePage) = 0;
 
-    virtual IORsult Get(const Key &key, Value &value, BoostNativeMetricPtr &metricPtr) = 0;
+    virtual IOResult Get(const Key &key, Value &value, BlobValueTransformFunc func,
+        BoostNativeMetricPtr &metricPtr) = 0;
 
     virtual uint32_t GetSliceSize() = 0;
 
@@ -245,7 +246,7 @@ public:
         std::unordered_map<SliceAddressRef, DataSliceRef, SliceAddressHash, SliceAddressEqual> &copiedDataSlice,
         bool deepCopySliceAddress, bool hasFilePage) override;
 
-    IORsult Get(const Key &key, Value &value, BoostNativeMetricPtr &metricPtr) override;
+    IOResult Get(const Key &key, Value &value, BlobValueTransformFunc func, BoostNativeMetricPtr &metricPtr) override;
 
     uint32_t GetSliceSize() override
     {
@@ -471,10 +472,10 @@ public:
         return BSS_ERR;
     }
 
-    IORsult Get(const Key &key, Value &value, BoostNativeMetricPtr &metricPtr) override
+    IOResult Get(const Key &key, Value &value, BlobValueTransformFunc func, BoostNativeMetricPtr &metricPtr) override
     {
         LOG_ERROR("Unsupported operation exception.");
-        return false;
+        return IO_ERR;
     }
 
     uint32_t GetSliceSize() override

@@ -34,7 +34,7 @@ import org.apache.flink.runtime.state.KeyedBackendSerializationProxy;
 import org.apache.flink.runtime.state.KeyedStateHandle;
 import org.apache.flink.runtime.state.LocalRecoveryConfig;
 import org.apache.flink.runtime.state.LocalRecoveryDirectoryProvider;
-import org.apache.flink.runtime.state.RegisteredKeyValueStateBackendMetaInfo;
+import org.apache.flink.runtime.state.RegisteredStateMetaInfoBase;
 import org.apache.flink.runtime.state.SnapshotDirectory;
 import org.apache.flink.runtime.state.SnapshotResources;
 import org.apache.flink.runtime.state.SnapshotResult;
@@ -100,7 +100,7 @@ public abstract class AbstractBoostSnapshotStrategy<K> implements CheckpointList
      * 状态元信息
      */
     @Nonnull
-    protected final Map<String, RegisteredKeyValueStateBackendMetaInfo<?, ?>> metaInfoMap;
+    protected final Map<String, RegisteredStateMetaInfoBase> metaInfoMap;
 
     /**
      * 获取注册的优先队列

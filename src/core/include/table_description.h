@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
  * You can use this software according to the terms and conditions of the Mulan PSL v2.
  * You may obtain a copy of Mulan PSL v2 at:
  *          http://license.coscl.org.cn/MulanPSL2
@@ -92,10 +92,30 @@ public:
         return mPeakFilterElemNum;
     }
 
+    inline bool Equals(const TableDescription &des) const
+    {
+        if (mTableName != des.mTableName) {
+            return false;
+        }
+        if (mStateType != des.mStateType) {
+            return false;
+        }
+        if (mStartGroup != des.mStartGroup || mEndGroup != des.mEndGroup || mMaxParallelism != des.mMaxParallelism) {
+            return false;
+        }
+        return true;
+    }
+
     std::string ToString() const
     {
         return "TableDescription(name: " + mTableName + ", type: " + std::to_string(mStateType) +
                 ", ttl: " + std::to_string(mTableTTL) + ")";
+    }
+
+    inline uint32_t HashCode()
+    {
+        return std::hash<std::string>()(mTableName) + static_cast<uint32_t>(mStateType) + mStartGroup + mEndGroup +
+            mMaxParallelism;
     }
 
 private:

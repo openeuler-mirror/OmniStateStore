@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
  * You can use this software according to the terms and conditions of the Mulan PSL v2.
  * You may obtain a copy of Mulan PSL v2 at:
  *          http://license.coscl.org.cn/MulanPSL2
@@ -159,6 +159,16 @@ struct BinaryKey {
             return 0;
         }
         return NO_10 + mPrimaryKey.mKeyDataLength + mSecondKey.mKeyDataLength;
+    }
+
+    inline uint32_t KeyHashCode() const
+    {
+        return mKeyHashCode;
+    }
+
+    inline uint32_t StateId() const
+    {
+        return mPrimaryKey.mStateId;
     }
 
     inline uint32_t GetSerializeLength() const

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
  * You can use this software according to the terms and conditions of the Mulan PSL v2.
  * You may obtain a copy of Mulan PSL v2 at:
  *          http://license.coscl.org.cn/MulanPSL2
@@ -22,7 +22,7 @@ namespace ock {
 namespace bss {
 class FileCacheFactory {
 public:
-    FileCacheFactory(const ConfigRef &conf, const ExecutorServiceRef &ioExecutor, BoostNativeMetricPtr& metricPtr)
+    FileCacheFactory(const ConfigRef &conf, const ExecutorServiceRef &ioExecutor, BoostNativeMetricPtr *metricPtrAddr)
     {
         PathRef localBasePath = std::make_shared<Path>(Uri(conf->GetLocalPath()));
         PathRef dfsBasePath = std::make_shared<Path>(Uri(conf->GetRemotePath()));
@@ -34,7 +34,7 @@ public:
         mDfsFileManager = std::make_shared<FileManager>(dfsBasePath, identifier, mLocalFileIdGenerator, ioExecutor,
                                                         true);
         mInfiniteFileCache = std::make_shared<FileCacheManager>(conf, mLocalFileManager, mDfsFileManager, ioExecutor);
-        mInfiniteFileCache->Init(metricPtr);
+        mInfiniteFileCache->Init(metricPtrAddr);
     }
 
     ~FileCacheFactory()

@@ -30,7 +30,7 @@ TEST_F(TestFileManager, test_allocate_file_return_ok)
     ConfigRef config = std::make_shared<Config>();
     config->mLocalPath = localBasePath;
     config->mBackendUID = fileName;
-    BoostNativeMetric* metric = nullptr;
+    BoostNativeMetricPtr* metric = nullptr;
     FileCacheFactoryRef cacheFactory = std::make_shared<FileCacheFactory>(config, nullptr, metric);
     FileDirectoryRef fileDirectory =
         std::make_shared<FileDirectory>(cacheFactory->GetLocalFileManager()->GetBasePath());
@@ -45,7 +45,7 @@ TEST_F(TestFileManager, test_write_to_file_store_and_read_return_ok)
     std::vector<std::pair<SliceKey, Value>> queryEntries;
     for (uint32_t idx = 0; idx < fileCount; ++idx) {
         std::vector<std::pair<SliceKey, Value>> putEntries;
-        uint16_t stateId = 16;  // 00 010 000 = PUTValue
+        uint16_t stateId = VALUE << NO_13;  // 00 010 000 = PUTValue
         uint64_t keyStart1 = 20000;
         uint64_t valueStart = 50000;
 
@@ -78,7 +78,7 @@ TEST_F(TestFileManager, test_write_to_file_store_and_read_return_ok)
 TEST_F(TestFileManager, test_get_not_exist_entry_return_not_exist)
 {
     uint64_t key1 = 1;
-    uint16_t stateId = VALUE << NO_11;
+    uint16_t stateId = VALUE << NO_13;
     ByteBufferRef keyBuffer = MakeRef<ByteBuffer>(NO_8, MemoryType::FILE_STORE, mMemManager);
     keyBuffer->WriteUint64(key1, 0);
     SliceKey key = mGenerator->GenerateSglKey(keyBuffer->Data(), sizeof(key1), stateId);
@@ -93,7 +93,7 @@ TEST_F(TestFileManager, test_file_iterator_return_ok)
     uint32_t loopCount = 20;
     for (uint32_t idx = 0; idx < NO_1; ++idx) {  // 文件数
         std::vector<std::pair<SliceKey, Value>> entries;
-        uint16_t stateId = VALUE << NO_11;
+        uint16_t stateId = VALUE << NO_13;
         uint64_t keyStart1 = 20000;
         uint64_t valueStart = 50000;
         std::vector<SliceKey> keys;
@@ -128,7 +128,7 @@ TEST_F(TestFileManager, test_file_prefix_iterator_return_ok)
 {
     uint32_t loopCount = 40;
     uint64_t keyStart1 = 20000;
-    uint16_t stateId = VALUE << NO_11;
+    uint16_t stateId = VALUE << NO_13;
     std::vector<std::pair<SliceKey, Value>> putEntries;
     uint64_t valueStart = 50000;
     std::vector<SliceKey> keys;
@@ -199,7 +199,7 @@ TEST_F(TestFileManager, test_write_read_secondary_key_iterator_return_ok)
     uint64_t valueStart = 20000;
     uint64_t keyStart1 = 20000;
     uint64_t keyStart2 = 30000;
-    uint16_t stateId = MAP << NO_11;
+    uint16_t stateId = MAP << NO_13;
     uint32_t fileCount = 3;
     std::vector<std::pair<SliceKey, Value>> kvPairs;
     std::vector<SliceKey> keys;

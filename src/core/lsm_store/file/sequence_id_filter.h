@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
  * You can use this software according to the terms and conditions of the Mulan PSL v2.
  * You may obtain a copy of Mulan PSL v2 at:
  *          http://license.coscl.org.cn/MulanPSL2
@@ -27,6 +27,11 @@ public:
     {
         return false;
     }
+
+    virtual inline int64_t GetTtlTime()
+    {
+        return 0;
+    }
 };
 using SequenceIdFilterRef = std::shared_ptr<SequenceIdFilter>;
 
@@ -35,6 +40,11 @@ public:
     inline bool Filter(uint64_t seqId) override
     {
         return false;
+    }
+
+    inline int64_t GetTtlTime() override
+    {
+        return 0;
     }
 };
 
@@ -55,6 +65,10 @@ public:
             std::min(static_cast<uint64_t>(INT64_MAX - ts), static_cast<uint64_t>(mTtl)) <= currentTime);
     }
 
+    inline int64_t GetTtlTime() override
+    {
+        return mTtl;
+    }
 private:
     int64_t mTtl = 0;
 };

@@ -11,9 +11,14 @@
 
 package com.huawei.ock.bss.metric;
 
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+
+import org.apache.flink.metrics.MetricGroup;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
+import org.powermock.api.mockito.PowerMockito;
 
 /**
  * BoostSnapshotMetricTest
@@ -167,5 +172,24 @@ public class BoostSnapshotMetricTest {
         snapshotMetric.addSnapshotSstFileSize(1L);
         long res = snapshotMetric.getSnapshotSstFileSize();
         Assert.assertEquals(2L, res);
+    }
+
+    @Test
+    public void test_clear_previous_metric() {
+        snapshotMetric.clearPreviousMetric();
+    }
+
+    @Test
+    public void test_register_metric() throws Exception {
+        MetricGroup metricGroup = PowerMockito.mock(MetricGroup.class);
+        PowerMockito.when(metricGroup, "gauge", anyString(), any()).thenReturn(null);
+        snapshotMetric.registerMetric(metricGroup);
+    }
+
+    @Test
+    public void test_register_metric_null() throws Exception {
+        MetricGroup metricGroup = PowerMockito.mock(MetricGroup.class);
+        PowerMockito.when(metricGroup, "gauge", anyString(), any()).thenReturn(null);
+        snapshotMetric.registerMetric(null);
     }
 }

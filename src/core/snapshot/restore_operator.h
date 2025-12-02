@@ -28,10 +28,11 @@ public:
     RestoreOperator(ConfigRef &config, FileManagerRef &localFileManager, FileManagerRef &remoteFileManager,
                     SliceTableManagerRef &sliceTable, FreshTableRef &freshTable, StateIdProviderRef &stateIdProvider,
                     std::unordered_map<std::string, TableRef> &tables, FileCacheFactoryRef &fileCacheFactory,
-                    SnapshotManagerRef &snapshotManager)
+                    SnapshotManagerRef &snapshotManager,
+                    std::unordered_map<std::string, PQTableRef> pqTables)
         : mConfig(config), mLocalFileManager(localFileManager), mRemoteFileManager(remoteFileManager),
-          mSliceTable(sliceTable), mFreshTable(freshTable), mTables(tables), mStateIdProvider(stateIdProvider),
-          mFileCacheFactory(fileCacheFactory), mSnapshotManager(snapshotManager)
+          mSliceTable(sliceTable), mFreshTable(freshTable), mTables(tables), mPQTables(pqTables),
+          mStateIdProvider(stateIdProvider), mFileCacheFactory(fileCacheFactory), mSnapshotManager(snapshotManager)
     {
     }
 
@@ -40,8 +41,8 @@ public:
                     bool isLazyDownload);
 
     // 将restoredMetaInfo里面的本地恢复路径中的文件链接到当前db的本地恢复路径中.
-    BResult CreateHardLinkForRestoredLocalFile(const std::vector<SnapshotFileMappingRef> &restoredLocalFileMapping,
-                                               const PathRef &currentBasePath);
+    BResult CreateHardLinkForRestoredLocalFile(bool isExcludeSSTFiles,
+        const std::vector<SnapshotFileMappingRef> &restoredLocalFileMappings, const PathRef &currentBasePath);
 
 private:
     SnapshotFileMappingRef OrganizeRemoteFileInfo(std::vector<SnapshotFileMappingRef> &restoredLocalFileMappings,
@@ -54,6 +55,7 @@ private:
     SliceTableManagerRef mSliceTable = nullptr;
     FreshTableRef mFreshTable = nullptr;
     std::unordered_map<std::string, TableRef> mTables;
+    std::unordered_map<std::string, PQTableRef> mPQTables;
     StateIdProviderRef mStateIdProvider = nullptr;
     FileCacheFactoryRef mFileCacheFactory = nullptr;
     SnapshotManagerRef mSnapshotManager = nullptr;

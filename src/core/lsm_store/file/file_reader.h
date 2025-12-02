@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
  * You can use this software according to the terms and conditions of the Mulan PSL v2.
  * You may obtain a copy of Mulan PSL v2 at:
  *          http://license.coscl.org.cn/MulanPSL2
@@ -116,7 +116,9 @@ private:
     {
         RETURN_NULLPTR_AS_NULLPTR(mIndexReader);
         auto blockHandleIterator = mIndexReader->SubIterator(startKey, endKey, reverseOrder);
-        RETURN_NULLPTR_AS_NULLPTR(blockHandleIterator);
+        if (blockHandleIterator == nullptr) {
+            return nullptr;
+        }
         return std::make_shared<FileSubIterator>(shared_from_this(), internalKeyFilter, blockHandleIterator, startKey,
                                                   endKey, reverseOrder);
     }

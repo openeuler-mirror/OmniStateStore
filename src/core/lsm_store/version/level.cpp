@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
  * You can use this software according to the terms and conditions of the Mulan PSL v2.
  * You may obtain a copy of Mulan PSL v2 at:
  *          http://license.coscl.org.cn/MulanPSL2
@@ -111,6 +111,23 @@ std::vector<FileMetaDataRef> Level::GetFilesContainingPrefixKey(const Key &prefi
     return result;
 }
 
+std::vector<FileMetaDataRef> Level::GetFilesContainingStateId(uint32_t stateId)
+{
+    std::vector<FileMetaDataRef> result;
+    FileMetaDataGroupRef curGroup = mFileMetaDataGroups.empty() ? nullptr : mFileMetaDataGroups.at(0);
+    while (curGroup != nullptr) {
+        auto &files = curGroup->GetFiles();
+        for (const auto &item : files) {
+            if (item->GetStateIdInterval().Contains(stateId)) {
+                result.push_back(item);
+            }
+        }
+        curGroup = NextFileMetaDataGroup(curGroup);
+    }
+    return result;
+}
+
+
 bool Level::IsPrefixKeyWithinFile(const FileMetaDataRef &fileMetaData, const Key &prefixKey)
 {
     FullKeyRef smallest = fileMetaData->GetSmallest();
@@ -145,7 +162,7 @@ uint32_t Level::FindFile(const std::vector<FileMetaDataRef> &files, const Key &k
     uint32_t left = 0;
     uint32_t right = files.size();
     while (left < right) {
-        uint32_t mid = (left + right) >> NO_1;
+        uint32_t mid = left + ((right - left) >> NO_1);
         if (FullKeyUtil::CompareKeyWithInternalKey(key, files.at(mid)->GetLargest()) > 0) {
             left = mid + 1;
             continue;

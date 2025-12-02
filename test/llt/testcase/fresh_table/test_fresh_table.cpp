@@ -43,7 +43,7 @@ TEST_F(TestFreshTable, test_write_big_value_and_get_ok)
     char* data = static_cast<char*>(malloc(IO_SIZE_16M));
     ASSERT_TRUE(data != nullptr);
     memset_s(data, IO_SIZE_16M, 0xFF, IO_SIZE_16M);
-    uint16_t stateId = VALUE << NO_11;
+    uint16_t stateId = VALUE << NO_13;
     BinaryData val(reinterpret_cast<uint8_t *>(data), IO_SIZE_16M);
     QueryKey queryKey(stateId, 1234, priKey);
     Value putVal;
@@ -69,7 +69,7 @@ TEST_F(TestFreshTable, test_add)
     char* data = static_cast<char*>(malloc(IO_SIZE_16M));
     ASSERT_TRUE(data != nullptr);
     memset_s(data, IO_SIZE_16M, 0xFF, IO_SIZE_16M);
-    uint16_t stateId = MAP << NO_11;
+    uint16_t stateId = MAP << NO_13;
     BinaryData val(reinterpret_cast<uint8_t *>(data), IO_SIZE_16M);
     QueryKey queryKey(stateId, 1234, priKey, secKey);
     Value putVal;

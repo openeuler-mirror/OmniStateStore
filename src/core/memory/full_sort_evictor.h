@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
  * You can use this software according to the terms and conditions of the Mulan PSL v2.
  * You may obtain a copy of Mulan PSL v2 at:
  *          http://license.coscl.org.cn/MulanPSL2
@@ -107,13 +107,13 @@ public:
     class FlushQueueForBucketGroup : public std::enable_shared_from_this<FlushQueueForBucketGroup> {
     public:
         BResult Initialize(const FullSortEvictorRef &fullSortEvictor, const ExecutorServicePtr &executorService,
-                           const BucketGroupRef &bucketGroup, BoostNativeMetricPtr &metricPtr);
+                           const BucketGroupRef &bucketGroup, BoostNativeMetricPtr *metricPtr);
         bool SubmitJob(std::vector<SliceScore> &entryList, const FullSortEvictorRef &fullSortEvictor, bool isSync);
 
         ExecutorServicePtr mService;
         std::weak_ptr<FullSortEvictor> mFullSortEvictor;
         BucketGroupRef mBucketGroup;
-        BoostNativeMetricPtr mQueueNativeMetric = nullptr;
+        BoostNativeMetricPtr *mMetricPtrAddr = nullptr;
     };
     using FlushQueueForBucketGroupRef = std::shared_ptr<FlushQueueForBucketGroup>;
     ExecutorServicePtr mService;

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
  * You can use this software according to the terms and conditions of the Mulan PSL v2.
  * You may obtain a copy of Mulan PSL v2 at:
  *          http://license.coscl.org.cn/MulanPSL2
@@ -23,8 +23,9 @@ namespace bss {
 class SliceKVIterator {
 public:
     SliceKVIterator(const IteratorRef<std::vector<DataSliceRef>> &dataSliceVectorIterator,
-                    const MemManagerRef &memManager)
-        : mDataSliceVectorIterator(dataSliceVectorIterator), mMemManager(memManager)
+                    const MemManagerRef &memManager, TombstoneServiceRef tombstoneService = nullptr)
+        : mDataSliceVectorIterator(dataSliceVectorIterator), mMemManager(memManager),
+        mTombstoneService(tombstoneService)
     {
         mCurrentKV = mCurrentKVList.end();
         mStart = mMemManager->GetConfig()->mStartGroup;
@@ -93,6 +94,7 @@ private:
     uint32_t mEnd = 0;
     uint32_t mMaxParallelism = 0;
     bool mForSavepoint = false;
+    TombstoneServiceRef mTombstoneService;
     std::function<bool(const KeyValueRef &keyValue)> mKeyGroupFilter = nullptr;
 };
 using SliceKVIteratorPtr = std::shared_ptr<SliceKVIterator>;

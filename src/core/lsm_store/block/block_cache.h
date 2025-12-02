@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
  * You can use this software according to the terms and conditions of the Mulan PSL v2.
  * You may obtain a copy of Mulan PSL v2 at:
  *          http://license.coscl.org.cn/MulanPSL2
@@ -36,7 +36,7 @@ public:
 
     inline bool IsDataBlock(BlockType blockType)
     {
-        return blockType == BlockType::DATA;
+        return blockType == BlockType::DATA || blockType == BlockType::BLOB;
     }
 
     inline BlockRef Get(uint64_t blockId, BlockType blockType)
@@ -84,10 +84,16 @@ public:
         return mLruCache.Remove(blockId);
     }
 
-    inline void RegisterMetric(BoostNativeMetricPtr metricPtr)
+    inline void RegisterMetric(ConfigRef config, BoostNativeMetricPtr metricPtr)
     {
-        mLruCache.RegisterMetric(metricPtr);
-        mLruCacheFilterAndIndex.RegisterMetric(metricPtr);
+        mLruCache.RegisterMetric(config, metricPtr);
+        mLruCacheFilterAndIndex.RegisterMetric(config, metricPtr);
+    }
+
+    inline void DeRegisterMetric(ConfigRef config)
+    {
+        mLruCache.DeRegisterMetric(config);
+        mLruCacheFilterAndIndex.DeRegisterMetric(config);
     }
 
 private:
@@ -119,6 +125,17 @@ public:
         mBlockCacheMap.emplace(slotId, std::make_pair(1, blockCache));
         LOG_INFO("Create block cache success, slotId:" << slotId << ", capacity:" << capacity);
         return blockCache;
+    }
+
+    BlockCacheRef GetBlockCache(uint32_t slotId)
+    {
+        std::lock_guard<std::mutex> lock(mLock);
+        auto iter = mBlockCacheMap.find(slotId);
+        if (iter != mBlockCacheMap.end()) {
+            return iter->second.second;
+        }
+        LOG_WARN("Unexpected: block cache of slot:" << slotId << " not exist.");
+        return nullptr;
     }
 
     void DeleteBlockCache(uint32_t slotId)

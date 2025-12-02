@@ -10,7 +10,9 @@
  */
 
 #include "slice_table_restore_operation.h"
+
 #include <iostream>
+
 #include "slice_table/bucket_group_range.h"
 #include "slice_table/bucket_group_rescale_util.h"
 
@@ -21,7 +23,7 @@ BResult SliceTableRestoreOperation::RestoreSliceBucketIndex(std::vector<Restored
 {
     for (const auto &dbMeta : restoredDbMetas) {
         if (dbMeta->GetStartKeyGroup() > mConfig->GetEndGroup() ||
-            dbMeta->GetEndKeyGroup() < mConfig->GetStartGroup()) { // 过滤掉不属于该KeyGroup的dbMeta.
+            dbMeta->GetEndKeyGroup() < mConfig->GetStartGroup()) {  // 过滤掉不属于该KeyGroup的dbMeta.
             continue;
         }
 
@@ -30,13 +32,17 @@ BResult SliceTableRestoreOperation::RestoreSliceBucketIndex(std::vector<Restored
             metaFileInputView, std::make_shared<GroupRange>(dbMeta->GetStartKeyGroup(), dbMeta->GetEndKeyGroup()),
             dbMeta->GetSnapshotVersion());
         // 查找sliceTable和fileStore的元数据偏移.
-        for (const auto& opInfo : dbMeta->GetRestoredSnapshotOperatorInfos()) {
+        for (const auto &opInfo : dbMeta->GetRestoredSnapshotOperatorInfos()) {
             SnapshotOperatorType opType = opInfo->GetSnapshotOperatorInfo()->GetSnapshotOperatorType();
             if (opType == SnapshotOperatorType::FRESH_TABLE) {
                 continue;
             }
             if (opType == SnapshotOperatorType::SLICE_TABLE) {
                 restoreMeta->SetSliceTableMetaOffset(static_cast<int64_t>(opInfo->GetSnapshotOperatorMetaOffset()));
+                continue;
+            }
+            if (opType == SnapshotOperatorType::BLOB_STORE) {
+                restoreMeta->SetBlobServiceMetaOffset(static_cast<int64_t>(opInfo->GetSnapshotOperatorMetaOffset()));
                 continue;
             }
             if (opType == SnapshotOperatorType::FILE_STORE) {
@@ -60,12 +66,14 @@ BResult SliceTableRestoreOperation::RestoreSliceBucketIndex(std::vector<Restored
         uint64_t snapshotId = restoredDbMetas[0]->GetSnapshotId();
         metaFileInputView->Seek(restoreMeta->GetSliceTableMetaOffset());
         SliceBucketGroupRangeGroupRef oldSliceSegmentGroup = nullptr;
-        RETURN_NOT_OK(RestoreSliceBucketIndex(metaFileInputView, dbMeta->GetSnapshotVersion(), oldSliceSegmentGroup,
-                                              snapshotId));
+        RETURN_NOT_OK(
+            RestoreSliceBucketIndex(metaFileInputView, dbMeta->GetSnapshotVersion(), oldSliceSegmentGroup, snapshotId));
 
         // 缩放BucketGroup, 针对并行度并更场景.
-        auto newSliceBucketGroupRangeGroup = std::make_shared<SliceBucketGroupRangeGroup>(
-            mSliceBucketIndex->GetIndexCapacity(), mBucketGroupManager->GetBucketGroupRanges(), mSliceBucketIndex);
+        auto newSliceBucketGroupRangeGroup =
+            std::make_shared<SliceBucketGroupRangeGroup>(mSliceBucketIndex->GetIndexCapacity(),
+                                                         mBucketGroupManager->GetBucketGroupRanges(),
+                                                         mSliceBucketIndex);
         RETURN_NOT_OK(BucketGroupRescaleUtil::Rescale(oldSliceSegmentGroup, newSliceBucketGroupRangeGroup,
                                                       mBucketGroupManager, restoreMeta->GetRescaleMappingInfo()));
         restoreMetaList.push_back(restoreMeta);
@@ -80,11 +88,11 @@ BResult SliceTableRestoreOperation::RestoreSliceBucketIndex(const FileInputViewR
 {
     if (snapshotVersion >= NO_3) {
         uint8_t kvSeparateMode = 0;
-        RETURN_NOT_OK_AS_READ_ERROR(reader->Read(kvSeparateMode)); // 读取kv分离标记
+        RETURN_NOT_OK_AS_READ_ERROR(reader->Read(kvSeparateMode));  // 读取kv分离标记
     }
 
     uint32_t oldBucketNum = 0;
-    RETURN_NOT_OK_AS_READ_ERROR(reader->Read(oldBucketNum)); // 读取bucketNum
+    RETURN_NOT_OK_AS_READ_ERROR(reader->Read(oldBucketNum));  // 读取bucketNum
     if (UNLIKELY(oldBucketNum == 0)) {
         LOG_ERROR("Old bucket num resolve failed, oldBucketNum:" << oldBucketNum);
         return BSS_ERR;
@@ -95,7 +103,7 @@ BResult SliceTableRestoreOperation::RestoreSliceBucketIndex(const FileInputViewR
     std::vector<LogicalSliceChainRef> logicalSliceChainTable(oldBucketNum);
     for (uint32_t i = 0; i < oldBucketNum; i++) {
         uint8_t isEmptyChain = 0;
-        RETURN_NOT_OK_AS_READ_ERROR(reader->Read(isEmptyChain)); // 读取emptyChain标记
+        RETURN_NOT_OK_AS_READ_ERROR(reader->Read(isEmptyChain));  // 读取emptyChain标记
         if (isEmptyChain == NO_1) {
             logicalSliceChainTable[i] = LogicalSliceChain::mEmptySliceChain;
         } else {
@@ -103,12 +111,12 @@ BResult SliceTableRestoreOperation::RestoreSliceBucketIndex(const FileInputViewR
                                                                                              false);
             RETURN_NOT_OK(logicalSliceChain->Restore(reader, snapshotId));
             logicalSliceChainTable[i] = logicalSliceChain;
-            sliceTotalSize +=  logicalSliceChain->GetSliceSize();
-            LOG_DEBUG("Restore non-empty slice chain, idx:" << i << ", logicSliceChainStatus:" <<
-                      static_cast<uint32_t>(logicalSliceChain->GetSliceStatus()) << ", endSliceIndex:" <<
-                      logicalSliceChain->GetSliceChainTailIndex() << ", baseSliceIndex:" <<
-                      logicalSliceChain->GetBaseSliceIndex() << ", sliceSize:" << logicalSliceChain->GetSliceSize() <<
-                      ", filePageSize:" << logicalSliceChain->GetFilePageSize());
+            sliceTotalSize += logicalSliceChain->GetSliceSize();
+            LOG_DEBUG("Restore non-empty slice chain, idx:"
+                      << i << ", logicSliceChainStatus:" << static_cast<uint32_t>(logicalSliceChain->GetSliceStatus())
+                      << ", endSliceIndex:" << logicalSliceChain->GetSliceChainTailIndex() << ", baseSliceIndex:"
+                      << logicalSliceChain->GetBaseSliceIndex() << ", sliceSize:" << logicalSliceChain->GetSliceSize()
+                      << ", filePageSize:" << logicalSliceChain->GetFilePageSize());
         }
     }
 
@@ -116,12 +124,19 @@ BResult SliceTableRestoreOperation::RestoreSliceBucketIndex(const FileInputViewR
     std::vector<BucketGroupRangeRef> bucketGroupRanges;
     RETURN_NOT_OK(BucketGroupManager::RestoreMeta(reader, oldBucketNum, bucketGroupRanges));
 
-    oldSliceSegmentGroup = std::make_shared<SliceBucketGroupRangeGroup>(oldBucketNum, bucketGroupRanges,
-        std::make_shared<SliceBucketIndex>(logicalSliceChainTable));
-    LOG_DEBUG("Restore slice bucket group range success, oldBucketNum:" << oldBucketNum << ", newBucketNum:" <<
-              mCurTotalBucketNum << ", totalSize:" << sliceTotalSize << ", bucketGroupRangeSize:" <<
-              bucketGroupRanges.size());
+    oldSliceSegmentGroup =
+        std::make_shared<SliceBucketGroupRangeGroup>(oldBucketNum, bucketGroupRanges,
+                                                     std::make_shared<SliceBucketIndex>(logicalSliceChainTable));
+    LOG_DEBUG("Restore slice bucket group range success, oldBucketNum:"
+              << oldBucketNum << ", newBucketNum:" << mCurTotalBucketNum << ", totalSize:" << sliceTotalSize
+              << ", bucketGroupRangeSize:" << bucketGroupRanges.size());
     return BSS_OK;
+}
+
+BResult SliceTableRestoreOperation::RestoreBlobStore(std::vector<SliceTableRestoreMetaRef> &metaList,
+                                                     std::unordered_map<std::string, uint32_t> &restorePathFileIdMap)
+{
+    return mSliceTable->RestoreBlobStore(metaList, restorePathFileIdMap);
 }
 
 void SliceTableRestoreOperation::TryEvictCompositeLogicalSliceChain(uint64_t chainMemory)
@@ -129,12 +144,13 @@ void SliceTableRestoreOperation::TryEvictCompositeLogicalSliceChain(uint64_t cha
     auto evictMemoryWatermark = static_cast<uint64_t>(mSliceTable->GetMemHighMark());
     uint64_t usedMemory = mMemManager->GetMemoryUseSize(MemoryType::SLICE_TABLE);
     if (usedMemory + chainMemory >= evictMemoryWatermark) {
-        LOG_INFO("Evict composite logical slice start, chainMemory:" << chainMemory << ", usedMemory:" << usedMemory <<
-                 ", watermark:" << evictMemoryWatermark);
+        LOG_INFO("Evict composite logical slice start, chainMemory:" << chainMemory << ", usedMemory:" << usedMemory
+                                                                     << ", watermark:" << evictMemoryWatermark);
         auto ret = mSliceTable->TryCurrentDBEvict(0, true, true);
         if (UNLIKELY(ret != BSS_OK)) {
-            LOG_ERROR("Force sync evict composite logical slice failed, ret:" << ret << ", chainMemory:" <<
-                      chainMemory << ", usedMemory:" << usedMemory << ", watermark:" << evictMemoryWatermark);
+            LOG_ERROR("Force sync evict composite logical slice failed, ret:"
+                      << ret << ", chainMemory:" << chainMemory << ", usedMemory:" << usedMemory
+                      << ", watermark:" << evictMemoryWatermark);
         }
     }
 }
@@ -197,7 +213,7 @@ BResult SliceTableRestoreOperation::LoadSlicesIntoLogicalSliceChain(const Logica
     RETURN_ALLOC_FAIL_AS_NULLPTR(sliceIterator);
     while (sliceIterator->HasNext()) {
         SliceAddressRef sliceAddress = sliceIterator->Next();
-        if (sliceAddress == nullptr || sliceAddress->IsEvicted()) { // 跳过已经被淘汰的sliceAddress.
+        if (sliceAddress == nullptr || sliceAddress->IsEvicted()) {  // 跳过已经被淘汰的sliceAddress.
             continue;
         }
 
@@ -209,8 +225,8 @@ BResult SliceTableRestoreOperation::LoadSlicesIntoLogicalSliceChain(const Logica
         inputView->Init(FileSystemType::LOCAL, restoreFilePath);
         auto ret = inputView->ReadByteBuffer(0, buffer, sliceAddress->GetStartOffset(), sliceAddress->GetDataLen());
         if (UNLIKELY(ret != BSS_OK)) {
-            LOG_ERROR("Load slice chain failed, because of read file failed, ret:" << ret << ", filePath:" <<
-                      restoreFilePath->ExtractFileName());
+            LOG_ERROR("Load slice chain failed, because of read file failed, ret:"
+                      << ret << ", filePath:" << restoreFilePath->ExtractFileName());
             return BSS_ERR;
         }
 
@@ -233,8 +249,8 @@ BResult SliceTableRestoreOperation::LoadSlicesIntoLogicalSliceChain(const Logica
 }
 
 BResult SliceTableRestoreOperation::DoCompactCompositeSlice(
-    const std::vector<DataSliceRef> &canCompactSliceListReversed,
-    DataSliceRef &compactedDataSlice, bool forceFilter, uint32_t bucketIndex)
+    const std::vector<DataSliceRef> &canCompactSliceListReversed, DataSliceRef &compactedDataSlice, bool forceFilter,
+    uint32_t bucketIndex)
 {
     // 1. 执行Merge操作.
     std::vector<std::pair<SliceKey, Value>> resultVec;
@@ -242,7 +258,7 @@ BResult SliceTableRestoreOperation::DoCompactCompositeSlice(
     auto retVal = SliceCompactionUtils::MergeDataSlicesForCompaction(
         resultVec, compactionCount, canCompactSliceListReversed, mMemManager, forceFilter,
         mSliceTable->GetStateFilterManager(), mSliceTable->GetSliceBucketIndex()->GetSlotStateFilter(bucketIndex),
-        true);
+        true, mSliceTable->GetTombstoneService());
     if (UNLIKELY((retVal != BSS_OK))) {
         LOG_WARN("Merge slice data for compaction failed or data empty, ret:" << retVal << ".");
         return retVal;
@@ -299,15 +315,19 @@ BResult SliceTableRestoreOperation::DoCompositeCompaction(const SliceIndexContex
 
     auto compactDataSlice = std::make_shared<DataSlice>();
     auto ret = DoCompactCompositeSlice(canCompactSliceListReversed, compactDataSlice, true, bucketIndex);
+    auto tombstoneService = mSliceTable->GetTombstoneService();
+    if (tombstoneService != nullptr) {
+        tombstoneService->Commit(ret == BSS_OK);
+    }
     if (UNLIKELY(ret != BSS_OK)) {
         LOG_WARN("Do compact composite slice failed, ret:" << ret << ", bucketIndex:" << bucketIndex);
         return ret;
     }
-    LOG_DEBUG("Do compact composite slice success, oldSliceSize:" << logicalSliceChain->GetSliceSize() <<
-              ", bucketIndex:" << bucketIndex << ", dataSliceSize:" << canCompactSliceListReversed.size());
+    LOG_DEBUG("Do compact composite slice success, oldSliceSize:"
+              << logicalSliceChain->GetSliceSize() << ", bucketIndex:" << bucketIndex
+              << ", dataSliceSize:" << canCompactSliceListReversed.size());
 
-    return ReplaceCompositeLogicalSlice(logicalSliceChain, bucketIndex, compactDataSlice,
-        sliceAddressReverseOrder);
+    return ReplaceCompositeLogicalSlice(logicalSliceChain, bucketIndex, compactDataSlice, sliceAddressReverseOrder);
 }
 
 BResult SliceTableRestoreOperation::DirectReplaceCompositeSlice(const SliceIndexContextRef &sliceIndexContext)
@@ -353,8 +373,9 @@ BResult SliceTableRestoreOperation::CompactCompositeLogicalSliceChain(uint32_t s
 }
 
 BResult SliceTableRestoreOperation::ReplaceCompositeLogicalSlice(LogicalSliceChainRef &logicalSliceChain,
-    uint32_t sliceIndexSlot, const DataSliceRef &compactedDataSlice,
-    std::vector<SliceAddressRef> &invalidSliceAddressList)
+                                                                 uint32_t sliceIndexSlot,
+                                                                 const DataSliceRef &compactedDataSlice,
+                                                                 std::vector<SliceAddressRef> &invalidSliceAddressList)
 {
     // 1. 创建新的LogicSliceChain.
     LogicalSliceChainRef compactedLogicalSliceChain = mSliceBucketIndex->CreateLogicalChainedSlice();
@@ -381,7 +402,8 @@ BResult SliceTableRestoreOperation::ReplaceCompositeLogicalSlice(LogicalSliceCha
 }
 
 void SliceTableRestoreOperation::SyncUpdateChain(const LogicalSliceChainRef &oldLogicalSliceChain,
-    const LogicalSliceChainRef &newLogicalSliceChain, uint32_t sliceIndexSlot)
+                                                 const LogicalSliceChainRef &newLogicalSliceChain,
+                                                 uint32_t sliceIndexSlot)
 {
     mSliceBucketIndex->UpdateLogicalSliceChain(sliceIndexSlot, oldLogicalSliceChain, newLogicalSliceChain, true);
 }

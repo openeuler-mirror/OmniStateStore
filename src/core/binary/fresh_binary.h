@@ -305,6 +305,7 @@ public:
     {
         return mValueLen - NO_9;
     }
+
     /**
      * Value type, @ValueType
      * @return

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
  * You can use this software according to the terms and conditions of the Mulan PSL v2.
  * You may obtain a copy of Mulan PSL v2 at:
  *          http://license.coscl.org.cn/MulanPSL2
@@ -23,9 +23,66 @@
 #include "binary/slice_binary.h"
 #include "common/util/bss_math.h"
 #include "compare_slice_key.h"
+#include "slice_table.h"
 
 namespace ock {
 namespace bss {
+BResult ValueSpace::Put(uint32_t index, FreshValueNodePtr &value, const MemorySegment &freshSegment, bool isValue,
+    SliceTableManagerRef sliceTable, uint32_t keyHashCode, uint16_t stateId, uint64_t &seqId)
+{
+    uint32_t count = 0;
+    bool deleteOrPut = false;
+    std::vector<FreshValueNode *> nodes;
+    RETURN_ERROR_AS_NULLPTR(value);
+    value->VisitAsList(freshSegment, [&](FreshValueNode &curVal) {
+        seqId = std::max(seqId, curVal.ValueSeqId());
+        if (curVal.ValueType() == ValueType::DELETE) {
+            deleteOrPut = true;
+            return false;
+        } else if (curVal.ValueType() == ValueType::PUT) {
+            deleteOrPut = true;
+            nodes.emplace_back(&curVal);
+            return false;
+        }
+        nodes.emplace_back(&curVal);
+        return true;
+    });
+
+    bool isKvSeparate = false;
+    for (auto node = nodes.rbegin(); node != nodes.rend(); ++node) {
+        count++;
+        uint32_t len = (*node)->ValueDataLen();
+        if (UNLIKELY(sliceTable != nullptr) && isValue && sliceTable->NeedKvSeparate(len)) {
+            uint64_t blobId = 0;
+            BResult result = sliceTable->WriteValueToBlobStore((*node), keyHashCode, stateId, blobId);
+            if (UNLIKELY(result != BSS_OK)) {
+                LOG_ERROR("Write value to blob store failed, ret: " << result);
+                return result;
+            }
+            len = sizeof(uint64_t);
+            mBuffer->WriteAt(reinterpret_cast<const uint8_t *>(&blobId), len, mValueDataBaseOffset + mWritenBytes);
+            isKvSeparate = true;
+        } else {
+            mBuffer->WriteAt((*node)->Value(), len, mValueDataBaseOffset + mWritenBytes);
+        }
+        mWritenBytes += len;
+    }
+    auto valType = isKvSeparate ? ValueType::SEPARATE : value->ValueType();
+    if (!isValue) {
+        valType = ValueType::APPEND;
+        if (!count) {
+            valType = ValueType::DELETE;
+        } else if (deleteOrPut) {
+            valType = ValueType::PUT;
+        }
+    } else if (count > 1) {
+        LOG_ERROR("Value type should not have more than one element");
+    }
+    // value offset;
+    mValueOffsets[index] = (static_cast<uint8_t>(valType) << VALUE_INDICATOR_OFFSET) | (mWritenBytes & 0xFFFFFFF);
+    return BSS_OK;
+}
+
 BResult Slice::Initialize(std::vector<std::pair<SliceKey, Value>> &kvPairs,
                           const SliceCreateMeta &meta, const MemManagerRef &memManager, bool forceMemory)
 {
@@ -150,7 +207,7 @@ BResult Slice::CreateAndInitBuffer(const SliceCreateMeta &meta,
 }
 
 BResult Slice::Initialize(RawDataSlice &rawDataSlice, const SliceCreateMeta &meta, const MemManagerRef &memManager,
-                          bool &forceEvict)
+                          bool &forceEvict, SliceTableManagerRef sliceTable)
 {
     mMemManager = memManager;
     uint32_t kvCount = rawDataSlice.GetSliceData().size();
@@ -160,12 +217,8 @@ BResult Slice::Initialize(RawDataSlice &rawDataSlice, const SliceCreateMeta &met
 
     // create and initialize slice buffer.
     std::vector<std::pair<BinaryKey, uint32_t>> sortedKeySlotList;
-    BResult result = CreateAndInitBuffer(meta, rawDataSlice, sortedKeySlotList, forceEvict);
-    RETURN_NOT_OK_NO_LOG(result);
-
-    result = FillBuffer(rawDataSlice, sortedKeySlotList);
-    RETURN_NOT_OK(result);
-
+    RETURN_NOT_OK_NO_LOG(CreateAndInitBuffer(meta, rawDataSlice, sortedKeySlotList, forceEvict, sliceTable));
+    RETURN_NOT_OK(FillBuffer(rawDataSlice, sortedKeySlotList, sliceTable));
     mInit = true;
     return BSS_OK;
 }
@@ -188,7 +241,7 @@ uint32_t GetTotalValLen(const MemorySegment &freshSegment, FreshValueNodePtr &va
 
 BResult Slice::CreateAndInitBuffer(const SliceCreateMeta &meta, RawDataSlice &rawDataSlice,
                                    std::vector<std::pair<BinaryKey, uint32_t>> &sortedKeySlotList,
-                                   bool &forceEvict)
+                                   bool &forceEvict, SliceTableManagerRef sliceTable)
 {
     auto &kvPairs = rawDataSlice.GetSliceData();
     auto &indexVec = rawDataSlice.GetVectorGroup()->GetIndexVec();
@@ -229,6 +282,10 @@ BResult Slice::CreateAndInitBuffer(const SliceCreateMeta &meta, RawDataSlice &ra
         // get value size.
         auto &value = pair.second;
         uint32_t valueLen = GetTotalValLen(*rawDataSlice.GetFreshSegment(), value);
+        if (UNLIKELY(sliceTable != nullptr) && key.mIsValue && sliceTable->NeedKvSeparate(valueLen)) {
+            // 开启KV分离，只存储blobId
+            valueLen = sizeof(uint64_t);
+        }
         totalValueSize += valueLen;
         forceEvict = forceEvict || (valueLen > IO_SIZE_4M && StateId::IsList(key.mPrimaryKey.mStateId));
     }
@@ -371,8 +428,8 @@ BResult Slice::PutKv(uint32_t curIndex, const std::pair<SliceKey, Value> &kv)
     return BSS_OK;
 }
 
-BResult Slice::FillBuffer(RawDataSlice &rawDataSlice,
-                          std::vector<std::pair<BinaryKey, uint32_t>> &sortedKeySlotList)
+BResult Slice::FillBuffer(RawDataSlice &rawDataSlice, std::vector<std::pair<BinaryKey, uint32_t>> &sortedKeySlotList,
+    SliceTableManagerRef sliceTable)
 {
     // put key and value.
     uint32_t curIndex = 0;
@@ -444,10 +501,13 @@ BResult Slice::FillBuffer(RawDataSlice &rawDataSlice,
         mIndexSpace->Put(indexIdVec[curIndex], curIndex);
 
         // key
-        mKeySpace->Put(curIndex, kv.first);
+        BinaryKey key = kv.first;
+        mKeySpace->Put(curIndex, key);
 
         // value
-        auto seqId = mValueSpace->Put(curIndex, kv.second, freshSegment, kv.first.mIsValue);
+        uint64_t seqId = 0;
+        RETURN_NOT_OK(mValueSpace->Put(curIndex, kv.second, freshSegment, kv.first.mIsValue, sliceTable,
+            key.KeyHashCode(), key.StateId(), seqId));
 
         // seqId;
         mSeqIdSpace->Put(curIndex, seqId);

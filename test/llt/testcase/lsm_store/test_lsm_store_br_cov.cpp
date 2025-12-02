@@ -309,7 +309,7 @@ TEST_F(TestLsmStoreBrCov, Table_ReadInternalKey_ShouldReturnKey_WhenAllReadsSucc
     uint32_t primaryUserKeyHash = NO_4096;
     uint32_t keyLen = 1;
     uint8_t data = 1;
-    uint16_t stateId = NO_4096;
+    uint16_t stateId = MAP << NO_13;
     uint32_t secondaryUserKeyHash = NO_4096;
     uint64_t seqId = NO_4096;
     uint8_t valueType = ValueType::PUT;

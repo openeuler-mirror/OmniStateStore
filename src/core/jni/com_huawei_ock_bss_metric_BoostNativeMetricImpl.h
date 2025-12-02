@@ -1,5 +1,5 @@
 /*
-* Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
+* Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
 * You can use this software according to the terms and conditions of the Mulan PSL v2.
 * You may obtain a copy of Mulan PSL v2 at:
 *          http://license.coscl.org.cn/MulanPSL2
@@ -32,7 +32,14 @@ JNIEXPORT jlong JNICALL Java_com_huawei_ock_bss_metric_BoostNativeMetricImpl_ope
  * Signature: (JI)J
  */
 JNIEXPORT jlong JNICALL Java_com_huawei_ock_bss_metric_BoostNativeMetricImpl_getMetric
-  (JNIEnv *, jobject, jlong, jint);
+  (JNIEnv *, jclass, jlong, jint);
+
+/*
+ * Class:     com_huawei_ock_bss_metric_BoostNativeMetricImpl
+ * Method:    close
+ * Signature: (J)V
+ */
+JNIEXPORT void JNICALL Java_com_huawei_ock_bss_metric_BoostNativeMetricImpl_close(JNIEnv *, jclass, jlong);
 
 #ifdef __cplusplus
 }

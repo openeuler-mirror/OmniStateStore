@@ -60,9 +60,9 @@ BResult BoostStateDBImpl::Open(const ConfigRef &config)
     }
 
     mCacheExecutorService = std::make_shared<ExecutorService>(1, NO_1024);
-    ret = mCacheExecutorService->Start();
-    if (!ret) {
-        LOG_ERROR("Failed to start executor service, ret:" << ret);
+    mCacheExecutorService->SetThreadName("LsmLazyIOExecutor");
+    if (!mCacheExecutorService->Start()) {
+        LOG_ERROR("Failed to start lazy download IO executor service, ret:" << ret);
         InnerClose();
         return BSS_ERR;
     }
@@ -110,7 +110,11 @@ void BoostStateDBImpl::StartMemoryMonitor()
 {
 #if ENABLE_MEMORY_MONITOR
     mExecutor = std::make_shared<ExecutorService>(NO_1, NO_1);
-    mExecutor->Start();
+    mExecutor->SetThreadName("MemMonitorExecutor");
+    if (!mExecutor->Start()) {
+        LOG_ERROR("Failed to start memory monitor executor service.");
+        return;
+    }
     mMemManagerMonitorTask = std::make_shared<MemManagerMonitorTask>(mMemManager);
     mExecutor->Execute(mMemManagerMonitorTask);
 #endif
@@ -118,7 +122,7 @@ void BoostStateDBImpl::StartMemoryMonitor()
 
 void BoostStateDBImpl::CreateCacheAndFileManager(const ConfigRef &config)
 {
-    mFileCacheFactory = std::make_shared<FileCacheFactory>(config, mCacheExecutorService, mBoostNativeMetric);
+    mFileCacheFactory = std::make_shared<FileCacheFactory>(config, mCacheExecutorService, &mBoostNativeMetric);
     mFileCache = mFileCacheFactory->GetFileCache();
     mLocalFileManager = mFileCacheFactory->GetLocalFileManager();
     mRemoteFileManager = mFileCacheFactory->GetDfsFileManager();
@@ -161,10 +165,15 @@ void BoostStateDBImpl::InnerClose()
         mCacheExecutorService->Stop();
     }
 
-    if (mBoostNativeMetric != nullptr) {
-        mBoostNativeMetric->Close();
-        delete mBoostNativeMetric;
-        mBoostNativeMetric = nullptr;
+    if (!mPQTable.empty()) {
+        while (mPQTable.begin() != mPQTable.end()) {
+            mPQTable.begin()->second->Close();
+            mPQTable.erase(mPQTable.begin());
+        }
+    }
+    BlockCacheRef blockCache = BlockCacheManager::Instance()->GetBlockCache(mConfig->GetTaskSlotFlag());
+    if (LIKELY(blockCache != nullptr)) {
+        blockCache->DeRegisterMetric(mConfig);
     }
 
 #if ENABLE_MEMORY_MONITOR
@@ -176,7 +185,8 @@ void BoostStateDBImpl::InnerClose()
         mExecutor->Stop();
     }
 #endif
-
+    // 释放DbGroup指针
+    BoostStateDbGroupMgr::DeleteDbGroupPtr(GetDbGroupId());
     LOG_INFO("Boost state db closed, db group:" << GetDbGroupId());
 }
 
@@ -202,6 +212,28 @@ TableRef BoostStateDBImpl::GetTableOrCreate(TableDescriptionRef tableDesc)
     auto ret = abstractTable->Init(mFreshTable, mSliceTable, mStateIdProvider, tableDesc, mSeqGenerator,
                                    tableDesc->GetTableTTL(), mStateFilterManager);
     return ret == BSS_OK ? table : nullptr;
+}
+
+PQTableRef BoostStateDBImpl::CreatePQTable(const std::string &str)
+{
+    PQTableRef table = mPQTable[str];
+    if (table == nullptr) {
+        TableSerializer tblSerializer;
+        TableDescriptionRef des = std::make_shared<TableDescription>(PQ, str, -1, tblSerializer, *mConfig);
+        auto bucketGroupManager = mSliceTable->GetBucketGroupManager();
+        if (UNLIKELY(bucketGroupManager == nullptr || bucketGroupManager->GetBucketGroupVector().empty())) {
+            return nullptr;
+        }
+        auto lsmStore = bucketGroupManager->GetBucketGroupVector()[0]->GetLsmStore();
+        table = std::make_shared<PQTable>(mMemManager, mFreshTransformer->GetTransformExecutor(),
+            lsmStore, str, mStateIdProvider, des);
+        auto ret = table->Initialize();
+        if (ret != BSS_OK) {
+            return nullptr;
+        }
+        mPQTable[str] = table;
+    }
+    return mPQTable[str];
 }
 
 BResult BoostStateDBImpl::UpdateTtlConfig(TableDescriptionRef tableDesc)
@@ -230,11 +262,15 @@ SnapshotOperatorCoordinator *BoostStateDBImpl::CreateSyncCheckpoint(const std::s
     PathRef snapshotPath = std::make_shared<Path>(Uri(checkpointPath));
     LOG_INFO("Create sync checkpoint start, checkpointId:" << checkpointId << ", snapshotPath:" <<
              snapshotPath->ExtractFileName());
+    std::vector<PQTableRef> pqTables;
+    for (const auto &item : mPQTable) {
+        pqTables.emplace_back(item.second);
+    }
     PendingSnapshotOperatorCoordinatorRef snapshotOperatorCoordinator =
         MakeRef<PendingSnapshotOperatorCoordinator>(checkpointId, mConfig->GetStartGroup(), mConfig->GetEndGroup(),
                                                     mSeqGenerator->Next(), mStateIdProvider, snapshotPath,
                                                     mLocalFileManager, mRemoteFileManager, mConfig, mFreshTable,
-                                                    mSliceTable, mMemManager);
+                                                    mSliceTable, mMemManager, pqTables);
     auto ret = mSnapshotManager->RegisterPendingSnapshot(snapshotOperatorCoordinator);
     if (UNLIKELY(ret != BSS_OK)) {
         return nullptr;
@@ -309,12 +345,15 @@ BResult BoostStateDBImpl::Restore(std::vector<std::string> &restorePath,
     auto restoreOperator = std::make_shared<RestoreOperator>(mConfig, mLocalFileManager,
                                                              mRemoteFileManager, mSliceTable, mFreshTable,
                                                              mStateIdProvider, mTables, mFileCacheFactory,
-                                                             mSnapshotManager);
+                                                             mSnapshotManager, mPQTable);
     uint64_t seqId = 0;
     BResult ret = restoreOperator->Restore(restoredMetaPaths, lazyPathMapping, seqId, isLazyDownload);
     mSeqGenerator->Restore(seqId);
     for (const auto &item : mTables) {
         std::dynamic_pointer_cast<AbstractTable>(item.second)->SetStateIdProvider(mStateIdProvider);
+    }
+    for (const auto &item : mPQTable) {
+        item.second->SetStateIdProvider(mStateIdProvider);
     }
     // restore完成, 调用lsm compaction
     mSliceTable->Open();
@@ -324,9 +363,12 @@ BResult BoostStateDBImpl::Restore(std::vector<std::string> &restorePath,
 SavepointDataView *BoostStateDBImpl::TriggerSavepoint()
 {
     auto stateIdProviderSnapshot = mStateIdProvider->Copy();
+    std::vector<PQTableRef> pqTables;
+    for (const auto &item : mPQTable) {
+        pqTables.emplace_back(item.second);
+    }
     auto pendingSavepoint = MakeRef<PendingSavepointCoordinator>(mSnapshotManager, mFreshTable, mSliceTable,
-                                                                 mSnapshotManager->AllocateSavepointId(),
-                                                                 stateIdProviderSnapshot, mMemManager);
+        mSnapshotManager->AllocateSavepointId(), stateIdProviderSnapshot, mMemManager, pqTables);
     auto ret = mSnapshotManager->RegisterPendingSavepoint(pendingSavepoint);
     if (UNLIKELY(ret != BSS_OK)) {
         LOG_ERROR("Failed to register savepoint, ret:" << ret);
@@ -398,6 +440,5 @@ void BoostStateDBFactory::Destroy(BoostStateDBPtr &db)
     delete db;
     db = nullptr;
 }
-
 }  // namespace bss
 }  // namespace ock

@@ -10,6 +10,7 @@
  */
 
 #include "snapshot_restore_utils.h"
+
 #include "file_store_snapshot_operator.h"
 #include "fresh_table_snapshot_operator.h"
 #include "slice_table_snapshot_operator.h"
@@ -50,6 +51,8 @@ SnapshotOperatorInfoRef SnapshotRestoreUtils::Deserialize(const FileInputViewRef
         }
         return std::make_shared<FileStoreSnapshotOperatorInfo>(SnapshotOperatorType::FILE_STORE, fileStoreIds,
                                                                fileMetaOffsets);
+    } else if (operatorType == SnapshotOperatorType::BLOB_STORE) {
+        return std::make_shared<SliceTableSnapshotOperatorInfo>(SnapshotOperatorType::BLOB_STORE);
     } else {
         LOG_ERROR("Illegal snapshot type, type:" << static_cast<uint32_t>(operatorType));
         return nullptr;
@@ -138,7 +141,7 @@ void SnapshotRestoreUtils::WriteSnapshotMetaTail(const FileOutputViewRef &output
                                                  uint64_t stateIdProviderOffset)
 {
     // 这里是对应恢复的时候的snapshotVersion版本号, 后面校验这个数字是否正确.
-    outputView->WriteUint32(NO_5); // magic
+    outputView->WriteUint32(NO_5);  // magic
     outputView->WriteUint64(snapshotId);
     outputView->WriteUint32(startKeyGroup);
     outputView->WriteUint32(endKeyGroup);
@@ -175,8 +178,8 @@ SnapshotMetaTailRef SnapshotRestoreUtils::ReadSnapshotMetaTail(const PathRef &sn
     uint32_t snapshotVersion = UINT32_MAX;
     RETURN_NULLPTR_AS_READ_ERROR(snapshotMetaInputView->Read(snapshotVersion));
     if (UNLIKELY(snapshotVersion > NO_5)) {
-        LOG_ERROR("Unknown version of snapshot meta, expect version: 5, actual version:" <<
-                  snapshotVersion << ", snapshot meta path:" << snapshotMetaPath->ExtractFileName());
+        LOG_ERROR("Unknown version of snapshot meta, expect version: 5, actual version:"
+                  << snapshotVersion << ", snapshot meta path:" << snapshotMetaPath->ExtractFileName());
         return nullptr;
     }
     uint64_t snapshotId;
@@ -204,7 +207,7 @@ SnapshotMetaTailRef SnapshotRestoreUtils::ReadSnapshotMetaTail(const PathRef &sn
 }
 
 SnapshotMetaRef SnapshotRestoreUtils::WriteDbMeta(uint64_t snapshotId, uint64_t startKeyGroup, uint64_t endKeyGroup,
-                                                  uint64_t seqId, const StateIdProviderRef& stateIdProvider,
+                                                  uint64_t seqId, const StateIdProviderRef &stateIdProvider,
                                                   const PathRef &localSnapshotPath,
                                                   const FileOutputViewRef &localOutputView,
                                                   const FileManagerRef &localFileManager,
@@ -246,6 +249,9 @@ SnapshotMetaRef SnapshotRestoreUtils::WriteDbMeta(uint64_t snapshotId, uint64_t 
             continue;
         }
         if (snapshotOperator->GetType() == SnapshotOperatorType::FILE_STORE) {
+            snapshotStat->AddFileStoreSnapshotMeta(snapshotOperatorMeta->mSnapshotMeta);
+        }
+        if (snapshotOperator->GetType() == SnapshotOperatorType::BLOB_STORE) {
             snapshotStat->AddFileStoreSnapshotMeta(snapshotOperatorMeta->mSnapshotMeta);
         }
     }

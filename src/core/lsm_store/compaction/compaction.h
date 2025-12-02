@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
  * You can use this software according to the terms and conditions of the Mulan PSL v2.
  * You may obtain a copy of Mulan PSL v2 at:
  *          http://license.coscl.org.cn/MulanPSL2
@@ -124,7 +124,7 @@ public:
                     }
 
                     auto cmpLargest = f->GetLargest()->CompareKey(key);
-                    if (cmpLargest > 0 && f->GetSmallest()->CompareKey(key) < 0) {
+                    if (cmpLargest >= 0 && f->GetSmallest()->CompareKey(key) <= 0) {
                         return false;
                     }
 

@@ -24,6 +24,12 @@ BResult FreshTableSnapshotOperator::SyncSnapshot(bool isSavepoint)
         mState = State::SYNC;
     }
 
+    if (!mPqTables.empty()) {
+        for (const auto &item : mPqTables) {
+            RETURN_NOT_OK(item->TriggerSegmentFlush(true)); // pq表数据先刷到文件里。
+        }
+    }
+
     // 1. Savepoint流程首先确保将FreshTable的数据Flush到SliceTable中, 然后直接返回.
     RETURN_ERROR_AS_NULLPTR(mFreshTable);
     if (isSavepoint) {

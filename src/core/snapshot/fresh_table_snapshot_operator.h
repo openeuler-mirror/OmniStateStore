@@ -14,6 +14,7 @@
 
 #include <cstdint>
 
+#include "kv_table/pq_table.h"
 #include "include/bss_err.h"
 #include "abstract_snapshot_operator.h"
 #include "fresh_table/fresh_table.h"
@@ -24,10 +25,8 @@ namespace bss {
 class FreshTableSnapshotOperator : public AbstractSnapshotOperator {
 public:
     FreshTableSnapshotOperator(uint64_t operatorId, const FreshTableRef &freshTable, const ConfigRef &config,
-                               const MemManagerRef &memManager)
-        : AbstractSnapshotOperator(operatorId), mFreshTable(freshTable), mConfig(config), mMemManager(memManager)
-    {
-    }
+        const MemManagerRef &memManager, const std::vector<PQTableRef> &pqTable) : AbstractSnapshotOperator(operatorId),
+        mFreshTable(freshTable), mConfig(config), mMemManager(memManager), mPqTables(pqTable) {}
 
     ~FreshTableSnapshotOperator() override = default;
 
@@ -57,6 +56,7 @@ private:
     std::string mLocalAddress;
     SnapshotMetaRef mSnapshotMeta = std::make_shared<SnapshotMeta>();
     MemManagerRef mMemManager = nullptr;
+    std::vector<PQTableRef> mPqTables;
 };
 
 class FreshTableSnapshotOperatorInfo : public SnapshotOperatorInfo {

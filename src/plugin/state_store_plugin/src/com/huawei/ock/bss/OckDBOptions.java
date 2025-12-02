@@ -134,6 +134,24 @@ public class OckDBOptions {
                     .withDescription("enable filter and index block cache");
 
     /**
+     * enable Key-Value Separate Storage
+     */
+    public static final ConfigOption<Boolean> OCKDB_KV_SEPARATE_SWITCH =
+            ConfigOptions.key("state.backend.ockdb.kv-separate.switch")
+                    .booleanType()
+                    .defaultValue(false)
+                    .withDescription("enable KV Separate");
+
+    /**
+     * Key-Value Separate Threshold, KV separation is used only if it is greater than this value
+     */
+    public static final ConfigOption<Integer> OCKDB_KV_SEPARATE_THRESHOLD =
+            ConfigOptions.key("state.backend.ockdb.kv-separate.threshold")
+                    .intType()
+                    .defaultValue(200)
+                    .withDescription("KV separate threshold, default: 200");
+
+    /**
      * lsmCacheFilterAndIndexRatio
      */
     public static final ConfigOption<Float> OCKDB_FILTER_AND_INDEX_OWN_CACHE_RATIO =
@@ -204,4 +222,13 @@ public class OckDBOptions {
             .intType()
             .defaultValue(0)
             .withDescription("elements number of peak filter");
+
+    /**
+     * priority queue type
+     */
+    public static final ConfigOption<String> OCKDB_PRIORITY_QUEUE_TYPE =
+        ConfigOptions.key("state.backend.ockdb.timer-service.factory")
+            .stringType()
+            .defaultValue(EmbeddedOckStateBackend.PriorityQueueStateType.HEAP.name())
+            .withDescription("priority queue type of state backend");
 }

@@ -57,6 +57,7 @@ public:
     {
         Close();
         std::unordered_map<uint64_t, DLinkedNodeRef>().swap(mCache);
+        std::unordered_map<ConfigRef, BoostNativeMetricPtr>().swap(mLruCachesMetricMap);
         LOG_INFO("Delete LRUCache success.");
     }
 
@@ -153,16 +154,40 @@ public:
         mLock.UnLock();
     }
 
-    inline void RegisterMetric(BoostNativeMetricPtr metricPtr)
+    inline void RegisterMetric(ConfigRef config, BoostNativeMetricPtr metricPtr)
     {
-        mBoostNativeMetric = metricPtr;
+        if (UNLIKELY(metricPtr == nullptr)) {
+            LOG_ERROR("RegisterMetric for lru cache failed, metricPtr is nullptr.");
+            return;
+        }
+        mMetricEnabled = metricPtr->IsFileCacheMetricEnabled();
+        if (!mMetricEnabled) {
+            return;
+        }
+        mLock.Lock();
+        mLruCachesMetricMap.emplace(config, metricPtr);
+        mLock.UnLock();
+    }
+
+    inline void DeRegisterMetric(ConfigRef config)
+    {
+        if (!mMetricEnabled) {
+            return;
+        }
+        mLock.Lock();
+        mLruCachesMetricMap.erase(config);
+        mLock.UnLock();
     }
 
     inline void UpdateCacheStat(BlockType type, bool isAdd, uint64_t size)
     {
-        if (mBoostNativeMetric != nullptr && mBoostNativeMetric->IsFileCacheMetricEnabled()) {
-            mBoostNativeMetric->UpdateCacheStat(type, isAdd, size);
+        if (!mMetricEnabled) {
+            return;
         }
+        for (auto it = mLruCachesMetricMap.begin(); it != mLruCachesMetricMap.end(); it++) {
+            CONTINUE_LOOP_AS_NULLPTR(it->second);
+            it->second->UpdateCacheStat(type, isAdd, size);
+        } 
     }
 
 private:
@@ -220,7 +245,8 @@ private:
     uint64_t mCapacity;
     uint64_t mCurrentSize;
     SpinLock mLock;
-    BoostNativeMetricPtr mBoostNativeMetric = nullptr;
+    bool mMetricEnabled = false;
+    std::unordered_map<ConfigRef, BoostNativeMetricPtr> mLruCachesMetricMap; // config作为db的标识
 };
 
 }  // namespace bss

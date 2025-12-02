@@ -390,7 +390,7 @@ private:
         PathRef localPath = std::make_shared<Path>(Uri(localBasePath));
         ConfigRef config = std::make_shared<Config>();
         config->SetLocalPath(localPath->Name());
-        BoostNativeMetric* metric = nullptr;
+        BoostNativeMetricPtr* metric = nullptr;
         return std::make_shared<FileCacheFactory>(config, nullptr, metric);
     }
 };

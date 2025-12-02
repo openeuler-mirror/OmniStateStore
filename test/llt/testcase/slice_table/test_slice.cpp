@@ -124,7 +124,7 @@ TEST_F(TestSlice, TestSlicePut)
     rawDataSlice->PutIndexVec();
     SliceCreateMeta meta = { 0L, 1L, 0L };
     bool force = false;
-    auto ret = slice->Initialize(*rawDataSlice, meta, mMemManager, force);
+    auto ret = slice->Initialize(*rawDataSlice, meta, mMemManager, force, nullptr);
     ASSERT_EQ(ret, BSS_OK);
     BinaryData prikey(reinterpret_cast<uint8_t *>(&key1), sizeof(uint64_t));
     QueryKey queryKey(stateId, hash, prikey);
@@ -190,11 +190,11 @@ TEST_F(TestSlice, TestSliceGetLong)
     }
     SliceCreateMeta meta = { 0L, 1L, 0L };
     bool force = false;
-    slice->Initialize(*rawDataSlice, meta, mMemManager, force);
+    slice->Initialize(*rawDataSlice, meta, mMemManager, force, nullptr);
     for (auto &item : keys) {
         uint32_t hashCode = item.mKeyHashCode;
         BinaryData prikey(item.mPrimaryKey.mKeyData,  item.mPrimaryKey.mKeyDataLength);
-        uint16_t stateId = item.mPrimaryKey.mStateId;
+        stateId = item.mPrimaryKey.mStateId;
         QueryKey queryKey(stateId, hashCode, prikey);
         Value value;
         bool ret = slice->Get(queryKey, value);
@@ -257,11 +257,11 @@ TEST_F(TestSlice, TestSliceGetShort)
     }
     SliceCreateMeta meta = { 0L, 1L, 0L };
     bool force = false;
-    slice->Initialize(*rawDataSlice, meta, mMemManager, force);
+    slice->Initialize(*rawDataSlice, meta, mMemManager, force, nullptr);
     for (auto &item : keys) {
         uint32_t hashCode = item.mKeyHashCode;
         BinaryData prikey(item.mPrimaryKey.mKeyData,  item.mPrimaryKey.mKeyDataLength);
-        uint16_t stateId = item.mPrimaryKey.mStateId;
+        stateId = item.mPrimaryKey.mStateId;
         QueryKey queryKey(stateId, hashCode, prikey);
         Value value;
         bool ret = slice->Get(queryKey, value);
@@ -286,7 +286,7 @@ TEST_F(TestSlice, test_find_started_index_slot_return_right_index)
 
     // create kv pair and add to list.
     uint32_t kvCount = 64;
-    uint16_t stateId = MAP << NO_11;
+    uint16_t stateId = MAP << NO_13;
     std::vector<KVPair> kvPairList;
     for (uint64_t i = 0; i < kvCount; ++i) {
         std::string priKey = std::to_string(i + 0xFFFFFFFF);
@@ -423,7 +423,7 @@ TEST_F(TestSlice, test_slice_hash_conflict_return_ok)
 
     // create kv pair and add to list.
     uint32_t kvCount = 1020;
-    uint16_t stateId = MAP << NO_11;
+    uint16_t stateId = MAP << NO_13;
     std::vector<KVPair> kvPairList;
     std::vector<QueryKey> keys;
     std::vector<Value> values;

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
  */
 
 #ifndef BOOST_SS_SLICE_COMPACTOR_H
@@ -35,12 +35,18 @@ public:
     BResult DoCompactSlice(const std::vector<DataSliceRef> &canCompactSliceListReversed,
         DataSliceRef &compactedDataSlice, bool forceFilter, uint32_t bucketIndex, bool reserveDeleteMarker);
 
+    void RegisterTombstoneService(const TombstoneServiceRef &tombstoneService)
+    {
+        mTombstoneService = tombstoneService;
+    }
+
 private:
     uint32_t mInMemoryCompactionThreshold = 0;
     SliceCompactionPolicyRef mSliceCompactionPolicy;
     SliceBucketIndexRef mBucketIndex;
     MemManagerRef mMemManager;
     StateFilterManagerRef mStateFilterManager;
+    TombstoneServiceRef mTombstoneService = nullptr;
 };
 using SliceCompactorRef = std::shared_ptr<SliceCompactor>;
 }  // namespace bss

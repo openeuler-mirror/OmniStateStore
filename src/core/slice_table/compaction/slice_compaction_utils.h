@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
  * You can use this software according to the terms and conditions of the Mulan PSL v2.
  * You may obtain a copy of Mulan PSL v2 at:
  *          http://license.coscl.org.cn/MulanPSL2
@@ -15,9 +15,11 @@
 #include <unordered_map>
 #include <vector>
 
+#include "blob_cleaner.h"
 #include "common/util/seq_generator.h"
 #include "lsm_store/file/state_filter_manager.h"
 #include "slice_table/slice/data_slice.h"
+#include "tombstone/tombstone_service.h"
 
 namespace ock {
 namespace bss {
@@ -40,8 +42,8 @@ public:
         return byteBuffer;
     }
 
-    static Value MergeCompactValue(const SliceKey &key, Value &first, Value &second,
-                                            const MemManagerRef &memManager, const StateFilterManagerRef &stateFilter)
+    static Value MergeCompactValue(const SliceKey &key, Value &first, Value &second, const MemManagerRef &memManager,
+        const StateFilterManagerRef &stateFilter, TombstoneServiceRef tombstoneService = nullptr)
     {
         Value value;
         if (first.IsNull() && first.ValueType() != DELETE) {
@@ -65,6 +67,9 @@ public:
                 return value;
             }
         }
+        if (tombstoneService != nullptr) {
+            tombstoneService->DeleteValue(key, first);
+        }
         return second;
     }
 
@@ -72,7 +77,8 @@ public:
         std::vector<std::pair<SliceKey, Value>> &finalResult, uint32_t &compactionCount,
         const std::vector<DataSliceRef> &compactionListReverseOrder, const MemManagerRef &memManager,
         bool forceFilter, const StateFilterManagerRef &stateFilterManager,
-        const std::function<bool(SliceKey)> &indexSlotFilter, bool reserveDeleteMarker)
+        const std::function<bool(SliceKey)> &indexSlotFilter, bool reserveDeleteMarker,
+        TombstoneServiceRef tombstoneService = nullptr)
     {
         SliceKVMap newMap;
         uint32_t compactionListSize = compactionListReverseOrder.size();
@@ -86,7 +92,7 @@ public:
                     continue;
                 }
                 auto newValue = MergeCompactValue(entry.first, newMap[entry.first], entry.second, memManager,
-                                                  stateFilterManager);
+                                                  stateFilterManager, tombstoneService);
                 if (UNLIKELY(newValue.IsNull() && newValue.ValueType() != DELETE)) {
                     return BSS_ALLOC_FAIL;
                 }

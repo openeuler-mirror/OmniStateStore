@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
  * You can use this software according to the terms and conditions of the Mulan PSL v2.
  * You may obtain a copy of Mulan PSL v2 at:
  *          http://license.coscl.org.cn/MulanPSL2
@@ -41,17 +41,20 @@ BResult MemManager::Initialize(ConfigRef config, bool alignAddress)
         return BSS_OK;
     }
     mTaskSlotFlag = config->GetTaskSlotFlag();
-    AddDbRefCount();
+    RETURN_NOT_OK(AddDbRefCount());
 
     mConfig = config;
     mAlignAddress = alignAddress;
-    CalMemoryTypeSize(config->GetTotalDBSize());
+    if (!CalMemoryTypeSize(config->GetTotalDBSize())) {
+        LOG_ERROR("Calculate memory type size failed.");
+        return BSS_ERR;
+    }
     mHeapAvailableSize.store(config->GetHeapAvailableSize());
     for (auto &item : mTypeCurrentSize) {
         item.store(0, std::memory_order_relaxed);
     }
 
-    InitAllocator();
+    RETURN_NOT_OK(InitAllocator());
     mInitialized = true;
     LOG_INFO("Memory pool type:" << static_cast<uint32_t>(mAllocatorType) << ", parameter is: " << ToString()
                                  << ", heapAvailableSize: " << mHeapAvailableSize.load());
@@ -294,7 +297,7 @@ bool MemManager::CalMemoryTypeSize(uint64_t memoryLimit)
     // 计算FreshTable大小
     uint64_t totalFreshTypeSize = CalcFreshTableSize();
     LOG_INFO("Calc fresh table size is " << totalFreshTypeSize);
-    if (totalFreshTypeSize > (mMemoryLimit / 2)) {
+    if (totalFreshTypeSize > (mMemoryLimit / NO_2)) {
         LOG_ERROR("Fresh table size: " << totalFreshTypeSize << "exceed half of memory limit: " << mMemoryLimit);
         return false;
     }
@@ -321,18 +324,6 @@ bool MemManager::CalMemoryTypeSize(uint64_t memoryLimit)
 
     // 设置SliceTable的可用内存限制.
     mTypeMaxSize[static_cast<size_t>(MemoryType::SLICE_TABLE)] = availableMem - allocatedSize;
-
-    // mMetric
-    for (const auto &pair : mDBsMetricMap) {
-        BoostNativeMetricPtr metric = pair.second;
-        metric->SetMemoryTotalMax(mMemoryLimit);
-        metric->SetMemoryFreshMax(mTypeMaxSize[static_cast<size_t>(MemoryType::FRESH_TABLE)]);
-        metric->SetMemorySliceMax(mTypeMaxSize[static_cast<size_t>(MemoryType::SLICE_TABLE)]);
-        metric->SetMemoryFileMax(mTypeMaxSize[static_cast<size_t>(MemoryType::FILE_STORE)]);
-        metric->SetMemorySnapshotMax(mTypeMaxSize[static_cast<size_t>(MemoryType::SNAPSHOT)]);
-        LOG_INFO("Set memory limit info to metric.");
-    }
-
     return true;
 }
 

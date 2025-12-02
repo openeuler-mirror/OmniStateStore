@@ -33,7 +33,12 @@ public:
     {
         return static_cast<uint64_t>(fileId) << NO_32;
     }
+
+    static uint32_t GetFileOffset(uint64_t fileAddress)
+    {
+        return static_cast<uint32_t>(fileAddress & 0xFFFFFFFFL);
+    }
 };
 }  // namespace bss
-}
+}  // namespace ock
 #endif

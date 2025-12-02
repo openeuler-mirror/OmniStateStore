@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
  * You can use this software according to the terms and conditions of the Mulan PSL v2.
  * You may obtain a copy of Mulan PSL v2 at:
  *          http://license.coscl.org.cn/MulanPSL2
@@ -25,13 +25,14 @@
 #include "include/bss_types.h"
 #include "order_range.h"
 #include "path_transform.h"
+#include "file_meta_base.h"
 
 namespace ock {
 namespace bss {
 class FileMetaData;
 using FileMetaDataRef = std::shared_ptr<FileMetaData>;
 
-class FileMetaData {
+class FileMetaData : public FileMetaBase {
 public:
     // 定义FileMetaData的比较器FileMetaDataComparator.
     using FileMetaDataComparator = std::function<bool(const FileMetaDataRef &, const FileMetaDataRef &)>;
@@ -50,11 +51,14 @@ public:
 
     FileMetaData(uint64_t fileAddress, int64_t seqId, uint64_t fileSize, const FullKeyRef &smallest,
                  const FullKeyRef &largest, GroupRangeRef groupRange, HashCodeOrderRangeRef orderRange,
-                 std::string identifier, StateIdInterval stateIdInterval,
-                 FileStatus fileStatus = FileStatus::LOCAL)
-        : mIdentifier(std::move(identifier)), mFileAddress(fileAddress), mFileSize(fileSize),
-          mSeqId(seqId), mSmallest(std::move(smallest)), mLargest(std::move(largest)),
-          mGroupRange(std::move(groupRange)), mOrderRange(std::move(orderRange)), mStateIdInterval(stateIdInterval),
+                 std::string identifier, StateIdInterval stateIdInterval, FileStatus fileStatus = FileStatus::LOCAL)
+        : FileMetaBase(identifier, fileAddress, fileSize),
+          mSeqId(seqId),
+          mSmallest(std::move(smallest)),
+          mLargest(std::move(largest)),
+          mGroupRange(std::move(groupRange)),
+          mOrderRange(std::move(orderRange)),
+          mStateIdInterval(stateIdInterval),
           mFileStatus(fileStatus)
     {
     }
@@ -77,21 +81,6 @@ public:
             }
         }
         return mShortName;
-    }
-
-    inline uint64_t GetFileAddress() const
-    {
-        return mFileAddress;
-    }
-
-    inline const std::string &GetIdentifier() const
-    {
-        return mIdentifier;
-    }
-
-    inline uint64_t GetFileSize() const
-    {
-        return mFileSize;
     }
 
     inline int64_t GetSeqId() const
@@ -208,9 +197,6 @@ public:
     }
 
 private:
-    std::string mIdentifier;    // 文件标志符: 完整的文件路径+文件名.
-    uint64_t mFileAddress = 0;  // 文件地址: 分配的唯一文件ID.
-    uint64_t mFileSize = 0;     // 文件大小.
     int64_t mSeqId = 0;
     FullKeyRef mSmallest = nullptr;
     FullKeyRef mLargest = nullptr;

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
  * You can use this software according to the terms and conditions of the Mulan PSL v2.
  * You may obtain a copy of Mulan PSL v2 at:
  *          http://license.coscl.org.cn/MulanPSL2
@@ -31,8 +31,9 @@ enum Error : int32_t {
     BSS_EXISTS = 10,
     BSS_INNER_RETRY = 11,
     BSS_NO_COMPRESS = 12,
-    BSS_NOT_SUPPORTED = 13,
-
+    BSS_NOT_FOUND = 13,
+    BSS_NOT_SUPPORTED = 14,
+    BSS_BLOB_NOT_SNAPSHOT = 15,
     BSS_IO_ERR = 201,
 
     BSS_FRESH_TABLE_IS_FULL = 500,

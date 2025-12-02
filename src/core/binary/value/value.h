@@ -12,6 +12,8 @@
 #ifndef BOOST_SS_VALUE_H
 #define BOOST_SS_VALUE_H
 #include <iomanip>
+
+#include "binary/key/key.h"
 #include "binary/byte_buffer.h"
 #include "bss_types.h"
 #include "value_type.h"
@@ -114,6 +116,15 @@ public:
     }
 
     /**
+     * Set the seqId
+     * @param seqId seqId
+     */
+    inline void SetSeqId(uint64_t seqId)
+    {
+        mSeqId = seqId;
+    }
+
+    /**
      * Buffer object to store value data, it used for lifecycle management of this value.
      * @return buffer object.
      */
@@ -161,7 +172,8 @@ public:
      * @param allocator allocator for allocate merged value buffer.
      * @return return BSS_OK if success, else return BSS_ERR.
      */
-    inline BResult MergeWithNewerValue(const Value &newerValue, BufferAllocator allocator)
+    inline BResult MergeWithNewerValue(const Key &key, const Value &newerValue, BufferAllocator allocator,
+        std::function<void(const Key&, const Value&)> action)
     {
         mSeqId = newerValue.mSeqId;
         if (newerValue.mValueType == APPEND) {
@@ -187,6 +199,7 @@ public:
                 return BSS_OK;
             }
         }
+        action(key, *this);
         mValueType = newerValue.mValueType;
         mValueData = newerValue.mValueData;
         mValueLen = newerValue.mValueLen;
@@ -245,7 +258,7 @@ private:
         }
         uint32_t mergedValueLen = olderValueLen + newerValueLen;
         BufferRef buffer = allocator(mergedValueLen);
-        if (buffer == nullptr) {
+        if (UNLIKELY(buffer == nullptr)) {
             LOG_WARN("Failed to allocate buffer. length:" << mergedValueLen);
             return { 0, nullptr };
         }
@@ -253,14 +266,14 @@ private:
         // copy older value to buffer.
         errno_t ret1 = memcpy_s(buffer->Data(), mergedValueLen, olderValue.ValueData(),
             olderValueLen);
-        if (ret1 != EOK) {
+        if (UNLIKELY(ret1 != EOK)) {
             LOG_ERROR("memcpy_s failed for older value, ret = " << ret1);
             return { 0, nullptr };
         }
         // append newer value to buffer.
         errno_t ret2 = memcpy_s(buffer->Data() + olderValueLen, mergedValueLen - olderValueLen,
             newerValue.ValueData(), newerValueLen);
-        if (ret2 != EOK) {
+        if (UNLIKELY(ret2 != EOK)) {
             LOG_ERROR("memcpy_s failed for newer value, ret = " << ret2);
             return { 0, nullptr };
         }
@@ -269,6 +282,7 @@ private:
 };
 using ValuePtr = Value *;
 using ValueRef = std::shared_ptr<Value>;
+using BlobValueTransformFunc = std::function<BResult(uint64_t, uint32_t, uint64_t, Value &)>;
 }  // namespace bss
 }  // namespace ock
 #endif  // BOOST_SS_VALUE_H

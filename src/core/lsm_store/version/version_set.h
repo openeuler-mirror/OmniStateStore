@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
  * You can use this software according to the terms and conditions of the Mulan PSL v2.
  * You may obtain a copy of Mulan PSL v2 at:
  *          http://license.coscl.org.cn/MulanPSL2
@@ -25,6 +25,7 @@
 #include "lsm_store/file/order_range.h"
 #include "version.h"
 #include "version_edit.h"
+#include "tombstone/tombstone_service.h"
 
 namespace ock {
 namespace bss {
@@ -205,14 +206,13 @@ public:
     }
 
     MergingIteratorRef MakeInputIterator(const CompactionRef &compaction, const MemManagerRef &memManager,
-                                         FileProcHolder mHolder)
+                                         FileProcHolder mHolder, TombstoneServiceRef &tombstoneService)
     {
         uint32_t levelId = compaction->GetInputLevelId();
         std::vector<KeyValueIteratorRef> iterators;
         if (levelId == 0) {
             for (auto &fileMetaData : compaction->GetLevelInputs()) {
-                iterators.emplace_back(
-                    InputSortedRun::BuildInputSortedRunIterator(fileMetaData, mFileIteratorBuilder));
+                iterators.emplace_back(InputSortedRun::BuildInputSortedRunIterator(fileMetaData, mFileIteratorBuilder));
             }
         } else {
             std::vector<InputSortedRunRef> inputSortedRunList =
@@ -230,7 +230,7 @@ public:
             }
         }
 
-        return std::make_shared<MergingIterator>(iterators, memManager, mHolder, true);
+        return std::make_shared<MergingIterator>(iterators, memManager, mHolder, true, tombstoneService);
     }
 
     void SetFileIteratorBuilder(InputSortedRun::FileIteratorWriterRef fileIteratorBuilder)

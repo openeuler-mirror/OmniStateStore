@@ -34,6 +34,21 @@ public:
 
     FileOutputView() = default;
 
+    BResult Init(const PathRef &filePath, WriteMode writeMode = WriteMode::NO_OVERWRITE)
+    {
+        RETURN_INVALID_PARAM_AS_NULLPTR(filePath);
+        mFilePath = filePath;
+        fileSystem = FileSystem::CreateFileSystem(FileSystemType::LOCAL, mFilePath);
+        RETURN_ERROR_AS_NULLPTR(fileSystem);
+        int flags = O_WRONLY | O_CREAT | O_CLOEXEC;
+        if (writeMode == WriteMode::NO_OVERWRITE) {
+            flags |= O_APPEND;
+        } else {
+            flags |= O_TRUNC;
+        }
+        return fileSystem->Open(flags);
+    }
+
     BResult Init(const PathRef &filePath, const ConfigRef &conf, WriteMode writeMode = WriteMode::NO_OVERWRITE)
     {
         RETURN_INVALID_PARAM_AS_NULLPTR(filePath);

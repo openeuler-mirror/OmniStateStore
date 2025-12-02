@@ -217,7 +217,7 @@ public class EmbeddedOckStateBackend extends AbstractManagedMemoryStateBackend i
         }
 
         if (original.priorityQueueStateType == null) {
-            this.priorityQueueStateType = PriorityQueueStateType.HEAP;
+            this.priorityQueueStateType = getPriorityQueueStateType();
         } else {
             this.priorityQueueStateType = original.priorityQueueStateType;
         }
@@ -523,9 +523,20 @@ public class EmbeddedOckStateBackend extends AbstractManagedMemoryStateBackend i
      *
      * @return PriorityQueueStateType
      */
-    public PriorityQueueStateType getPriorityQueueStateType() {
-        return (this.priorityQueueStateType == null) ? PriorityQueueStateType.valueOf(
-            PriorityQueueStateType.HEAP.name()) : this.priorityQueueStateType;
+    public final PriorityQueueStateType getPriorityQueueStateType() {
+        String pqType = config.get(OckDBOptions.OCKDB_PRIORITY_QUEUE_TYPE);
+        if (PriorityQueueStateType.OCKDB.name().equals(pqType)) {
+            return PriorityQueueStateType.OCKDB;
+        }
+
+        if (PriorityQueueStateType.HEAP.name().equals(pqType)) {
+            return PriorityQueueStateType.HEAP;
+        }
+
+        LOG.error("config priority queue type:{} is invalid.", pqType);
+        throw new IllegalConfigurationException(
+            "Could not parse value for key 'state.backend.ockdb.timer-service.factory',"
+                + " Expected one of: [HEAP, OCKDB]");
     }
 
     /**
@@ -534,9 +545,6 @@ public class EmbeddedOckStateBackend extends AbstractManagedMemoryStateBackend i
      * @param priorityQueueStateType PriorityQueueStateType
      */
     public void setPriorityQueueStateType(PriorityQueueStateType priorityQueueStateType) {
-        if (priorityQueueStateType != PriorityQueueStateType.HEAP) {
-            throw new UnsupportedOperationException("Only heapPriorityQueueStateType supported now.");
-        }
         this.priorityQueueStateType = checkNotNull(priorityQueueStateType);
     }
 

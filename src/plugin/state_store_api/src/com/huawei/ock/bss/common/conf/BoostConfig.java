@@ -41,6 +41,16 @@ public class BoostConfig {
 
     private boolean cacheFilterAndIndexSwitch = true; // 默认开启FilterBlock和IndexBlock的缓存.
 
+    /**
+     * KV separation is turned off by default
+     */
+    private boolean isKVSeparateSwitch = false; // 默认关闭KV分离.
+
+    /**
+     * KV separation threshold, default: 200
+     */
+    private int kVSeparateThreshold = 200;
+
     private float cacheFilterAndIndexRatio = 0.0F; // 默认不使用独立缓存，复用LRU缓存.
 
     private String lsmStoreCompressionPolicy;
@@ -141,6 +151,14 @@ public class BoostConfig {
         this.cacheFilterAndIndexSwitch = switchValue;
     }
 
+    public void setKVSeparateSwitch(boolean isKVSeparate) {
+        this.isKVSeparateSwitch = isKVSeparate;
+    }
+
+    public void setKVSeparateThreshold(int threshold) {
+        this.kVSeparateThreshold = threshold;
+    }
+
     public float getCacheFilterAndIndexRatio() {
         return this.cacheFilterAndIndexRatio;
     }
@@ -151,6 +169,14 @@ public class BoostConfig {
 
     public boolean getCacheFilterAndIndexSwitch() {
         return this.cacheFilterAndIndexSwitch;
+    }
+
+    public boolean isKVSeparate() {
+        return this.isKVSeparateSwitch;
+    }
+
+    public int getKVSeparateThreshold() {
+        return this.kVSeparateThreshold;
     }
 
     public void setLsmStoreCompressionPolicy(String lsmStoreCompressionPolicy) {

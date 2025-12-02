@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
  * You can use this software according to the terms and conditions of the Mulan PSL v2.
  * You may obtain a copy of Mulan PSL v2 at:
  *          http://license.coscl.org.cn/MulanPSL2
@@ -53,6 +53,9 @@ public:
     FileInfoRef AllocateFile(const FileDirectoryRef &fileDirectory,
                              const std::function<std::string(std::string)> &fileNameGenerator);
 
+    FileInfoRef AllocatePrefixFile(const std::string &prefix, const FileDirectoryRef &fileDirectory,
+                             const std::function<std::string(std::string)> &fileNameGenerator);
+
     FileInfoRef AllocateFile(const FileIdRef &fileId, const PathRef &path, bool canDelete);
 
     FileInfoRef AllocateFile();
@@ -93,7 +96,7 @@ public:
         return mWorkingBasePath;
     }
 
-    BResult StartRestore(const std::vector<SnapshotFileMappingRef> &restoredFileMappings);
+    BResult StartRestore(const std::vector<SnapshotFileMappingRef> &restoredFileMappings, bool isExcludeSSTFiles);
 
     BResult EndRestore();
 
@@ -113,7 +116,8 @@ public:
     }
 
     static std::atomic<uint64_t> mPrefix;
-
+private:
+    BResult RestoreFileMapping(const std::vector<SnapshotFileMappingRef> &restoredFileMappings, bool isExcludeSSTFiles);
 private:
     PathRef mWorkingBasePath = nullptr;
     std::string mBackendUid;

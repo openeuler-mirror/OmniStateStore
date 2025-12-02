@@ -50,6 +50,9 @@ public:
                                     SliceBucketGroupRangeGroupRef &oldSliceSegmentGroup,
                                     uint64_t snapshotId);
 
+    BResult RestoreBlobStore(std::vector<SliceTableRestoreMetaRef> &metaList,
+                             std::unordered_map<std::string, uint32_t> &restorePathFileIdMap);
+
     void TryEvictCompositeLogicalSliceChain(uint64_t chainMemory);
 
     BResult LoadSlicesIntoSliceTable(uint32_t snapshotVersion, bool isFailOver);

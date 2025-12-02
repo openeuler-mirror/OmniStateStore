@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
  * You can use this software according to the terms and conditions of the Mulan PSL v2.
  * You may obtain a copy of Mulan PSL v2 at:
  *          http://license.coscl.org.cn/MulanPSL2
@@ -18,21 +18,27 @@
 
 #include "binary/value/value_type.h"
 #include "version/version.h"
+#include "tombstone/tombstone_service.h"
 
 namespace ock {
 namespace bss {
 class MergingIterator : public Iterator<KeyValueRef> {
 public:
     MergingIterator(const std::vector<KeyValueIteratorRef> &iterators, const MemManagerRef &memManager,
-                    FileProcHolder holder, bool sectionRead = false)
-        : MergingIterator(iterators, memManager, nullptr, nullptr, false, holder, sectionRead)
+                    FileProcHolder holder, bool sectionRead = false, TombstoneServiceRef tombstoneService = nullptr)
+        : MergingIterator(iterators, memManager, nullptr, nullptr, false, holder, sectionRead, tombstoneService)
     {
     }
 
     MergingIterator(std::vector<KeyValueIteratorRef> iterators, const MemManagerRef &memManager,
                     std::function<void(VersionPtr &versionPtr)> cleaner, VersionPtr currentVersion, bool reverseOrder,
-                    FileProcHolder holder, bool sectionRead = false) : mIterators(std::move(iterators)),
-        mMemManager(memManager), mReverseOrder(reverseOrder), mHolder(holder), mSectionRead(sectionRead)
+                    FileProcHolder holder, bool sectionRead = false, TombstoneServiceRef tombstoneService = nullptr)
+        : mIterators(std::move(iterators)),
+          mMemManager(memManager),
+          mReverseOrder(reverseOrder),
+          mHolder(holder),
+          mSectionRead(sectionRead),
+          mTombstoneService(tombstoneService)
     {
         mVersion = currentVersion;
         if (mVersion != nullptr) {
@@ -160,6 +166,9 @@ private:
                     auto result = newerValue.MergeWithOlderValue(olderValue, allocator);
                     RETURN_NOT_OK_WITH_WARN_LOG(result);
                 }
+                if (mTombstoneService != nullptr) {
+                    mTombstoneService->DeleteValue(pair->key, pair->value);
+                }
             }
 
             mIteratorQueue.pop();
@@ -181,8 +190,7 @@ private:
             return nullptr;
         }
         // reserve some byte buffer for flush.
-        auto byteBuffer =
-            MakeRef<ByteBuffer>(reinterpret_cast<uint8_t *>(dataAddress), size, mMemManager);
+        auto byteBuffer = MakeRef<ByteBuffer>(reinterpret_cast<uint8_t *>(dataAddress), size, mMemManager);
         if (UNLIKELY(byteBuffer == nullptr)) {
             mMemManager->ReleaseMemory(dataAddress);
             LOG_ERROR("Make ref failed, byteBuffer is null.");
@@ -266,6 +274,7 @@ private:
     std::vector<ByteBufferRef> mMergeBuffer;
     FileProcHolder mHolder;
     bool mSectionRead = false;
+    TombstoneServiceRef mTombstoneService = nullptr;
 };
 using MergingIteratorRef = std::shared_ptr<MergingIterator>;
 

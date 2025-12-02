@@ -28,10 +28,11 @@ public:
     enum class State { CREATED, RUNNING, COMPLETED, FAILED, CANCELED };
 
     PendingSavepointCoordinator(const SnapshotManagerRef &snapshotManager, const FreshTableRef &freshTable,
-                                const SliceTableManagerRef &sliceTable, uint64_t savepointId,
-                                const StateIdProviderRef &stateIdProvider, const MemManagerRef &memManager)
+        const SliceTableManagerRef &sliceTable, uint64_t savepointId, const StateIdProviderRef &stateIdProvider,
+        const MemManagerRef &memManager, const std::vector<PQTableRef> &pqTable)
         : mSnapshotManagerRef(snapshotManager), mFreshTable(freshTable), mSliceTable(sliceTable),
-          mSavepointId(savepointId), mStateIdProvider(stateIdProvider), mMemManager(memManager)
+          mSavepointId(savepointId), mStateIdProvider(stateIdProvider), mMemManager(memManager),
+          mPqTables(pqTable)
     {
     }
 
@@ -43,6 +44,8 @@ public:
     }
 
     BResult Start() override;
+
+    BResult DoBlobStoreSnapshot();
 
     void Cancel() override;
 
@@ -60,11 +63,12 @@ public:
 
     inline void RegisterSnapshotOperator(const AbstractSnapshotOperatorRef &snapshotOperator) override
     {
-        if (UNLIKELY(snapshotOperator == nullptr)) {
-            LOG_ERROR("Register snapshot operator is null.");
-            return;
-        }
         mRegisteredSnapshotOperators.emplace(snapshotOperator->GetOperatorId(), snapshotOperator);
+    }
+
+    inline void UnregisterSnapshotOperator(const AbstractSnapshotOperatorRef &snapshotOperator) override
+    {
+        mRegisteredSnapshotOperators.erase(snapshotOperator->GetOperatorId());
     }
 
     inline StateIdProviderRef GetStateIdProviderSnapshot()
@@ -75,6 +79,11 @@ public:
     std::map<uint32_t, AbstractSnapshotOperatorRef> GetRegisterSnapshotOperator() override
     {
         return mRegisteredSnapshotOperators;
+    }
+
+    inline SliceTableManagerRef &GetSliceTable()
+    {
+        return mSliceTable;
     }
 
 private:
@@ -88,6 +97,7 @@ private:
     std::atomic<uint32_t> mOperatorIdCounter{ 0 };
     MemManagerRef mMemManager = nullptr;
     std::map<uint32_t, AbstractSnapshotOperatorRef> mRegisteredSnapshotOperators;
+    std::vector<PQTableRef> mPqTables;
 };
 using PendingSavepointCoordinatorRef = Ref<PendingSavepointCoordinator>;
 

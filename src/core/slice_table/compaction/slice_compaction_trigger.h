@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
  * You can use this software according to the terms and conditions of the Mulan PSL v2.
  * You may obtain a copy of Mulan PSL v2 at:
  *          http://license.coscl.org.cn/MulanPSL2
@@ -33,9 +33,8 @@ public:
 
         // create and initialize compaction executor.
         mCompactionEventExecutor = std::make_shared<ExecutorService>(NO_1, NO_1024);
-        mCompactionEventExecutor->SetThreadName("CompactionEventExecutor");
-        bool result = mCompactionEventExecutor->Start();
-        if (!result) {
+        mCompactionEventExecutor->SetThreadName("SliceCompactionExecutor");
+        if (!mCompactionEventExecutor->Start()) {
             LOG_ERROR("Compaction event executor start failed.");
             mCompactionEventExecutor = nullptr;
             return BSS_ERR;
@@ -50,6 +49,11 @@ public:
         if (mCompactionEventExecutor != nullptr) {
             mCompactionEventExecutor->Stop();
         }
+    }
+
+    void RegisterTombstoneService(const TombstoneServiceRef &tombstoneService) const
+    {
+        mSliceCompactor->RegisterTombstoneService(tombstoneService);
     }
 
     void RegisterSliceCompactionMetric(BoostNativeMetricPtr metricPtr)
@@ -69,7 +73,6 @@ public:
         const uint32_t bucketIndex = sliceIndexContext->GetSliceIndexSlot();
         const RunnablePtr task = std::make_shared<TryCompactionTask>(mSliceCompactor, bucketIndex,
                                                                      compactCompletedNotify, mBoostNativeMetric);
-        LOG_INFO("Submit a slice compaction task.");
         bool ret = mCompactionEventExecutor->Execute(task);
         if (UNLIKELY(!ret)) {
             LOG_ERROR("Execute async slice compaction task failed.");

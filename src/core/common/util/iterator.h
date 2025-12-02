@@ -41,6 +41,7 @@ public:
     }
 };
 template <typename E> using IteratorRef = Ref<Iterator<E>>;
+template <typename E> using IteratorPtr = std::shared_ptr<Iterator<E>>;
 
 template <typename E> class VectorIterator : public Iterator<E> {
 public:

@@ -20,7 +20,7 @@ namespace bss {
 class FileStoreSnapshotOperator : public AbstractSnapshotOperator {
 public:
     FileStoreSnapshotOperator(uint64_t operatorId, uint64_t snapshotId, const std::vector<LsmStoreRef> &lsmStores,
-                              const FileCacheManagerRef fileCache)
+                              const FileCacheManagerRef &fileCache)
         : AbstractSnapshotOperator(operatorId), mSnapshotId(snapshotId), mLsmStores(lsmStores), mFileCache(fileCache)
     {
         for (const auto &lsmStore : lsmStores) {
@@ -63,8 +63,7 @@ public:
 private:
     uint64_t mSnapshotId = 0;
     std::vector<LsmStoreRef> mLsmStores;
-    // <PathString, <FileAddress, FileSize, count>>
-    std::unordered_map<std::string, std::tuple<uint64_t, uint32_t, uint32_t>> mToSnapshotFileAddress;
+    FileMetaInfoMap mToSnapshotFileAddress;
     std::vector<uint64_t> mLocalOutputOffsets;
     FileCacheManagerRef mFileCache = nullptr;
     std::vector<FileStoreIDRef> mFileStoreIds;
@@ -73,18 +72,18 @@ using FileStoreSnapshotOperatorRef = std::shared_ptr<FileStoreSnapshotOperator>;
 
 class FileStoreSnapshotOperatorInfo : public SnapshotOperatorInfo {
 public:
-    FileStoreSnapshotOperatorInfo(SnapshotOperatorType type, std::vector<FileStoreIDRef> fileStoreIds,
-                                  std::vector<uint64_t> fileMetaOffsets)
+    FileStoreSnapshotOperatorInfo(SnapshotOperatorType type, const std::vector<FileStoreIDRef> &fileStoreIds,
+                                  const std::vector<uint64_t> &fileMetaOffsets)
         : SnapshotOperatorInfo(type), mFileStoreIds(fileStoreIds), mFileMetaOffsets(fileMetaOffsets)
     {
     }
 
-    inline std::vector<FileStoreIDRef> GetFileStoreIds() const
+    inline const std::vector<FileStoreIDRef> &GetFileStoreIds() const
     {
         return mFileStoreIds;
     }
 
-    inline std::vector<uint64_t> GetFileMetaOffsets() const
+    inline const std::vector<uint64_t> &GetFileMetaOffsets() const
     {
         return mFileMetaOffsets;
     }

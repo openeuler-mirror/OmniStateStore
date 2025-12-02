@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
  * You can use this software according to the terms and conditions of the Mulan PSL v2.
  * You may obtain a copy of Mulan PSL v2 at:
  *          http://license.coscl.org.cn/MulanPSL2
@@ -17,8 +17,9 @@
 #include "auto_closeable.h"
 #include "bss_err.h"
 #include "config.h"
-#include "table_description.h"
+#include "pq_table.h"
 #include "table.h"
+#include "table_description.h"
 
 namespace ock {
 namespace bss {
@@ -46,6 +47,12 @@ public:
      * @return return table instance if success, else return nullptr.
      */
     virtual TableRef GetTableOrCreate(TableDescriptionRef tableDesc) = 0;
+
+    /**
+     * create pqtable if not exist.
+     * @return return pqtable instance if success, else return nullptr.
+     */
+    virtual PQTableRef CreatePQTable(const std::string &str) = 0;
 
     /**
      * update TTL fiter manager

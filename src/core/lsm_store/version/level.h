@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
  * You can use this software according to the terms and conditions of the Mulan PSL v2.
  * You may obtain a copy of Mulan PSL v2 at:
  *          http://license.coscl.org.cn/MulanPSL2
@@ -104,6 +104,8 @@ public:
 
     std::vector<FileMetaDataRef> GetFilesContainingPrefixKey(const Key &prefixKey, uint32_t keyGroup,
                                                              bool checkOrderRange);
+
+    std::vector<FileMetaDataRef> GetFilesContainingStateId(uint32_t stateId);
 
     void GetFilesForKey(const Key &key, int32_t keyGroup, bool checkOrderRange,
                         std::vector<FileMetaDataRef> &result);
