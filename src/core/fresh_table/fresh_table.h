@@ -221,7 +221,19 @@ public:
         if (mBoostNativeMetric == nullptr || !mBoostNativeMetric->IsFreshMetricEnabled()) {
             return;
         }
-        mBoostNativeMetric->SetFreshRecordCount([this]() -> uint64_t { return mActive->GetBinaryData()->Size(); });
+        mBoostNativeMetric->SetFreshRecordCount([this]() -> uint64_t {
+            ReadLocker<ReadWriteLock> lock(&mRwLockActive);
+            if (UNLIKELY(mActive == nullptr)) {
+                LOG_ERROR("Query fresh record count, active boost segment is null, return 0.");
+                return 0;
+            }
+            BoostHashMapRef boostHashMap = mActive->GetBinaryData();
+            if (UNLIKELY(boostHashMap == nullptr)) {
+                LOG_ERROR("Query fresh record count, boost hash map is null, return 0.");
+                return 0;
+            }
+            return boostHashMap->Size();
+        });
         mBoostNativeMetric->SetFreshFlushingRecordCount([this]() -> uint64_t {
             ReadLocker<ReadWriteLock> lock(&mRwLock);
             uint64_t records = 0;
@@ -357,6 +369,7 @@ private:
 
     inline BResult CreateAndAssignBinarySegment(const MemorySegmentRef &memorySegment)
     {
+        WriteLocker<ReadWriteLock> lock(&mRwLockActive);
         mActive = std::make_shared<BoostSegment>();
         RETURN_ALLOC_FAIL_AS_NULLPTR(mActive);
         return mActive->Init(mSegmentId++, memorySegment, 0);
@@ -377,6 +390,7 @@ private:
 private:
     std::atomic<bool> mIsOpened{ false };
 
+    ReadWriteLock mRwLockActive;
     BoostSegmentRef mActive;
 
     ReadWriteLock mRwLock;
