@@ -161,7 +161,7 @@ void LsmStore::FinalizeVersionEdit(const CompactionProcessorRef &processor, std:
         editBuilder->DeleteFile(lvlInput->GetGroupRange(), processor->mCompaction->GetInputLevelId(),
                                 lvlInput->GetIdentifier());
     }
-
+    processor->mOutputSize.clear();
     for (auto &outputLvlInput : processor->mCompaction->GetOutputLevelInputs()) {
         editBuilder->DeleteFile(outputLvlInput->GetGroupRange(), processor->mCompaction->GetOutputLevelId(),
                                 outputLvlInput->GetIdentifier());
@@ -171,6 +171,7 @@ void LsmStore::FinalizeVersionEdit(const CompactionProcessorRef &processor, std:
         if (!output->GetGroupRange()->Equals(mGroupRange)) {
             LOG_ERROR("New File should be current group range.");
         }
+        processor->mOutputSize.emplace_back(output->GetFileSize());
         editBuilder->AddFile(mGroupRange, processor->mCompaction->GetOutputLevelId(), output);
     }
 

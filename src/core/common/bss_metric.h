@@ -696,14 +696,14 @@ public:
 
     void AddLsmCompactionReadSize(uint64_t lsmCompactionReadSize, uint32_t levelId)
     {
-        levelId = std::max(levelId, NO_3);
+        levelId = std::min(levelId, NO_3);
         mLevelCompactionRead[levelId] += lsmCompactionReadSize;
         mTotalCompactionRead += lsmCompactionReadSize;
     }
 
     void AddLsmCompactionWriteSize(uint64_t lsmCompactionWriteSize, uint32_t levelId)
     {
-        levelId = std::max(levelId, NO_3);
+        levelId = std::min(levelId, NO_3);
         mLevelCompactionWrite[levelId] += lsmCompactionWriteSize;
         mTotalCompactionWrite += lsmCompactionWriteSize;
     }

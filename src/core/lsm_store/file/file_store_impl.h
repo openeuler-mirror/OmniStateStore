@@ -55,6 +55,7 @@ public:
 public:
     CompactionRef mCompaction = nullptr;
     std::vector<FileMetaDataRef> mOutputs;
+    std::vector<uint64_t> mOutputSize;
     FileWriterRef mFileBuilder = nullptr;
     uint32_t mCurrentFileId = 0;
     std::string mCurrentFileName;
@@ -419,10 +420,9 @@ private:
         auto inputLevelId = compaction->GetInputLevelId();
         auto outputLevelId = compaction->GetOutputLevelId();
         auto fileInputs = processor->mCompaction->GetLevelInputs();
-        for (const auto &item : processor->mOutputs) {
-            CONTINUE_LOOP_AS_NULLPTR(item);
-            mBoostNativeMetric->UpdateLevelFileMetric(item->GetFileSize(), outputLevelId, true);
-            mBoostNativeMetric->AddLsmCompactionWriteSize(item->GetFileSize(), outputLevelId);
+        for (const auto &size : processor->mOutputSize) {
+            mBoostNativeMetric->UpdateLevelFileMetric(size, outputLevelId, true);
+            mBoostNativeMetric->AddLsmCompactionWriteSize(size, outputLevelId);
         }
         for (const auto &item : fileInputs) {
             CONTINUE_LOOP_AS_NULLPTR(item);
