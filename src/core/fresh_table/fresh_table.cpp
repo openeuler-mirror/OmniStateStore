@@ -415,6 +415,7 @@ BResult FreshTable::NewActiveSegment(uint32_t size, FreshTable::MapLayerType lay
         return BSS_ALLOC_FAIL;
     }
 
+    WriteLocker<ReadWriteLock> lock(&mRwLockActive);
     mActive = std::make_shared<BoostSegment>();  // 替换freshTable的active memorySegment.
     return mActive->Init(mSegmentId++, memorySegment, 0);
 }

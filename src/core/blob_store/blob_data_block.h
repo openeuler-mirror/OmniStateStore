@@ -73,9 +73,6 @@ public:
     {
         return mBlobDataBlockMeta;
     }
-
-    BResult GetDataBlobEntry(uint32_t index, BlobIndexEntryRef blobIndexEntry);
-
 private:
     BlobDataBlockMetaRef mBlobDataBlockMeta = nullptr;
     uint32_t mLength = 0;
