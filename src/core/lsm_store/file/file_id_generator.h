@@ -102,7 +102,7 @@ public:
 
     FileIdRef Generate();
 
-    static inline uint32_t GetMaxAllowUniqueId() const
+    static inline uint32_t GetMaxAllowUniqueId()
     {
         return maxAllowedUniqueID;
     }
