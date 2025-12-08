@@ -121,6 +121,7 @@ IOResult LogicalSliceChainImpl::Get(const Key &key, Value &value, BlobValueTrans
     }
 
     // 2. get from file page.
+    ReadLocker<ReadWriteLock> lk(&mFileRwLock);
     for (const auto &filePage : mFilePage) {
         found = filePage->Get(key, value);
         if (found) {

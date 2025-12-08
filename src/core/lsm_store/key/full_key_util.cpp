@@ -149,6 +149,9 @@ int32_t FullKeyUtil::CompareKeyWithInternalKey(const Key &key, const FullKeyRef 
         LOG_ERROR("full key primary user key is nullptr.");
         return -1;
     }
+    if (fullKey->IsPqKey()) {
+        return 1;
+    }
     int cmp = ComparePrimaryKey(key.PriKey().KeyData(), 0, key.PriKey().KeyLen(), key.PriKey().KeyHashCode(),
                                 const_cast<uint8_t *>(fullKey->PriKey().KeyData()), 0,
                                 fullKey->PriKey().KeyLen(), fullKey->KeyHashCode());

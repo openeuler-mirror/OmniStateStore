@@ -183,7 +183,7 @@ BResult LsmStore::AddEntry(const CompactionProcessorRef &compactionProcessor, co
 {
     if (compactionProcessor->mFileBuilder != nullptr &&
         compactionProcessor->mFileBuilder->IsStateChange(keyValue)) {
-        return FinishCompactionOutputFile(compactionProcessor);
+        RETURN_NOT_OK_NO_LOG(FinishCompactionOutputFile(compactionProcessor));
     }
     BResult ret = InitNewFileIfNecessary(compactionProcessor, holder);
     RETURN_NOT_OK_NO_LOG(ret);
@@ -473,17 +473,12 @@ BResult LsmStore::BuildLsmStoreFlushFile(const PQTableIteratorRef &iter, FileMet
     RETURN_ERROR_AS_NULLPTR(fileInfo);
     FileProcHolder holder = FileProcHolder::FILE_STORE_FLUSH;  // 标记该流程是Flush写流程
     auto fileBuilder = mFileCache->CreateBuilder(fileInfo->GetFilePath(), 0, holder);
-    Iterator_Result result;
     while (iter->HasNext()) {
         auto ret = fileBuilder->Add(iter->Next());
         if (UNLIKELY(ret != BSS_OK)) {
             mFileCacheManager->DiscardFile(FileAddressUtil::GetFileAddressWithZeroOffset(fileInfo->GetFileId()->Get()));
             return BSS_INNER_ERR;
         }
-    }
-    if (UNLIKELY(result == Iterator_Result_Failed)) {
-        mFileCacheManager->DiscardFile(FileAddressUtil::GetFileAddressWithZeroOffset(fileInfo->GetFileId()->Get()));
-        return BSS_INNER_ERR;
     }
 
     FileBlockMetaRef fileMeta;
