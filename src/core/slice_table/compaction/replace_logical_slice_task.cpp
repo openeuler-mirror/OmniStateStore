@@ -53,23 +53,21 @@ BResult ReplaceLogicalSlice::SyncReplaceChainAndSlice(LogicalSliceChainRef &logi
             return BSS_INVALID_PARAM;
         }
         if (sliceAddress->IsEvicted()) {
-            std::vector<FilePageRef> currentPages;
-            logicalSliceChain->GetFilePages(currentPages);
-            compactedLogicalSliceChain->SetFilePages(currentPages);
             evictedPageCount++;
         } else if (sliceAddress->IsTriggerFlush()) {
-            std::vector<FilePageRef> currentPages;
-            logicalSliceChain->GetFilePages(currentPages);
-            // 触发了flush, chain马上会设置filePage，理论只有级短的时间是empty，加while保证能拿到filePages。
-            while (currentPages.empty()) {
-                logicalSliceChain->GetFilePages(currentPages);
+            // 触发flush, 理论只有级短的时间是empty, 加while保证能filePage设置成功。
+            while (!logicalSliceChain->HasFilePage()) {
                 usleep(NO_20);
             }
-            compactedLogicalSliceChain->SetFilePages(currentPages);
             compactedLogicalSliceChain->InsertSlice(sliceAddress);
         } else {
             compactedLogicalSliceChain->InsertSlice(sliceAddress);
         }
+    }
+    if (logicalSliceChain->HasFilePage()) {
+        BucketGroupRef bucketGroup = GetBucketGroup();
+        RETURN_ERROR_AS_NULLPTR(bucketGroup);
+        compactedLogicalSliceChain->InsertFilePageIfEmpty(std::make_shared<FilePage>(bucketGroup->GetLsmStore()));
     }
 
     // 2. 插入compacted的sliceAddress.

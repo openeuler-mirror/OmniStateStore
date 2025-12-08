@@ -151,6 +151,11 @@ private:
 
     static const LogicalSliceChainSnapshotMetaRef mEmptySliceMeta;
 
+    BucketGroupRef GetBucketGroup() const
+    {
+        return mBucketGroupManager->GetBucketGroupVector()[0];
+    }
+
 private:
     SliceBucketIndexRef mSliceBucketIndex;
     BucketGroupManagerRef mBucketGroupManager = nullptr;

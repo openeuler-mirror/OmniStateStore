@@ -75,9 +75,6 @@ BResult LogicalSliceChainImpl::Initialize(
     }
     mSliceStatus.store(logicalSliceChain->GetSliceStatus());
     mSliceSize.store(snapshotSliceSize);
-    if (hasFilePage) {
-        mFilePage.resize(NO_1);
-    }
 
     LOG_DEBUG("Logic slice chain info, baseSliceIndex:"
               << mBaseSliceIndex.load() << ", chainEndIndex:" << mChainEndIndex.load()
@@ -352,7 +349,7 @@ LogicalSliceChainRef LogicalSliceChainImpl::DeepCopy()
         }
     }
     ReadLocker<ReadWriteLock> lk(&mFileRwLock);
-    if (mFilePage.size() != 0) {
+    if (!mFilePage.empty()) {
         copyLogicSliceChain->mFilePage.resize(mFilePage.size());
         std::copy(mFilePage.begin(), mFilePage.end(), copyLogicSliceChain->mFilePage.begin());
     }

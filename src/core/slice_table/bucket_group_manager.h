@@ -78,7 +78,7 @@ public:
 
     KeyValueIteratorRef IteratorFileStoreData(uint16_t stateId);
     std::vector<BucketGroupRef> GetBucketGroupVector();
-    void MarkLogicalSliceChainFlushed(const LogicalSliceChainRef &logicalSliceChain, BucketGroupRef bucketGroup);
+    void MarkLogicalSliceChainFlushed(const LogicalSliceChainRef &logicalSliceChain, const BucketGroupRef &bucketGroup);
     void SnapshotMeta(const FileOutputViewRef &localOutputView);
     static BResult RestoreMeta(const FileInputViewRef &reader, uint32_t totalBucketNum,
                                std::vector<BucketGroupRangeRef> &bucketGroupRanges);

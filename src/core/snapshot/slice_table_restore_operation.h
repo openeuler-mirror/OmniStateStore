@@ -69,7 +69,10 @@ public:
     BResult DoCompositeCompaction(const SliceIndexContextRef &sliceIndexContext);
     BResult DirectReplaceCompositeSlice(const SliceIndexContextRef &sliceIndexContext);
     BResult CompactCompositeLogicalSliceChain(uint32_t sliceIndexSlot);
-
+    BucketGroupRef GetBucketGroup() const
+    {
+        return mBucketGroupManager->GetBucketGroupVector()[0];
+    }
 private:
     ConfigRef mConfig = nullptr;
     SliceTableManagerRef mSliceTable = nullptr;

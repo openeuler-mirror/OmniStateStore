@@ -351,9 +351,8 @@ public:
         for (int32_t i = curIndex; i < static_cast<int32_t>(logicalSliceChain->GetCurrentSliceChainLen()); i++) {
             newLogicalSliceChain->InsertSlice(logicalSliceChain->GetSliceAddress(i));
         }
-        std::vector<FilePageRef> filePages;
-        logicalSliceChain->GetFilePages(filePages);
-        newLogicalSliceChain->SetFilePages(filePages);
+        mBucketGroupManager->MarkLogicalSliceChainFlushed(newLogicalSliceChain,
+            mBucketGroupManager->GetBucketGroupVector()[0]);
         newLogicalSliceChain->SetBaseSliceIndex(logicalSliceChain->GetBaseSliceIndex() - curIndex);
         auto invalidSliceAddress = std::vector<SliceAddressRef>();
         mSliceBucketIndex->UpdateLogicalSliceChain(bucketIndex, logicalSliceChain, newLogicalSliceChain, false);

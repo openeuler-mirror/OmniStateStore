@@ -110,6 +110,14 @@ BResult SliceTableRestoreOperation::RestoreSliceBucketIndex(const FileInputViewR
             LogicalSliceChainRef logicalSliceChain = std::make_shared<LogicalSliceChainImpl>(SliceStatus::NORMAL,
                                                                                              false);
             RETURN_NOT_OK(logicalSliceChain->Restore(reader, snapshotId));
+            if (logicalSliceChain->HasFilePage()) {
+                auto bucketGroup = GetBucketGroup();
+                RETURN_ERROR_AS_NULLPTR(bucketGroup);
+                auto filePage = std::make_shared<FilePage>(bucketGroup->GetLsmStore());
+                std::vector<FilePageRef> filePages;
+                filePages.push_back(filePage);
+                logicalSliceChain->SetFilePages(filePages);
+            }
             logicalSliceChainTable[i] = logicalSliceChain;
             sliceTotalSize += logicalSliceChain->GetSliceSize();
             LOG_DEBUG("Restore non-empty slice chain, idx:"
@@ -177,9 +185,7 @@ BResult SliceTableRestoreOperation::LoadSlicesIntoSliceTable(uint32_t snapshotVe
             for (auto &item : chains) {
                 std::vector<FilePageRef> filePages;
                 item->GetFilePages(filePages);
-                for (auto &filePage : filePages) {
-                    chain->InsertFilePage(filePage);
-                }
+                chain->InsertAllFilePage(filePages);
             }
             mSliceBucketIndex->SetLogicChainedSlice(slot, chain);
             remaining.fetch_sub(1);

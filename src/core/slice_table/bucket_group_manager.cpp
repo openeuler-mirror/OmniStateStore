@@ -102,11 +102,9 @@ std::vector<BucketGroupRef> BucketGroupManager::GetBucketGroupVector()
 }
 
 void BucketGroupManager::MarkLogicalSliceChainFlushed(const LogicalSliceChainRef &logicalSliceChain,
-                                                      BucketGroupRef bucketGroup)
+                                                      const BucketGroupRef &bucketGroup)
 {
-    if (logicalSliceChain->GetFilePageSize() == 0) {
-        logicalSliceChain->InsertFilePage(std::make_shared<FilePage>(bucketGroup->GetLsmStore()));
-    }
+    logicalSliceChain->InsertFilePageIfEmpty(std::make_shared<FilePage>(bucketGroup->GetLsmStore()));
 }
 
 BResult BucketGroupManager::RestoreMeta(const FileInputViewRef &reader, uint32_t totalBucketNum,
