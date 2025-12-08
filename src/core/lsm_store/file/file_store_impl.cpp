@@ -130,14 +130,16 @@ BResult LsmStore::FinishCompactionOutputFile(const CompactionProcessorRef &proce
         FileBlockMetaRef fileBlockMeta;
         auto ret = processor->mFileBuilder->Finish(fileBlockMeta);
         RETURN_NOT_OK_NO_LOG(ret);
-        FullKeyRef smallest = (fileBlockMeta->GetStartKey() == nullptr) ?
-                                  nullptr :
-                                  FullKeyUtil::CopyInternalKey(fileBlockMeta->GetStartKey(), mMemManager,
-                                                               FileProcHolder::FILE_STORE_COMPACTION);
-        FullKeyRef largest = (fileBlockMeta->GetEndKey() == nullptr) ?
-                                 nullptr :
-                                 FullKeyUtil::CopyInternalKey(fileBlockMeta->GetEndKey(), mMemManager,
-                                                              FileProcHolder::FILE_STORE_COMPACTION);
+        RETURN_ERROR_AS_NULLPTR(fileBlockMeta->GetStartKey());
+        FullKeyRef smallest = FullKeyUtil::CopyInternalKey(fileBlockMeta->GetStartKey(), mMemManager,
+                                                           FileProcHolder::FILE_STORE_COMPACTION);
+        RETURN_ERROR_AS_NULLPTR(fileBlockMeta->GetEndKey());
+        FullKeyRef largest = FullKeyUtil::CopyInternalKey(fileBlockMeta->GetEndKey(), mMemManager,
+                                                          FileProcHolder::FILE_STORE_COMPACTION);
+        if (UNLIKELY(smallest == nullptr || largest == nullptr)) {
+            mFileCacheManager->DiscardFile(FileAddressUtil::GetFileAddressWithZeroOffset(processor->mCurrentFileId));
+            return BSS_ALLOC_FAIL;
+        }
         FileMetaData::BuilderRef builder = FileMetaData::NewBuilder();
         builder->Fill(smallest, largest, fileBlockMeta->GetFileSize(),
                       FileAddressUtil::GetFileAddressWithZeroOffset(processor->mCurrentFileId),
@@ -148,8 +150,11 @@ BResult LsmStore::FinishCompactionOutputFile(const CompactionProcessorRef &proce
         mFileCache->FinishBuilder(processor->mCurrentFileId, fileMetaData);
         processor->mOutputs.emplace_back(fileMetaData);
         processor->mFileBuilder = nullptr;
-        LOG_DEBUG("Finish compaction output file success, fileStoreSeqId:" << mSeqId << "." << "filename: "
-                                                        << PathTransform::ExtractFileName(processor->mCurrentFileName));
+        LOG_DEBUG("Finish compaction output file success, fileStoreSeqId:"
+                  << mSeqId << "filename: " << PathTransform::ExtractFileName(processor->mCurrentFileName)
+                  << ", smallestKey:" << smallest->ToString() << ", largestKey:" << largest->ToString()
+                  << ", fileAddress:" << fileMetaData->GetFileAddress() << ", fileId:" << fileMetaData->GetFileId()
+                  << ", fileSize:" << fileMetaData->GetFileSize());
     }
     return BSS_OK;
 }
@@ -560,8 +565,12 @@ void LsmStore::CreateVersion(const FileMetaDataRef &fileMetaData)
     innerVersionBuilder->InternalRelease();
     LOG_INFO("Flush file store success, fileStoreSeqId:"
              << mSeqId << ", versionId:" << newVersion->GetVersionSeqId()
-             << ", fileAddress:" << fileMetaData->GetFileAddress() << ", fileSize:" << fileMetaData->GetFileSize()
-             << ", filePath:" << PathTransform::ExtractFileName(fileMetaData->GetIdentifier()));
+             << ", fileName:" << PathTransform::ExtractFileName(fileMetaData->GetIdentifier())
+             << ", smallestKey:" << fileMetaData->GetSmallest()->ToString()
+             << ", largestKey:" << fileMetaData->GetLargest()->ToString()
+             << ", fileAddress:" << fileMetaData->GetFileAddress()
+             << ", fileId:" << fileMetaData->GetFileId()
+             << ", fileSize:" << fileMetaData->GetFileSize());
 }
 
 uint64_t LsmStore::GetNextSeqNumber()

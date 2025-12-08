@@ -138,6 +138,11 @@ public:
         mHolder = holder;
     }
 
+    inline FileMetaDataRef &GetFileMeta()
+    {
+        return mFileMetaData;
+    }
+
 protected:
     inline bool IsFileCacheEnabled()
     {
