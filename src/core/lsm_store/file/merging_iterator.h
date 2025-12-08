@@ -139,14 +139,16 @@ private:
 
             if (mCurrentPair == nullptr) {
                 mCurrentPair = pair;
+                mPrevIterator = peekIterator;
             } else {
                 const auto &key1 = mCurrentPair->key;
                 const auto &key2 = pair->key;
                 int cmp = key1.Compare(key2);
-                if (UNLIKELY((mReverseOrder && cmp < 0) || (!mReverseOrder && cmp > 0))) {
-                    LOG_ERROR("Wrong order, reverse order:" << mReverseOrder << ", curHash:" << key1.ToString()
-                                                            << ", nextHash:" << key2.ToString());
+                if (CheckWrongOrder(key1, key2, cmp)) {
+                    LOG_INFO("currentKey and nextKey is same iterator:" << (mPrevIterator == peekIterator));
+                    peekIterator->PrintUsefulInfo();
                 }
+                mPrevIterator = peekIterator;
 
                 // keys are not the same, return this entry.
                 if (cmp != 0) {
@@ -159,13 +161,8 @@ private:
                 }
 
                 // keys are the same, merge them if needed.
-                auto &newerValue = mCurrentPair->value;
-                auto &olderValue = pair->value;
-                if (newerValue.ValueType() == ValueType::APPEND) {
-                    auto allocator = [this](uint32_t size) -> ByteBufferRef { return CreateBuffer(size); };
-                    auto result = newerValue.MergeWithOlderValue(olderValue, allocator);
-                    RETURN_NOT_OK_WITH_WARN_LOG(result);
-                }
+                RETURN_NOT_OK_WITH_WARN_LOG(MergeValue(mCurrentPair->value, pair->value));
+
                 if (mTombstoneService != nullptr) {
                     mTombstoneService->DeleteValue(pair->key, pair->value);
                 }
@@ -178,6 +175,25 @@ private:
             } else {
                 peekIterator->Close();
             }
+        }
+        return BSS_OK;
+    }
+
+    bool CheckWrongOrder(const Key &key1, const Key &key2, int cmp) const
+    {
+        if (UNLIKELY((mReverseOrder && cmp < 0) || (!mReverseOrder && cmp > 0))) {
+            LOG_ERROR("Wrong order, reverse order:" << mReverseOrder << ", cmp:" << cmp << ", curHash:"
+                                                    << key1.ToString() << ", nextHash:" << key2.ToString());
+            return true;
+        }
+        return false;
+    }
+
+    BResult MergeValue(Value &newerValue, Value &olderValue)
+    {
+        if (newerValue.ValueType() == ValueType::APPEND) {
+            auto allocator = [this](uint32_t size) -> ByteBufferRef { return CreateBuffer(size); };
+            return newerValue.MergeWithOlderValue(olderValue, allocator);
         }
         return BSS_OK;
     }
@@ -230,6 +246,11 @@ private:
             return currentPair;
         }
 
+        void PrintUsefulInfo() override
+        {
+            mEntryIterator->PrintUsefulInfo();
+        }
+
         inline KeyValueRef GetNextPair() const
         {
             return mNextPair;
@@ -251,7 +272,7 @@ private:
     private:
         KeyValueIteratorRef mEntryIterator = nullptr;
         bool mReverseOrder = false;
-        KeyValueRef mNextPair;
+        KeyValueRef mNextPair = nullptr;
         uint64_t mSeqId = 0;
     };
 
@@ -270,11 +291,12 @@ private:
     bool mReverseOrder = false;
     VersionPtr mVersion = nullptr;
     std::priority_queue<IteratorWrapperRef, std::vector<IteratorWrapperRef>, CompareIteratorWrapper> mIteratorQueue;
-    KeyValueRef mCurrentPair;
+    KeyValueRef mCurrentPair = nullptr;
     std::vector<ByteBufferRef> mMergeBuffer;
     FileProcHolder mHolder;
     bool mSectionRead = false;
     TombstoneServiceRef mTombstoneService = nullptr;
+    IteratorWrapperRef mPrevIterator = nullptr;
 };
 using MergingIteratorRef = std::shared_ptr<MergingIterator>;
 

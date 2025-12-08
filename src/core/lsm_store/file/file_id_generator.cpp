@@ -14,7 +14,17 @@
 
 namespace ock {
 namespace bss {
+
+uint32_t FileIdGenerator::mInitValue = 0;
+uint32_t FileIdGenerator::maxAllowedUniqueID = 0;
+FileIdRecorderRef FileIdGenerator::mFileIdRecorder;
 std::atomic<uint32_t> FileIdGenerator::mUniqueId = { 1 };
+std::mutex FileIdGenerator::mMutex;
+
+uint32_t FileIdRecorder::mCardinality = 0;
+uint32_t FileIdRecorder::mMaxAllowedUniqueID = 0;
+std::atomic<bool> FileIdRecorder::isInitialized { false };
+std::vector<bool> FileIdRecorder::mUsedFileUniqueIDs;
 
 FileIdRef FileIdGenerator::Generate()
 {
@@ -40,15 +50,6 @@ FileIdRef FileIdGenerator::Generate()
         return nullptr;
     }
     return fileId;
-}
-
-void FileIdGenerator::Restore(std::vector<FileIdRef> &fileIds)
-{
-    std::lock_guard<std::mutex> lock(mMutex);
-    for (const auto &fileId : fileIds) {
-        RecordUniqueId(fileId->GetUniqueId());
-        LOG_DEBUG("Restore fileId generator success, unique id:" << fileId->GetUniqueId());
-    }
 }
 
 }  // namespace bss

@@ -23,17 +23,28 @@ namespace ock {
 namespace bss {
 class FileIdRecorder {
 public:
-    explicit FileIdRecorder(uint32_t maxAllowedUniqueID) : mMaxAllowedUniqueID(maxAllowedUniqueID), mCardinality(0)
-    {
-        mUsedFileUniqueIDs = std::vector<bool>(maxAllowedUniqueID, false);
-    }
+    FileIdRecorder() = default;
 
     ~FileIdRecorder()
     {
-        std::vector<bool>().swap(mUsedFileUniqueIDs);
+        bool expected = true;
+        if (isInitialized.compare_exchange_strong(expected, false)) {
+            LOG_INFO("clear FileId Recorder.");
+            std::vector<bool>().swap(mUsedFileUniqueIDs);
+        }
     }
 
-    inline bool IsIDRecorded(uint32_t uniqueID) const
+    static inline void Initialize(uint32_t maxAllowedUniqueID)
+    {
+        bool expected = false;
+        if (isInitialized.compare_exchange_strong(expected, true)) {
+            LOG_INFO("init FileId Recorder.");
+            mUsedFileUniqueIDs.resize(maxAllowedUniqueID, false);
+            mMaxAllowedUniqueID = maxAllowedUniqueID;
+        }
+    }
+
+    static inline bool IsIDRecorded(uint32_t uniqueID)
     {
         if (uniqueID >= mMaxAllowedUniqueID) {
             LOG_ERROR("Invalid id: " << uniqueID);
@@ -42,7 +53,7 @@ public:
         return mUsedFileUniqueIDs[uniqueID];
     }
 
-    inline void RecordUniqueID(uint32_t uniqueID)
+    static inline void RecordUniqueID(uint32_t uniqueID)
     {
         if (UNLIKELY(uniqueID >= mMaxAllowedUniqueID)) {
             LOG_ERROR("Invalid id: " << uniqueID);
@@ -55,12 +66,12 @@ public:
         }
     }
 
-    inline uint32_t RecordedFileIdNum() const
+    static inline uint32_t RecordedFileIdNum()
     {
         return mCardinality;
     }
 
-    inline void RecycleFileId(uint32_t uniqueId)
+    static inline void RecycleFileId(uint32_t uniqueId)
     {
         if (uniqueId >= mMaxAllowedUniqueID) {
             return;
@@ -73,59 +84,47 @@ public:
     }
 
 private:
-    std::vector<bool> mUsedFileUniqueIDs;
-    uint32_t mMaxAllowedUniqueID = 0;
-    uint32_t mCardinality = 0;
+    static uint32_t mCardinality;
+    static uint32_t mMaxAllowedUniqueID;
+    static std::atomic<bool> isInitialized;
+    static std::vector<bool> mUsedFileUniqueIDs;
 };
 using FileIdRecorderRef = std::shared_ptr<FileIdRecorder>;
 
 class FileIdGenerator {
 public:
     explicit FileIdGenerator(FileModeInfo fileModeInfo)
-        : mFileMode(fileModeInfo), mFileIdRecorder(std::make_shared<FileIdRecorder>(mFileMode.maxAllowedUniqueID))
     {
-        mInitValue = mFileMode.initValue;
-    }
-
-    FileIdGenerator(uint32_t initUniqueIdValue, FileModeInfo fileModeInfo)
-        : mFileMode(fileModeInfo), mFileIdRecorder(std::make_shared<FileIdRecorder>(mFileMode.maxAllowedUniqueID))
-    {
-        mInitValue = mFileMode.initValue;
-        mUniqueId.store(initUniqueIdValue);
+        mInitValue = fileModeInfo.initValue;
+        maxAllowedUniqueID = fileModeInfo.maxAllowedUniqueID;
+        mFileIdRecorder->Initialize(maxAllowedUniqueID);
     }
 
     FileIdRef Generate();
 
-    inline uint32_t GetMaxAllowUniqueId() const
+    static inline uint32_t GetMaxAllowUniqueId() const
     {
-        return mFileMode.maxAllowedUniqueID;
+        return maxAllowedUniqueID;
     }
 
-    inline void Recycle(const FileIdRef &fileId)
+    static inline void Recycle(const FileIdRef &fileId)
     {
         RETURN_AS_NULLPTR(fileId);
         std::lock_guard<std::mutex> lock(mMutex);
         RecycleUniqueId(fileId->GetUniqueId());
     }
 
-    void Restore(std::vector<FileIdRef> &fileIds);
-
-    inline void RecycleUniqueId(uint32_t uniqueId)
+    static inline void RecycleUniqueId(uint32_t uniqueId)
     {
         mFileIdRecorder->RecycleFileId(uniqueId);
     }
 
-    inline void RecordUniqueId(uint32_t uniqueId)
-    {
-        mFileIdRecorder->RecordUniqueID(uniqueId);
-    }
-
 private:
-    FileModeInfo mFileMode;
-    uint32_t mInitValue = 0;
+    static uint32_t mInitValue;
+    static uint32_t maxAllowedUniqueID;
+    static FileIdRecorderRef mFileIdRecorder;
     static std::atomic<uint32_t> mUniqueId;
-    FileIdRecorderRef mFileIdRecorder = nullptr;
-    mutable std::mutex mMutex;
+    static std::mutex mMutex;
 };
 using FileIdGeneratorRef = std::shared_ptr<FileIdGenerator>;
 

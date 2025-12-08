@@ -65,6 +65,16 @@ void FileIterator::Close()
     mBlockHandleIterator = nullptr;
 }
 
+void FileIterator::PrintUsefulInfo()
+{
+    LOG_INFO("fileName:" << PathTransform::ExtractFileName(mFileReader->GetFileMeta()->GetIdentifier())
+                         << ", smallestKey:" << mFileReader->GetFileMeta()->GetSmallest()->ToString()
+                         << ", largest:" << mFileReader->GetFileMeta()->GetLargest()->ToString()
+                         << ", fileAddress:" << mFileReader->GetFileMeta()->GetFileAddress()
+                         << ", fileId:" << mFileReader->GetFileMeta()->GetFileId()
+                         << ", fileSize:" << mFileReader->GetFileMeta()->GetFileSize());
+}
+
 KeyValueRef FileSubIterator::Advance()
 {
     while ((mDataBlockIterator != nullptr && mDataBlockIterator->HasNext()) ||

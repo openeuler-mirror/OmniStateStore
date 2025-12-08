@@ -69,12 +69,7 @@ BResult ValueSpace::Put(uint32_t index, FreshValueNodePtr &value, const MemorySe
     }
     auto valType = isKvSeparate ? ValueType::SEPARATE : value->ValueType();
     if (!isValue) {
-        valType = ValueType::APPEND;
-        if (!count) {
-            valType = ValueType::DELETE;
-        } else if (deleteOrPut) {
-            valType = ValueType::PUT;
-        }
+        valType = count ? (deleteOrPut ? ValueType::PUT : ValueType::APPEND) : ValueType::DELETE;
     } else if (count > 1) {
         LOG_ERROR("Value type should not have more than one element");
     }

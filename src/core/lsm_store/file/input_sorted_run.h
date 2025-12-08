@@ -116,8 +116,17 @@ public:
         KeyValueRef Next() override
         {
             KeyValueRef currentPair = mNextPair;
+            mPrev = mCurrent;
             mNextPair = Advance();
             return currentPair;
+        }
+
+        void PrintUsefulInfo() override
+        {
+            if (mPrev != nullptr) {
+                LOG_INFO("iterators size:" << mInputSortedRun->Size() << ", prev iterator info:");
+                mPrev->PrintUsefulInfo();
+            }
         }
 
     private:
@@ -148,6 +157,7 @@ public:
         FileIteratorWriterRef mBuilder = nullptr;
         InputSortedRunRef mInputSortedRun = nullptr;
         KeyValueIteratorRef mCurrent = nullptr;
+        KeyValueIteratorRef mPrev = nullptr;
         KeyValueRef mNextPair = nullptr;
         int32_t mCurrentIndex = -1;
         bool mInitialized = false;

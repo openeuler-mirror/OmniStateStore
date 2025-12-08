@@ -355,10 +355,12 @@ public:
                 fileName, fileAddress, restoreFilePath.fileStatus, fileSize,
                 1,        fileAddress, restoreFilePath.remotePath, restoreFilePath.restorePath
             };
-            LOG_INFO("restore info, file name:" << PathTransform::ExtractFileName(fileName) << ", file status:"
-                                                 << static_cast<uint32_t>(restoreFilePath.fileStatus) << ", remote:"
-                                                 << PathTransform::ExtractFileName(restoreFilePath.remotePath)
-                                                 << ", fileId:" << fileId << ", address :" << fileAddress);
+            LOG_INFO("restore info, file name:" << PathTransform::ExtractFileName(fileName) << ", remote file:"
+                                                << PathTransform::ExtractFileName(restoreFilePath.remotePath)
+                                                << ", file status:" << static_cast<uint32_t>(restoreFilePath.fileStatus)
+                                                << ", smallestKey:" << smallest->ToString()
+                                                << ", largestKey:" << largest->ToString() << ", fileId:" << fileId
+                                                << ", fileAddress:" << fileAddress << ", fileSize:" << fileSize);
 
             fileMapping.emplace(restoreFilePath.remotePath, restoreFileInfo);
         }

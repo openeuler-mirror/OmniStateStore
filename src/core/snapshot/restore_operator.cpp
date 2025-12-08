@@ -60,38 +60,25 @@ BResult RestoreOperator::Restore(std::vector<PathRef> &restoredMetaPaths,
         inputView->Seek(dbMeta->GetStateIdOffset());
         mStateIdProvider->Restore(inputView, tableDescriptions);
     }
-    // 3. 处理fileId冲突.
+
+    // 3. 重新生成fileId.
     std::vector<SnapshotFileMappingRef> restoredLocalFileMappings;
     restoredLocalFileMappings.reserve(restoredDbMetas.size());
     for (const auto &restoredDbMeta : restoredDbMetas) {
         restoredLocalFileMappings.emplace_back(restoredDbMeta->GetLocalFileMapping());
     }
-    std::vector<FileIdRef> restoredFileIdObjs;
-    std::vector<uint32_t> restoredFileIds;
-    std::vector<SnapshotFileInfoRef> conflictFileInfos;
+
     std::unordered_map<std::string, uint32_t> restorePathFileIdMap;
     for (const auto &item : restoredLocalFileMappings) {
         CONTINUE_LOOP_AS_NULLPTR(item);
         std::vector<SnapshotFileInfoRef> fileMapping = item->GetFileMapping();
         for (const auto &fileInfo : fileMapping) {
             CONTINUE_LOOP_AS_NULLPTR(fileInfo);
-            FileIdRef fileIdObj = std::make_shared<FileId>();
-            uint32_t fileId = fileInfo->GetFileId();
-            if (std::find(restoredFileIds.begin(), restoredFileIds.end(), fileId) != restoredFileIds.end()) {
-                conflictFileInfos.emplace_back(fileInfo);
-                continue;
-            }
-            RETURN_NOT_OK(fileIdObj->Init(fileInfo->GetFileId()));
-            restoredFileIds.emplace_back(fileId);
-            restorePathFileIdMap.emplace(fileInfo->GetFileName(), fileId);
-            restoredFileIdObjs.push_back(fileIdObj);
+            auto fileIdObj = mFileCacheFactory->GetLocalFileIdGenerator()->Generate();
+            RETURN_ERROR_AS_NULLPTR(fileIdObj);
+            fileInfo->SetFileId(fileIdObj->GetUniqueId());
+            restorePathFileIdMap.emplace(fileInfo->GetFileName(), fileIdObj->GetUniqueId());
         }
-    }
-    mFileCacheFactory->GetLocalFileIdGenerator()->Restore(restoredFileIdObjs);
-    for (const auto &item : conflictFileInfos) {  // 冲突的fileId需要重新申请.
-        auto fileId = mFileCacheFactory->GetLocalFileIdGenerator()->Generate();
-        item->SetFileId(fileId->Get());
-        restorePathFileIdMap.emplace(item->GetFileName(), fileId->Get());
     }
 
     // 4. 恢复Local file manager.
