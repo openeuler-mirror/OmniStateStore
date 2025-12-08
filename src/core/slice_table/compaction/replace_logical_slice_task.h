@@ -34,6 +34,11 @@ public:
     BResult SyncUpdateChain(LogicalSliceChainRef &oldLogicalSliceChain, LogicalSliceChainRef &newLogicalSliceChain,
         uint32_t sliceIndexSlot);
 
+    BucketGroupRef GetBucketGroup() const
+    {
+        RETURN_NULLPTR_AS_NULLPTR(mSliceTable->GetBucketGroupManager());
+        return mSliceTable->GetBucketGroupManager()->GetBucketGroupVector()[0];
+    }
 private:
     std::shared_ptr<Config> mConfig;
     SliceTableManagerRef mSliceTable;

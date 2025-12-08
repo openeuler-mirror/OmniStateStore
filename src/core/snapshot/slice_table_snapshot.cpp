@@ -133,9 +133,15 @@ BResult SliceTableSnapshot::CopyLogicSliceChain(const LogicalSliceChainRef &slic
                                                 LogicalSliceChainRef &copiedChain)
 {
     copiedChain = std::make_shared<LogicalSliceChainImpl>();
-    return copiedChain->Initialize(sliceChainBeforeCopy, chainMeta->mSliceChainHeadIndex,
-                                   chainMeta->mSliceChainTailIndex, params.copiedDataSliceReference,
-                                   params.deepCopySliceAddress, chainMeta->mHasFilePage);
+    RETURN_NOT_OK(copiedChain->Initialize(sliceChainBeforeCopy, chainMeta->mSliceChainHeadIndex,
+        chainMeta->mSliceChainTailIndex, params.copiedDataSliceReference,
+        params.deepCopySliceAddress, chainMeta->mHasFilePage));
+    if (sliceChainBeforeCopy->HasFilePage()) {
+        auto bucketGroup = GetBucketGroup();
+        RETURN_ERROR_AS_NULLPTR(bucketGroup);
+        copiedChain->InsertFilePageIfEmpty(std::make_shared<FilePage>(bucketGroup->GetLsmStore()));
+    }
+    return BSS_OK;
 }
 
 SnapshotMetaRef SliceTableSnapshot::SnapshotMetaFunc(uint64_t snapshotId, const FileOutputViewRef &localOutputView)

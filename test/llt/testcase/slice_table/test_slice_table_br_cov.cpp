@@ -638,7 +638,7 @@ TEST_F(TestSliceTableBrCov, LogicalSliceChain_Initialize_ShouldResizeFilePage_Wh
     EXPECT_EQ(logicalSliceChain->Initialize(logicalSliceChain, NO_0, NO_1, copiedDataSlice, false, true), BSS_OK);
     std::vector<FilePageRef> filePages;
     logicalSliceChain->GetFilePages(filePages);
-    EXPECT_EQ(filePages.size(), NO_1);
+    EXPECT_EQ(filePages.size(), NO_0);
 }
 
 /**

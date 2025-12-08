@@ -178,6 +178,10 @@ public:
 
     virtual void InsertFilePage(FilePageRef filePage) = 0;
 
+    virtual void InsertFilePageIfEmpty(FilePageRef filePage) = 0;
+
+    virtual void InsertAllFilePage(std::vector<FilePageRef> filePages) = 0;
+
     virtual void SetFilePages(std::vector<FilePageRef> filePages) = 0;
 
     virtual void SnapshotMeta(uint64_t snapshotId, const FileOutputViewRef &localOutputView,
@@ -374,6 +378,22 @@ public:
     {
         WriteLocker<ReadWriteLock> lk(&mFileRwLock);
         mFilePage.push_back(filePage);
+    }
+
+    void InsertFilePageIfEmpty(FilePageRef filePage) override
+    {
+        WriteLocker<ReadWriteLock> lk(&mFileRwLock);
+        if (mFilePage.empty()) {
+            mFilePage.push_back(filePage);
+        }
+    }
+
+    void InsertAllFilePage(std::vector<FilePageRef> filePages) override
+    {
+        WriteLocker<ReadWriteLock> lk(&mFileRwLock);
+        for (auto &filePage : filePages) {
+            mFilePage.push_back(filePage);
+        }
     }
 
     void SetFilePages(std::vector<FilePageRef> filePages) override
@@ -587,6 +607,16 @@ public:
     void GetFilePages(std::vector<FilePageRef> &currentPages) override;
 
     void InsertFilePage(FilePageRef filePage) override
+    {
+        LOG_ERROR("Unsupported operation exception.");
+    }
+
+    void InsertFilePageIfEmpty(FilePageRef filePage) override
+    {
+        LOG_ERROR("Unsupported operation exception.");
+    }
+
+    void InsertAllFilePage(std::vector<FilePageRef> filePages) override
     {
         LOG_ERROR("Unsupported operation exception.");
     }
