@@ -43,6 +43,7 @@ public:
     bool HasNext() override;
     KeyValueRef Next() override;
     void Close() override;
+    void PrintUsefulInfo() override;
 
 protected:
     KeyValueRef Advance();

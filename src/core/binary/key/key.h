@@ -231,7 +231,8 @@ public:
     inline std::string ToString() const
     {
         std::ostringstream oss;
-        oss << "StateId: " << mStateId << ", HashCode: " << mHashCode << ", KeyLen: " << mKeyLen << ", KeyData: [";
+        oss << "StateId: " << mStateId << ", HashCode: " << KeyHashCode()
+            << ", KeyLen: " << mKeyLen << ", KeyData: [";
         if (UNLIKELY(mKeyData != nullptr)) {
             uint32_t printLen = std::min(NO_20, mKeyLen);
             for (uint32_t i = 0; i < printLen; i++) {

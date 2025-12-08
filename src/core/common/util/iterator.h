@@ -39,6 +39,11 @@ public:
     virtual void Close()
     {
     }
+
+    virtual void PrintUsefulInfo()
+    {
+        LOG_INFO("virtual PrintUsefulInfo");
+    }
 };
 template <typename E> using IteratorRef = Ref<Iterator<E>>;
 template <typename E> using IteratorPtr = std::shared_ptr<Iterator<E>>;
