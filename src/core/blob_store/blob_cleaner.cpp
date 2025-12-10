@@ -33,8 +33,10 @@ BResult BlobCleaner::Restore(const FileInputViewRef &fileInputView,
 void BlobCleaner::TriggerSnapshot(uint64_t snapshotId, uint64_t blobStoreVersion, uint64_t seqId,
     BlobStoreSnapshotOperatorRef &blobStoreSnapshotOperator)
 {
-    // 快照互斥，如果当前有墓碑文件正在compaction，需要等待compaction完成并关闭，待快照完成重新开启，ReleaseTombstoneSnapshot入口
-    StopTombstoneCompaction();
+    if (mEnableTombstone) {
+        // 快照互斥，如果当前有墓碑文件正在compaction，需要等待compaction完成并关闭，待快照完成重新开启，ReleaseTombstoneSnapshot入口
+        StopTombstoneCompaction();
+    }
     mTombstoneFileManager->TriggerSnapshot(snapshotId, blobStoreVersion, seqId, blobStoreSnapshotOperator);
 }
 
@@ -308,7 +310,9 @@ TombstoneServiceRef BlobCleaner::RegisterTombstoneService(const std::string &nam
 void BlobCleaner::ReleaseTombstoneSnapshot(uint64_t snapshotId)
 {
     mTombstoneFileManager->ReleaseSnapshot(snapshotId);
-    StartScheduleCompaction();
+    if (mEnableTombstone) {
+        StartScheduleCompaction();
+    }
 }
 
 }
