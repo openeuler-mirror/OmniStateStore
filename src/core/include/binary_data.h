@@ -17,7 +17,7 @@
 #include <memory>
 #include <sstream>
 
-#include "binary/value/value_type.h"
+#include "value_type.h"
 #include "bss_def.h"
 #include "bss_types.h"
 #include "buffer.h"

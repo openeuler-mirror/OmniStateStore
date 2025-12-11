@@ -26,6 +26,8 @@ namespace bss {
 class SavepointDataView;
 class SnapshotOperatorCoordinator;
 class BoostNativeMetric;
+class PQTable;
+using PQTableRef = std::shared_ptr<PQTable>;
 
 class BoostStateDB : public AutoCloseable {
 public:
