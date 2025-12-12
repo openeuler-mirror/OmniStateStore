@@ -22,11 +22,43 @@
 
 namespace ock {
 namespace bss {
-class SkiplistProcessor;
+using SkipListCompletedNotify = std::function<void(const PQSkipList &item)>;
+class SkiplistProcessor : public Runnable {
+public:
+    SkiplistProcessor(const PQTableIteratorRef iterator, const LsmStoreRef &lsmStore, const PQSkipList &skipList,
+        SkipListCompletedNotify notify) : mIterator(iterator), mLsmStore(lsmStore),
+        mSkipList(skipList), mNotify(notify) {}
+
+    ~SkiplistProcessor() override = default;
+
+    void Run() override
+    {
+        bool expect = false;
+        BResult ret = BSS_ERR;
+        do {
+            if (!mResourceCleanupOwnershipTaken.compare_exchange_strong(expect, true)) {
+                break;
+            }
+            if (UNLIKELY(mLsmStore == nullptr)) {
+                break;
+            }
+            // write kv pair to lsmStore.
+            ret = mLsmStore->Put(mIterator);
+        } while (false);
+        if (ret == BSS_OK) {
+            mNotify(mSkipList);
+        }
+    }
+
+private:
+    PQTableIteratorRef mIterator;
+    LsmStoreRef mLsmStore = nullptr;
+    PQSkipList mSkipList;
+    SkipListCompletedNotify mNotify;
+    std::atomic<bool> mResourceCleanupOwnershipTaken{ false };
+};
 using SkiplistProcessorRef = std::shared_ptr<SkiplistProcessor>;
 
-using SkipListCompletedNotify =
-    std::function<void(const PQSkipList &item)>;
 class PQTable : public AutoCloseable {
 public:
     PQTable(const MemManagerRef &memManager, const ExecutorServicePtr &service, const LsmStoreRef &lsmStore,
@@ -105,16 +137,23 @@ public:
             [this](const PQSkipList &item) {
                 PollFlushingSegment(item);
         });
-        if (force) {
-            std::static_pointer_cast<Runnable>(processor)->Run();
-        } else {
-            auto ret = mService->Execute(std::static_pointer_cast<Runnable>(processor));
-            if (UNLIKELY(!ret)) {
-                LOG_ERROR("Submit task failed" << mService->QueueSize());
-                return BSS_ERR;
-            }
+        auto ret = mService->Execute(std::static_pointer_cast<Runnable>(processor));
+        if (UNLIKELY(!ret)) {
+            LOG_ERROR("Submit task failed" << mService->QueueSize());
+            return BSS_ERR;
         }
-
+        // Checkpoint流程首先确保处于待淘汰队列的跳表Flush完成.
+        uint32_t times = NO_1;
+        auto start = std::chrono::high_resolution_clock::now();
+        while (force && !IsSnapshotQueueEmpty()) {
+            if ((times++) % NO_100 == 0) {
+                auto end = std::chrono::high_resolution_clock::now();
+                auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
+                double elapsed = duration.count() / 1e3;  // 转换为ms
+                LOG_WARN("PQ table check snapshot queue cost time:" << elapsed << "ms.");
+            }
+            usleep(NO_100000); // 100ms
+        }
         mSkipList = InitNewSkipList();
         return BSS_OK;
     }
@@ -141,6 +180,12 @@ private:
     {
         WriteLocker<ReadWriteLock> lock(&mRwLock);
         mSnapshotQueue.PushBack(mSkipList);
+    }
+
+    inline bool IsSnapshotQueueEmpty()
+    {
+        ReadLocker<ReadWriteLock> lock(&mRwLock);
+        return mSnapshotQueue.Empty();
     }
 
     inline bool PollFlushingSegment(const PQSkipList &item)
@@ -170,41 +215,6 @@ private:
     uint16_t mStateId = 0;
 };
 using PQTableRef = std::shared_ptr<PQTable>;
-
-class SkiplistProcessor : public Runnable {
-public:
-    SkiplistProcessor(const PQTableIteratorRef iterator, const LsmStoreRef &lsmStore, const PQSkipList &skipList,
-        SkipListCompletedNotify notify) : mIterator(iterator), mLsmStore(lsmStore),
-        mSkipList(skipList), mNotify(notify) {}
-
-    ~SkiplistProcessor() override = default;
-
-    void Run() override
-    {
-        bool expect = false;
-        BResult ret = BSS_ERR;
-        do {
-            if (!mResourceCleanupOwnershipTaken.compare_exchange_strong(expect, true)) {
-                break;
-            }
-            if (UNLIKELY(mLsmStore == nullptr)) {
-                break;
-            }
-            // write kv pair to lsmStore.
-            ret = mLsmStore->Put(mIterator);
-        } while (false);
-        if (ret == BSS_OK) {
-            mNotify(mSkipList);
-        }
-    }
-
-private:
-    PQTableIteratorRef mIterator;
-    LsmStoreRef mLsmStore = nullptr;
-    PQSkipList mSkipList;
-    SkipListCompletedNotify mNotify;
-    std::atomic<bool> mResourceCleanupOwnershipTaken{ false };
-};
 }
 }
 #endif  // BOOST_SS_PQ_TABLE_H
