@@ -14,8 +14,8 @@
 
 #include <memory>
 
-#include "include/bss_err.h"
-#include "include/bss_types.h"
+#include "bss_err.h"
+#include "bss_types.h"
 
 namespace ock {
 namespace bss {
