@@ -17,7 +17,6 @@
 #include "auto_closeable.h"
 #include "bss_err.h"
 #include "config.h"
-#include "pq_table.h"
 #include "table.h"
 #include "table_description.h"
 
