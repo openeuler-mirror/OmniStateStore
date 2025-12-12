@@ -19,6 +19,7 @@
 #include "snapshot/savepoint_data_view.h"
 #include "transform/fresh_transformer.h"
 #include "common/bss_metric.h"
+#include "pq_table.h"
 
 namespace ock {
 namespace bss {
