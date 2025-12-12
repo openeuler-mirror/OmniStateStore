@@ -325,6 +325,9 @@ TombstoneServiceRef BlobFileManager::RegisterTombstoneService(const std::string 
 
 void BlobFileManager::ReleaseTombstoneSnapshot(uint64_t snapshotId)
 {
+    if (UNLIKELY(mBlobCleaner == nullptr)) {
+        return;
+    }
     mBlobCleaner->ReleaseTombstoneSnapshot(snapshotId);
 }
 
