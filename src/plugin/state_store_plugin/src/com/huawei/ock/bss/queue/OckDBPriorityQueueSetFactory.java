@@ -46,7 +46,7 @@ import javax.annotation.Nonnull;
  */
 public class OckDBPriorityQueueSetFactory implements PriorityQueueSetFactory {
     @VisibleForTesting
-    static final int DEFAULT_CACHES_SIZE = 2040;
+    static final int DEFAULT_CACHES_SIZE = 20480;
 
     @Nonnull
     private final DataOutputSerializer sharedElementOutView;
