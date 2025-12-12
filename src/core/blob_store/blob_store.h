@@ -70,7 +70,7 @@ public:
 
     BResult SyncSnapshot(uint64_t snapshotId, std::shared_ptr<BlobStoreSnapshotOperator> &snapshotOperator);
 
-    BResult ReleaseSnapshot(uint64_t snapshotId);
+    void ReleaseSnapshot(uint64_t snapshotId);
 
     TombstoneServiceRef CreateTombstoneService(const std::string &name);
 

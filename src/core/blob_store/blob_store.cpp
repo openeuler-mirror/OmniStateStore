@@ -145,16 +145,18 @@ BResult BlobStore::SyncSnapshot(uint64_t snapshotId, BlobStoreSnapshotOperatorRe
     return mBlobWriteBuffer->FlushCurrentWriteBuffer(snapshotId);
 }
 
-BResult BlobStore::ReleaseSnapshot(uint64_t snapshotId)
+void BlobStore::ReleaseSnapshot(uint64_t snapshotId)
 {
     auto it = mSnapshotMapping.find(snapshotId);
     if (it == mSnapshotMapping.end()) {
         LOG_ERROR("Release snapshot resources, snapshotId:" << snapshotId);
-        return BSS_ERR;
+        return;
     }
     mSnapshotMapping.erase(snapshotId);
+    if (UNLIKELY(mBlobFileManager == nullptr)) {
+        return;
+    }
     mBlobFileManager->ReleaseTombstoneSnapshot(snapshotId);
-    return BSS_OK;
 }
 
 TombstoneServiceRef BlobStore::CreateTombstoneService(const std::string &name)

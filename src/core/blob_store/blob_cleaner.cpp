@@ -309,6 +309,9 @@ TombstoneServiceRef BlobCleaner::RegisterTombstoneService(const std::string &nam
 
 void BlobCleaner::ReleaseTombstoneSnapshot(uint64_t snapshotId)
 {
+    if (UNLIKELY(mTombstoneFileManager == nullptr)) {
+        return;
+    }
     mTombstoneFileManager->ReleaseSnapshot(snapshotId);
     if (mEnableTombstone) {
         StartScheduleCompaction();
