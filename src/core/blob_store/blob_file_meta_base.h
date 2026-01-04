@@ -71,6 +71,10 @@ public:
         mValidGroupRange = groupRange;
     }
 
+    inline const GroupRangeRef &GetCoveredGroupRange() const
+    {
+        return mCoveredGroupRange;
+    }
 protected:
     uint64_t mMinBlobId = UINT64_MAX;
     uint64_t mMaxBlobId = 0;

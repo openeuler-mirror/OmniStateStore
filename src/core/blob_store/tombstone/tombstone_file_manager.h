@@ -104,7 +104,9 @@ public:
 
     BResult RestoreLevel(const FileInputViewRef &inputView,
                          std::unordered_map<std::string, uint32_t> &restorePathFileIdMap,
-                         std::vector<std::shared_ptr<TombstoneLevel>> levels, bool rescale);
+                         bool rescale);
+
+    void FinishRestore();
 
     BResult RestoreFileGroup(const FileInputViewRef &inputView,
                              std::unordered_map<std::string, uint32_t> &restorePathFileIdMap,
@@ -135,6 +137,7 @@ public:
 
     uint64_t GetSnapshotVersion(uint64_t snapshotId);
 
+    uint64_t CalTombstoneNum(uint64_t minBlobId);
 private:
     ConfigRef mConfig;
     FileCacheManagerRef mFileCacheManager = nullptr;

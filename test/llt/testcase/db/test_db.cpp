@@ -1347,6 +1347,7 @@ void TestDB::PrepareDbWithBlob()
     config->mTombstoneFileSize = IO_SIZE_256K;
     config->mTombstoneLevel0CompactionFileNum = 4;
     config->mBlobMinCompactionThreshold = 0;
+    config->mBlobMaxSpaceAmplificationRatio = 0;
     mkdir(backupPath.c_str(), mode_t(NO_777));
 
     mDB = BoostStateDBFactory::Create();
@@ -2934,6 +2935,7 @@ TEST_F(TestDB, test_cp_lsm_and_get_return_ok_with_blob)
         config->mTombstoneFileSize = IO_SIZE_256K;
         config->mTombstoneLevel0CompactionFileNum = 4;
         config->mBlobMinCompactionThreshold = 0;
+        config->mBlobMaxSpaceAmplificationRatio = 0;
         mDB = BoostStateDBFactory::Create();
         mDB->Open(config);
         std::string restorePath = basePth + std::to_string(cpId);

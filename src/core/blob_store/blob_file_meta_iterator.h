@@ -17,56 +17,59 @@
 
 namespace ock {
 namespace bss {
-class BlobFileGroupIterator : public Iterator<BlobFileGroupRef> {
-public:
-    explicit BlobFileGroupIterator(const BlobFileGroupManagerRef &blobFileGroupManager)
-    {
-        BlobFileGroupManagerRef copyFileGroupManager = blobFileGroupManager->DeepCopy(UINT64_MAX);
-        mBlobFileGroups = copyFileGroupManager->GetBlobFileGroups();
-        mNextFileGroupIndex = static_cast<int64_t>(mBlobFileGroups.size());
-    }
-
-    bool HasNext() override
-    {
-        Advance();
-        return mNextFileGroup != nullptr;
-    }
-
-    BlobFileGroupRef Next() override
-    {
-        mCurrentFileGroup = mNextFileGroup;
-        mNextFileGroup = nullptr;
-        return mCurrentFileGroup;
-    }
-
-    void Close() override
-    {
-    }
-
-    void Advance()
-    {
-        while (mNextFileGroup == nullptr && mNextFileGroupIndex > 0) {
-            mNextFileGroupIndex--;
-            mNextFileGroup = mBlobFileGroups[mNextFileGroupIndex];
-        }
-    }
-private:
-    std::vector<BlobFileGroupRef> mBlobFileGroups;
-    int64_t mNextFileGroupIndex = 0;
-    BlobFileGroupRef mNextFileGroup = nullptr;
-    BlobFileGroupRef mCurrentFileGroup = nullptr;
-};
-using BlobFileGroupIteratorRef = std::shared_ptr<BlobFileGroupIterator>;
-
 class BlobFileIterator : public Iterator<BlobImmutableFileRef> {
-    explicit BlobFileIterator(const BlobFileGroupManagerRef &blobFileGroupManager)
+    class BlobFileGroupIterator : public Iterator<BlobFileGroupRef> {
+    public:
+        explicit BlobFileGroupIterator(const BlobFileGroupManagerRef &blobFileGroupManager)
+        {
+            mBlobFileGroups = blobFileGroupManager->GetBlobFileGroups();
+            mNextFileGroupIndex = static_cast<int64_t>(mBlobFileGroups.size());
+        }
+
+        bool HasNext() override
+        {
+            Advance();
+            return mNextFileGroup != nullptr;
+        }
+
+        BlobFileGroupRef Next() override
+        {
+            mCurrentFileGroup = mNextFileGroup;
+            mNextFileGroup = nullptr;
+            return mCurrentFileGroup;
+        }
+
+        void Close() override
+        {
+        }
+
+        void Advance()
+        {
+            while (mNextFileGroup == nullptr && mNextFileGroupIndex > 0) {
+                mNextFileGroupIndex--;
+                mNextFileGroup = mBlobFileGroups[mNextFileGroupIndex];
+            }
+        }
+    private:
+        std::vector<BlobFileGroupRef> mBlobFileGroups;
+        int64_t mNextFileGroupIndex = 0;
+        BlobFileGroupRef mNextFileGroup = nullptr;
+        BlobFileGroupRef mCurrentFileGroup = nullptr;
+    };
+public:
+    BResult Init(const BlobFileGroupManagerRef &blobFileGroupManager)
     {
-        mFileGroupIterator = std::make_shared<BlobFileGroupIterator>(blobFileGroupManager->DeepCopy(UINT64_MAX));
+        auto copyBlobFileGroupManager = blobFileGroupManager->DeepCopy(UINT64_MAX);
+        if (copyBlobFileGroupManager == nullptr) {
+            return BSS_INNER_RETRY;
+        }
+        mFileGroupIterator = std::make_shared<BlobFileGroupIterator>(copyBlobFileGroupManager);
         if (mFileGroupIterator->HasNext()) {
             BlobFileGroupRef currentFileGroup = mFileGroupIterator->Next();
             mFiles = currentFileGroup->GetFiles();
             mNextFileIndex = static_cast<int64_t>(mFiles.size());
         }
+        return BSS_OK;
     }
 
     bool HasNext() override
@@ -111,7 +114,7 @@ private:
     BlobImmutableFileRef mNextFile = nullptr;
     BlobImmutableFileRef mCurrentFile = nullptr;
     BlobFileGroupRef mCurrentFileGroup = nullptr;
-    BlobFileGroupIteratorRef mFileGroupIterator = nullptr;
+    std::shared_ptr<BlobFileGroupIterator> mFileGroupIterator = nullptr;
 };
 
 }

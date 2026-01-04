@@ -245,6 +245,11 @@ public:
         return mIsTopLevel;
     }
 
+    inline void SetTopLevel(bool isTopLevel)
+    {
+        mIsTopLevel = isTopLevel;
+    }
+
     inline bool IsFull()
     {
         return LevelFileSize() >= mConfig->GetTombstoneLevelMaxSize(mLevel);
@@ -326,6 +331,16 @@ public:
         return totalSize;
     }
 
+    inline uint64_t CalTombstoneNum(uint64_t minBlobId)
+    {
+        uint64_t count = 0;
+        ReadLocker<ReadWriteLock> lock(&mRwLock);
+        for (const auto &group : mFileGroup) {
+            CONTINUE_LOOP_AS_NULLPTR(group);
+            count += group->CalTombstoneNum(minBlobId);
+        }
+        return count;
+    }
 private:
     ConfigRef mConfig;
     uint32_t mLevel;

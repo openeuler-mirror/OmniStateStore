@@ -56,11 +56,23 @@ public:
     BResult Restore(const FileInputViewRef &fileInputView,
         std::unordered_map<std::string, uint32_t> &restorePathFileIdMap, uint64_t restoreVersion,
         bool rescale);
+    
+    void FinishRestore();
 
     void TriggerSnapshot(uint64_t snapshotId, uint64_t blobStoreVersion, uint64_t seqId,
         BlobStoreSnapshotOperatorRef &blobStoreSnapshotOperator);
 
     bool TriggerCompaction();
+
+    bool IsSleeping() const
+    {
+        return mIsSleeping.load();
+    }
+
+    void ToSleeping()
+    {
+        mIsSleeping.store(true);
+    }
 
     bool IsClosed() const
     {
@@ -71,6 +83,7 @@ public:
     {
         mIsClose.store(false);
         mIsCompacting.store(true);
+        mIsSleeping.store(false);
     }
 
     void StopTombstoneCompaction()
@@ -78,7 +91,7 @@ public:
         mIsClose.store(true);
         uint32_t times = NO_1;
         auto start = std::chrono::high_resolution_clock::now();
-        while (UNLIKELY(IsCompacting())) {
+        while (UNLIKELY(IsCompacting()) && !IsSleeping()) {
             if ((times++) % NO_100 == 0) {
                 auto end = std::chrono::high_resolution_clock::now();
                 auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
@@ -131,6 +144,8 @@ public:
     void ReleaseTombstoneSnapshot(uint64_t snapshotId);
 
     TombstoneServiceRef RegisterTombstoneService(const std::string &name);
+
+    double CalBlobSpaceWasteRate(uint64_t minBlobId);
 private:
     ConfigRef mConfig = nullptr;
     BlobFileGroupManagerRef mBlobFileGroupManager = nullptr;
@@ -141,6 +156,7 @@ private:
     MemManagerRef mMemManager = nullptr;
     std::atomic<bool> mIsClose{ false };
     std::atomic<bool> mIsCompacting{ false };
+    std::atomic<bool> mIsSleeping{ false };
     uint32_t mCompactionIntervalInSecond = 10;
     bool mEnableTombstone = false;
 };

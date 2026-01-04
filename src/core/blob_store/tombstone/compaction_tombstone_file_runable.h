@@ -33,6 +33,10 @@ public:
         mBlobCleaner->StartTombstoneCompaction();
         while (!mBlobCleaner->IsClosed()) {
             mBlobCleaner->TriggerCompaction();
+            if (mBlobCleaner->IsClosed()) {
+                break;
+            }
+            mBlobCleaner->ToSleeping();
             sleep(mCompactionIntervalInSecond);
         }
         mBlobCleaner->SetCompacting(false);

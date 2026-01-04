@@ -84,8 +84,7 @@ KeyIterator *AbstractTable::KeysIterator(const BinaryData &ignore)
 
     // get all entry iterator from slice table.
     auto keyFilter = [stateId](const Key &key) -> bool { return stateId != key.PriKey().StateId(); };
-    BlobValueTransformFunc blobValueTransformFunc;
-    auto sliceTableIterator = mSliceTable->EntryIterator(keyFilter, blobValueTransformFunc, stateId);
+    auto sliceTableIterator = mSliceTable->EntryIterator(keyFilter, stateId);
 
     // create entry iterator by fresh table iterator and slice table iterator.
     return new (std::nothrow) KeyIterator{ freshTableIterator, sliceTableIterator, EntryIteratorType::KVALUE_ITERATOR };
@@ -168,7 +167,7 @@ MapIterator *AbstractTable::FullEntryIterator()
     // get all entry iterator from slice table.
     auto keyFilter = [stateId](const Key &key) -> bool { return stateId != key.PriKey().StateId(); };
     BlobValueTransformFunc blobValueTransformFunc;
-    auto sliceTableIterator = mSliceTable->EntryIterator(keyFilter, blobValueTransformFunc, stateId);
+    auto sliceTableIterator = mSliceTable->EntryIterator(keyFilter, stateId, blobValueTransformFunc);
 
     // create entry iterator by fresh table iterator and slice table iterator.
     return new (std::nothrow) MapIterator{ freshTableIterator, sliceTableIterator, EntryIteratorType::KVALUE_ITERATOR,
@@ -261,9 +260,7 @@ bool AbstractKMapTable::Contain(uint32_t keyHashCode, const BinaryData &key)
         }
         deletedKeyValues.emplace(&keyValue->key, keyValue);
     }
-
-    BlobValueTransformFunc blobValueTransformFunc;
-    auto sliceTableIterator = mSliceTable->PrefixIterator(queryKey, blobValueTransformFunc);
+    auto sliceTableIterator = mSliceTable->PrefixIterator(queryKey);
     while (sliceTableIterator != nullptr && sliceTableIterator->HasNext()) {
         auto keyValue = sliceTableIterator->Next();
         if (keyValue != nullptr && keyValue->value.ValueType() != ValueType::DELETE &&
@@ -355,8 +352,7 @@ KeyIterator *NsKVTable::KeysIterator(const BinaryData &nameSpace)
     auto keyFilter = [stateId, querySecKey](const Key &key) -> bool {
         return stateId != key.PriKey().StateId() || key.SecKey().CompareKeyNode(querySecKey) != 0;
     };
-    BlobValueTransformFunc blobValueTransformFunc;
-    auto sliceTableIterator = mSliceTable->EntryIterator(keyFilter, blobValueTransformFunc, stateId);
+    auto sliceTableIterator = mSliceTable->EntryIterator(keyFilter, stateId);
 
     // create key iterator by slice table iterator and fresh table iterator.
     return new (std::nothrow) KeyIterator{ freshTableIterator, sliceTableIterator, EntryIteratorType::KVALUE_ITERATOR };
@@ -379,8 +375,7 @@ KeyIterator *NsKMapTable::KeysIterator(const BinaryData &nameSpace)
         return stateId != key.PriKey().StateId() ||
                !key.PriKey().HasSameNameSpace(nameSpace.Data(), nameSpace.Length());
     };
-    BlobValueTransformFunc blobValueTransformFunc;
-    auto sliceTableIterator = mSliceTable->EntryIterator(keyFilter, blobValueTransformFunc, stateId);
+    auto sliceTableIterator = mSliceTable->EntryIterator(keyFilter, stateId);
 
     // create key iterator by slice table iterator and fresh table iterator.
     return new (std::nothrow) KeyIterator{ freshTableIterator, sliceTableIterator,
@@ -581,8 +576,7 @@ KeyIterator *NsKListTable::KeysIterator(const BinaryData &nameSpace)
         return stateId != key.PriKey().StateId() ||
                !key.PriKey().HasSameNameSpace(nameSpace.Data(), nameSpace.Length());
     };
-    BlobValueTransformFunc blobValueTransformFunc;
-    auto sliceTableIterator = mSliceTable->EntryIterator(keyFilter, blobValueTransformFunc, stateId);
+    auto sliceTableIterator = mSliceTable->EntryIterator(keyFilter, stateId);
 
     // create key iterator by slice table iterator and fresh table iterator.
     return new (std::nothrow) KeyIterator{ freshTableIterator, sliceTableIterator,

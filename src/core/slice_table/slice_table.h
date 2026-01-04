@@ -179,18 +179,37 @@ public:
     BResult GetValueFromBlobStore(uint64_t blobId, uint32_t keyGroup, uint64_t seqId, Value &value);
 
     /**
-     * Iterator all, for savepoint.
+     * Iterator all, for savepoint, with kv-separate.
+     * @param keyFilter key filter
+     * @param stateId state id
+     * @param blobValueTransformFunc kv-separate conversion to normal kv func
      * @return iterator of all kv.
      */
-    KeyValueIteratorRef EntryIterator(const KeyFilter &keyFilter, BlobValueTransformFunc &blobValueTransformFunc,
-        uint16_t stateId);
+    KeyValueIteratorRef EntryIterator(const KeyFilter &keyFilter, uint16_t stateId,
+        BlobValueTransformFunc &blobValueTransformFunc);
+
+    /**
+     * Get iterator for prefix, with kv-separate.
+     * @param prefixKey prefix key.
+     * @param blobValueTransformFunc kv-separate conversion to normal kv func
+     * @return iterator of having the same prefix.
+     */
+    KeyValueIteratorRef PrefixIterator(const Key &prefixKey, BlobValueTransformFunc &blobValueTransformFunc);
+
+    /**
+     * Iterator all, for savepoint.
+     * @param keyFilter key filter
+     * @param stateId state id
+     * @return iterator of all kv.
+     */
+    KeyValueIteratorRef EntryIterator(const KeyFilter &keyFilter, uint16_t stateId);
 
     /**
      * Get iterator for prefix.
      * @param prefixKey prefix key.
      * @return iterator of having the same prefix.
      */
-    KeyValueIteratorRef PrefixIterator(const Key &prefixKey, BlobValueTransformFunc &blobValueTransformFunc);
+    KeyValueIteratorRef PrefixIterator(const Key &prefixKey);
 
     /**
      * Obtain memory manager.

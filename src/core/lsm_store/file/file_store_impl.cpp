@@ -364,8 +364,6 @@ BResult LsmStore::DoCompaction(const CompactionProcessorRef &processor)
     {
         std::lock_guard<std::mutex> lock(mMutex);  // 从versionSet中获取merge迭代器时需要加锁互斥.
         iterator = mVersionSet->MakeInputIterator(processor->mCompaction, mMemManager, holder, mTombstoneService);
-        std::string str = mTombstoneService == nullptr? "true" : "false";
-        LOG_INFO("LsmStore::DoCompaction tombstone service is null:" << str);
         RETURN_ERROR_AS_NULLPTR(iterator);
     }
 

@@ -86,7 +86,7 @@ BlobFileGroupManagerRef BlobFileGroupManager::DeepCopy(uint64_t version)
         blobFileGroups.emplace_back(blobFileGroup);
     }
     if (UNLIKELY(blobFileGroups.empty())) {
-        LOG_INFO("Deep copy failed, copied file group is empty.");
+        LOG_DEBUG("Deep copy failed, copied file group is empty.");
         return nullptr;
     }
     return std::make_shared<BlobFileGroupManager>(blobFileGroups);
