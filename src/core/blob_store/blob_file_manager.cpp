@@ -135,7 +135,7 @@ BResult BlobFileManager::Restore(const std::vector<std::pair<FileInputViewRef, i
         RETURN_NOT_OK(RestoreFileGroup(fileInputView, restorePathFileIdMap, rescale));
         RETURN_NOT_OK(mBlobCleaner->Restore(fileInputView, restorePathFileIdMap, version, rescale));
     }
-
+    mBlobCleaner->FinishRestore();
     return BSS_OK;
 }
 

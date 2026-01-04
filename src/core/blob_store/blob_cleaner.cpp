@@ -14,6 +14,7 @@
 #include "blob_compaction_file_writer.h"
 #include "blob_file_group_manager.h"
 #include "blob_file_merging_iterator.h"
+#include "blob_file_meta_iterator.h"
 #include "blob_store.h"
 #include "tombstone/compaction_tombstone_file_runable.h"
 #include "tombstone/tombstone_file_manager.h"
@@ -28,6 +29,11 @@ BResult BlobCleaner::Restore(const FileInputViewRef &fileInputView,
     bool rescale)
 {
     return mTombstoneFileManager->Restore(fileInputView, restorePathFileIdMap, restoreVersion, rescale);
+}
+
+void BlobCleaner::FinishRestore()
+{
+    mTombstoneFileManager->FinishRestore();
 }
 
 void BlobCleaner::TriggerSnapshot(uint64_t snapshotId, uint64_t blobStoreVersion, uint64_t seqId,
@@ -85,8 +91,11 @@ bool BlobCleaner::TriggerCompaction()
         mTombstoneFileManager->CleanExpireTombstoneFile(minBlobId);
     }
     mTombstoneFileManager->TriggerCompaction();
-    if (mBlobFileManager->GetFileSize() > mConfig->GetBlobMinCompactionThreshold()) {
+    double blobSpaceWasteRate = CalBlobSpaceWasteRate(minBlobId);
+    if (mBlobFileManager->GetFileSize() > mConfig->GetBlobMinCompactionThreshold() &&
+        blobSpaceWasteRate > mConfig->GetBlobMaxSpaceAmplificationRatio()) {
         DoCompaction();
+        mBlobFileManager->CleanDeleteFiles();
     }
     return true;
 }
@@ -157,12 +166,16 @@ void BlobCleaner::DoCompaction()
     for (const auto &item : compactionFiles) {
         oss << item->GetBlobFileMeta()->ToString();
     }
-    oss << " new blob files:";
-    for (const auto &item : newBlobFileMetas) {
-        oss << item->ToString();
-    }
-    oss << " new tombstone files:";
+    oss << ", input tombstone files:";
     for (const auto &item : tombstoneFileSubVec->GetFileVec()) {
+        oss << item->GetFileMeta()->ToString();
+    }
+    oss << ", new blob files:";
+    for (const auto &item : result.first) {
+        oss << item->GetBlobFileMeta()->ToString();
+    }
+    oss << ", new tombstone files:";
+    for (const auto &item : result.second) {
         oss << item->GetFileMeta()->ToString();
     }
     std::string basicString = oss.str();
@@ -305,6 +318,64 @@ TombstoneServiceRef BlobCleaner::RegisterTombstoneService(const std::string &nam
         return mTombstoneFileManager->AddLevel0(name);
     }
     return nullptr;
+}
+
+double BlobCleaner::CalBlobSpaceWasteRate(uint64_t minBlobId)
+{
+    uint64_t totalTombstoneNum = mTombstoneFileManager->CalTombstoneNum(minBlobId);
+    uint64_t totalValidBlobNum = 0;
+    uint64_t totalBlobNumBelongKeyGroupRange = 0;
+    uint64_t totalBlobNum = 0;
+    auto blobFileIterator = std::make_shared<BlobFileIterator>();
+    BResult result = blobFileIterator->Init(mBlobFileManager->GetBlobFileGroupManager());
+    if (result != BSS_OK) {
+        return 1.0F;
+    }
+    while (blobFileIterator->HasNext()) {
+        float expiredRatio = 0.0F;
+        BlobImmutableFileRef blobFile = blobFileIterator->Next();
+        CONTINUE_LOOP_AS_NULLPTR(blobFile);
+        auto blobFileMeta = blobFile->GetBlobFileMeta();
+        CONTINUE_LOOP_AS_NULLPTR(blobFileMeta);
+        if (blobFileMeta->GetMinExpireTime() != 0 && blobFileMeta->GetMaxExpireTime() != 0) {
+            uint64_t currentTime = TimeStampUtil::GetCurrentTime();
+            if (currentTime < blobFileMeta->GetMinExpireTime()) {
+                expiredRatio = 0.0F;
+            } else if (currentTime > blobFileMeta->GetMaxExpireTime()) {
+                expiredRatio = 1.0F;
+            } else {
+                expiredRatio = static_cast<float>(currentTime - blobFileMeta->GetMinExpireTime()) /
+                    static_cast<float>(blobFileMeta->GetMaxExpireTime() - blobFileMeta->GetMinExpireTime());
+            }
+        }
+        auto validGroupRange = blobFileMeta->GetValidGroupRange();
+        CONTINUE_LOOP_AS_NULLPTR(validGroupRange);
+        auto coveredGroupRange = blobFileMeta->GetCoveredGroupRange();
+        CONTINUE_LOOP_AS_NULLPTR(coveredGroupRange);
+        float keyGroupValidRatio = static_cast<float>(validGroupRange->GetKeyGroupRangeSize()) /
+            static_cast<float>(coveredGroupRange->GetKeyGroupRangeSize());
+        uint32_t blobNum = blobFileMeta->GetBlobNum();
+        totalValidBlobNum +=
+            static_cast<uint64_t>(static_cast<float>(blobNum) * keyGroupValidRatio * (1 - expiredRatio));
+        totalBlobNumBelongKeyGroupRange += static_cast<uint64_t>(static_cast<float>(blobNum) * keyGroupValidRatio);
+        totalBlobNum += blobNum;
+    }
+    if (totalBlobNumBelongKeyGroupRange == 0) {
+        totalTombstoneNum = 0;
+    } else {
+        totalTombstoneNum = std::min(totalTombstoneNum, totalBlobNumBelongKeyGroupRange - 1);
+    }
+    uint64_t tmp = 1;
+    totalValidBlobNum = std::max(tmp, totalValidBlobNum);
+    double blobSpaceWasteRate = (static_cast<float>(totalBlobNum) /
+        static_cast<float>(totalValidBlobNum) * (1.0F - static_cast<float>(totalTombstoneNum) /
+        static_cast<float>(totalBlobNumBelongKeyGroupRange)));
+    LOG_DEBUG("Blob cleaner cal blob space waste rate, totalBlobNum: " << totalBlobNum
+        << ", totalBlobNumBelongKeyGroupRange: " <<  totalBlobNumBelongKeyGroupRange
+        << ", totalTombstoneNum: " << totalTombstoneNum
+        << ", totalValidBlobNum: " << totalValidBlobNum
+        << ", blobSpaceWasteRate: " << blobSpaceWasteRate);
+    return blobSpaceWasteRate;
 }
 
 void BlobCleaner::ReleaseTombstoneSnapshot(uint64_t snapshotId)

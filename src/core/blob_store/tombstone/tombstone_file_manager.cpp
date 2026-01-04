@@ -41,6 +41,12 @@ BResult TombstoneFileManager::TriggerCompaction()
         RETURN_NOT_OK(DoCompaction(mSnapshotMinVersion, false));
         versionSmallThanSnapshot = CalLevel0CompactionFileNum(mSnapshotMinVersion);
     }
+
+    // 触发其它Level compaction
+    for (const auto& level : mHighLevels) {
+        level->TriggerCompaction(mBlobFileManager->GetBlobFileGroupManager());
+    }
+    CheckTopLevelIsFull();
     return BSS_OK;
 }
 
@@ -73,7 +79,7 @@ BResult TombstoneFileManager::DoCompaction(uint64_t maxVersion, bool snapshot)
         return BSS_OK;
     }
     // 触发其它level compaction
-    for (auto level : mHighLevels) {
+    for (const auto &level : mHighLevels) {
         level->TriggerCompaction(mBlobFileManager->GetBlobFileGroupManager());
     }
     CheckTopLevelIsFull();
@@ -120,6 +126,7 @@ void TombstoneFileManager::InitLevel()
     TombstoneFileManagerRef self = shared_from_this();
     TombstoneLevelRef level1 = std::make_shared<TombstoneLevel>(mConfig, NO_1, self, false, mMemManager);
     TombstoneLevelRef level2 = std::make_shared<TombstoneLevel>(mConfig, NO_2, self, true, mMemManager);
+    level1->SetNextLevel(level2);
     mHighLevels.emplace_back(level1);
     mHighLevels.emplace_back(level2);
 }
@@ -156,33 +163,58 @@ BResult TombstoneFileManager::Restore(const FileInputViewRef &fileInputView,
     for (const auto &item : mLevel0) {
         item.second->RestoreVersion(restoreVersion);
     }
+    return RestoreLevel(fileInputView, restorePathFileIdMap, rescale);
+}
 
-    std::vector<TombstoneLevelRef> levels;
-    RETURN_NOT_OK(RestoreLevel(fileInputView, restorePathFileIdMap, levels, rescale));
-
-    return BSS_OK;
+void TombstoneFileManager::FinishRestore()
+{
+    uint32_t topLevelId = mHighLevels.size() - NO_1;
+    auto topLevel = mHighLevels.at(topLevelId);
+    RETURN_AS_NULLPTR(topLevel);
+    topLevel->SetTopLevel(true);
 }
 
 BResult TombstoneFileManager::RestoreLevel(const FileInputViewRef &inputView,
                                            std::unordered_map<std::string, uint32_t> &restorePathFileIdMap,
-                                           std::vector<TombstoneLevelRef> levels, bool rescale)
+                                           bool rescale)
 {
     uint32_t levelSize = 0;
-    std::unordered_map<std::string, RestoreFileInfo> restoreFileMapping;
     RETURN_NOT_OK(inputView->Read(levelSize));
+    std::vector<TombstoneLevelRef> restoreLevels;
+    restoreLevels.reserve(levelSize);
+    std::unordered_map<std::string, RestoreFileInfo> restoreFileMapping;
+    // 1、读取levels信息
     for (uint32_t i = 1; i <= levelSize; ++i) {
-        TombstoneLevelRef level = std::make_shared<TombstoneLevel>(mConfig, i, shared_from_this(), i == levelSize,
-                                                                   mMemManager);
+        TombstoneLevelRef restoreLevel = std::make_shared<TombstoneLevel>(mConfig, i, shared_from_this(),
+            i == levelSize, mMemManager);
         std::vector<TombstoneFileGroupRef> groupVec;
         RETURN_NOT_OK(RestoreFileGroup(inputView, restorePathFileIdMap, groupVec, restoreFileMapping));
-        level->InsertFileGroups(groupVec);
+        restoreLevel->InsertFileGroups(groupVec);
 
         if (i > 1) {
-            auto preLevel = levels[i - NO_2];
-            preLevel->SetNextLevel(level);
+            auto preLevel = restoreLevels[i - NO_2];
+            preLevel->SetNextLevel(restoreLevel);
         }
-        levels.emplace_back(level);
+        restoreLevels.emplace_back(restoreLevel);
     }
+    // 2、恢复mHighLevels
+    auto restoreLevelSize = static_cast<int32_t>(restoreLevels.size());
+    int32_t levelGap = restoreLevelSize - static_cast<int32_t>(mHighLevels.size());
+    while (levelGap > 0) {
+        TombstoneLevelRef lastLevel = mHighLevels.at(mHighLevels.size() - NO_1);
+        CONTINUE_LOOP_AS_NULLPTR(lastLevel);
+        TombstoneLevelRef newLevel = std::make_shared<TombstoneLevel>(mConfig, lastLevel->GetLevelId() + NO_1,
+            shared_from_this(), false, mMemManager);
+        lastLevel->SetNextLevel(newLevel);
+        mHighLevels.push_back(newLevel);
+        lastLevel->SetTopLevel(false);
+        --levelGap;
+    }
+    for (int index = 0; index < restoreLevelSize; ++index) {
+        TombstoneLevelRef curLevel = mHighLevels.at(index);
+        curLevel->InsertFileGroups(restoreLevels.at(index)->GetFileGroup());
+    }
+    // 3、恢复文件
     std::unordered_map<std::string, std::pair<uint64_t, uint32_t>> result;
     RETURN_NOT_OK(mFileCacheManager->RestoreFiles(result, restoreFileMapping, mBasePath, rescale));
     return BSS_OK;
@@ -370,6 +402,19 @@ uint64_t TombstoneFileManager::GetSnapshotVersion(uint64_t snapshotId)
         return UINT64_MAX;
     }
     return it->second->GetVersion();
+}
+
+uint64_t TombstoneFileManager::CalTombstoneNum(uint64_t minBlobId)
+{
+    uint64_t tombstoneNum = 0;
+    for (const auto &pair : mLevel0) {
+        tombstoneNum += pair.second->CalTombstoneNum(minBlobId);
+    }
+
+    for (const auto &level : mHighLevels) {
+        tombstoneNum += level->CalTombstoneNum(minBlobId);
+    }
+    return tombstoneNum;
 }
 
 }  // namespace bss

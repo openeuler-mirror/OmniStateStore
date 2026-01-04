@@ -357,8 +357,7 @@ TEST_F(TestSliceTableBrCov, PrefixIterator_ShouldReturnNull_WhenLogicalSliceChai
 {
     Key prefixKey;
     mSliceTable->mSliceBucketIndex->mMappingTable[0] = nullptr;
-    BlobValueTransformFunc blobValueTransformFunc;
-    KeyValueIteratorRef result = mSliceTable->PrefixIterator(prefixKey, blobValueTransformFunc);
+    KeyValueIteratorRef result = mSliceTable->PrefixIterator(prefixKey);
     EXPECT_EQ(result, nullptr);
 }
 
@@ -371,8 +370,7 @@ TEST_F(TestSliceTableBrCov, PrefixIterator_ShouldReturnNull_WhenLogicalSliceChai
 {
     Key prefixKey;
     mSliceTable->mSliceBucketIndex->mMappingTable[0]->NotifyNoneFlag(true);
-    BlobValueTransformFunc blobValueTransformFunc;
-    KeyValueIteratorRef result = mSliceTable->PrefixIterator(prefixKey, blobValueTransformFunc);
+    KeyValueIteratorRef result = mSliceTable->PrefixIterator(prefixKey);
     EXPECT_EQ(result, nullptr);
 }
 
@@ -387,8 +385,7 @@ TEST_F(TestSliceTableBrCov, PrefixIterator_ShouldReturnNull_WhenIteratorInitFail
     LogicalSliceChainRef logicalSliceChain = mockAddSlice();
     logicalSliceChain->SetSliceAddress(0, nullptr);
     logicalSliceChain->SetSliceChainTailIndex(0);
-    BlobValueTransformFunc blobValueTransformFunc;
-    KeyValueIteratorRef result = mSliceTable->PrefixIterator(prefixKey, blobValueTransformFunc);
+    KeyValueIteratorRef result = mSliceTable->PrefixIterator(prefixKey);
     EXPECT_EQ(result, nullptr);
 }
 

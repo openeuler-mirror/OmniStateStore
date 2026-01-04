@@ -47,6 +47,11 @@ public:
         return mBlobNum;
     }
 
+    uint64_t CalValidBlobIDNum() const
+    {
+        return mValidGroupRange->GetKeyGroupRangeSize() / mCoveredGroupRange->GetKeyGroupRangeSize() * mBlobNum;
+    }
+
     inline void SetVersion(uint64_t version)
     {
         mVersion = version;

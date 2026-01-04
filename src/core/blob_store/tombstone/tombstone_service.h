@@ -183,6 +183,19 @@ public:
         }
     }
 
+    inline uint64_t CalTombstoneNum(uint64_t minBlobId)
+    {
+        uint64_t count = mPendingSet.size();
+        ReadLocker<ReadWriteLock> lock(&mLock);
+        for (const auto &file : mWrittenFiles) {
+            const auto &tombstoneFileMeta = file->GetFileMeta();
+            CONTINUE_LOOP_AS_NULLPTR(tombstoneFileMeta);
+            if (tombstoneFileMeta->GetMinBlobId() >= minBlobId) {
+                count += tombstoneFileMeta->GetBlobNum();
+            }
+        }
+        return count;
+    }
 private:
     ConfigRef mConfig = nullptr;
     GroupRangeRef mKeyGroupRange = nullptr;

@@ -59,6 +59,11 @@ public:
         mTotalBlobNum += blobNum;
     }
 
+    uint32_t GetBlobNum()
+    {
+        return mTotalBlobNum;
+    }
+
     void SetVersion(uint64_t version)
     {
         mVersion = version;

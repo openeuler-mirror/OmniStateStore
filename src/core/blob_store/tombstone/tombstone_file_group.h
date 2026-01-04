@@ -52,6 +52,21 @@ public:
         return totalFileSize;
     }
 
+    inline uint64_t CalTombstoneNum(uint64_t minBlobId)
+    {
+        uint64_t tombstoneNum = 0;
+        ReadLocker<ReadWriteLock> lock(&mRwLock);
+        for (const auto &item : mFiles) {
+            CONTINUE_LOOP_AS_NULLPTR(item);
+            auto fileMeta = item->GetFileMeta();
+            CONTINUE_LOOP_AS_NULLPTR(fileMeta);
+            if (fileMeta->GetMaxBlobId() >= minBlobId) {
+                tombstoneNum += fileMeta->CalValidBlobIDNum();
+            }
+        }
+        return tombstoneNum;
+    }
+
     TombstoneFileSubVecRef FindOverLapFile(uint64_t minBlobId, uint64_t maxBlobId)
     {
         if (UNLIKELY(minBlobId > maxBlobId)) {

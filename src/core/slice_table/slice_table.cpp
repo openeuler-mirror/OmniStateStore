@@ -475,8 +475,32 @@ bool SliceTable::GetFromSlice(const Key &key, std::stack<Value> &mergingValues, 
     return true;
 }
 
-KeyValueIteratorRef SliceTable::EntryIterator(const KeyFilter &keyFilter,
-                                              BlobValueTransformFunc &blobValueTransformFunc, uint16_t stateId)
+KeyValueIteratorRef SliceTable::EntryIterator(const KeyFilter &keyFilter, uint16_t stateId,
+    BlobValueTransformFunc &blobValueTransformFunc)
+{
+    // get value from blob store
+    auto self = shared_from_this();
+    auto blobValueTransformFunc2 = [self](uint64_t blobId, uint32_t keyHashCode, uint64_t seqId,
+                                          Value &originalValue) -> BResult {
+        return self->GetValueFromBlobStore(blobId, keyHashCode, seqId, originalValue);
+    };
+    blobValueTransformFunc = std::move(blobValueTransformFunc2);
+    return EntryIterator(keyFilter, stateId);
+}
+
+KeyValueIteratorRef SliceTable::PrefixIterator(const Key &prefixKey, BlobValueTransformFunc &blobValueTransformFunc)
+{
+    // get value from blob store
+    auto self = shared_from_this();
+    auto blobValueTransformFunc2 = [self](uint64_t blobId, uint32_t keyHashCode, uint64_t seqId,
+                                          Value &originalValue) -> BResult {
+        return self->GetValueFromBlobStore(blobId, keyHashCode, seqId, originalValue);
+    };
+    blobValueTransformFunc = std::move(blobValueTransformFunc2);
+    return PrefixIterator(prefixKey);
+}
+
+KeyValueIteratorRef SliceTable::EntryIterator(const KeyFilter &keyFilter, uint16_t stateId)
 {
     SortedKeyValueMergingIteratorRef iterator = std::make_shared<SortedKeyValueMergingIterator>();
     if (UNLIKELY(iterator == nullptr)) {
@@ -486,17 +510,10 @@ KeyValueIteratorRef SliceTable::EntryIterator(const KeyFilter &keyFilter,
     KeyValueIteratorRef keyValueIterator = mBucketGroupManager->IteratorFileStoreData(stateId);
     RETURN_NULLPTR_AS_NULLPTR(keyValueIterator);
     iterator->Init(GetIterator(), keyValueIterator, mMemManager);
-    // get value from blob store
-    auto self = shared_from_this();
-    auto blobValueTransformFunc2 = [self](uint64_t blobId, uint32_t keyHashCode, uint64_t seqId,
-                                          Value &originalValue) -> BResult {
-        return self->GetValueFromBlobStore(blobId, keyHashCode, seqId, originalValue);
-    };
-    blobValueTransformFunc = std::move(blobValueTransformFunc2);
     return std::make_shared<SortedKeyValueMergingIteratorV2>(iterator, keyFilter);
 }
 
-KeyValueIteratorRef SliceTable::PrefixIterator(const Key &prefixKey, BlobValueTransformFunc &blobValueTransformFunc)
+KeyValueIteratorRef SliceTable::PrefixIterator(const Key &prefixKey)
 {
     mAccessRecorder->Record();
     LogicalSliceChainRef logicalSliceChain = GetSliceBucketIndex()->GetLogicalSliceChain(prefixKey);
@@ -515,12 +532,6 @@ KeyValueIteratorRef SliceTable::PrefixIterator(const Key &prefixKey, BlobValueTr
         LOG_ERROR("Failed to create prefix iterator!");
         return nullptr;
     }
-    auto self = shared_from_this();
-    auto blobValueTransformFunc2 = [self](uint64_t blobId, uint32_t keyHashCode, uint64_t seqId,
-                                          Value &originalValue) -> BResult {
-        return self->GetValueFromBlobStore(blobId, keyHashCode, seqId, originalValue);
-    };
-    blobValueTransformFunc = std::move(blobValueTransformFunc2);
     BResult ret = iterator->Init(logicalSliceChain, prefixKey);
     if (UNLIKELY(ret != BSS_OK)) {
         LOG_ERROR("Failed to initialize prefix iterator!");
