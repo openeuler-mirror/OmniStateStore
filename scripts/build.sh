@@ -35,6 +35,7 @@ fi
 arch=$(uname -m)
 BUILD_TYPE=release
 BUILD_UT=OFF
+FLINK_VERSION=all
 
 while true; do
     case "$1" in
@@ -54,7 +55,16 @@ while true; do
             fi
             shift 2
             ;;
+        --fv )
+            version=$2
+            version="${version// /}"
+            [[ "version" != "1.16.1" && "version" != "1.16.3" && "version" != "1.17.1" ]] && echo "Invalid flink version $2" && usage
+            FLINK_VERSION=${version}
+            CMAKE_FLAGS+="-DFLINK_VERSION=${version} "
+            shift 2
+            ;;
         --ut )
+            BUILD_UT=ON
             CMAKE_FLAGS+='-DBUILD_TESTS=ON '
             shift ;;
         --sve )
@@ -111,7 +121,13 @@ function build_cmake()
   cd build
   # configure
   $CMAKE_CMD
-  make build_all
+  if [[ "${BUILD_UT}" == "ON" ]]; then
+    make build_cpp
+  elif [[ "${FLINK_VERSION}" != "all" ]]; then
+    make build_version
+  else
+    make build_all
+  fi
 
   local ret=$?
   cd -
@@ -124,6 +140,10 @@ function build_cmake()
 }
 
 function build_package() {
+  if [[ "${BUILD_UT}" == "ON" ]]; then
+    return
+  fi
+
   log_info "***** Package jar with dir: ${OUTPUT_DIR} *****"
   cd ${OUTPUT_DIR}
   tar -zcvf BoostKit-omnistatestore_1.1.0_$(arch)_${BUILD_TYPE}.tar.gz ${BSS_OUTPUT_DIR} || {
@@ -139,6 +159,7 @@ function parse_args()
 
 function clean() {
   rm -rf ${BUILD_DIR}/*
+  rm -rf ${OUTPUT_DIR}/*
 }
 
 function check_glibc() {
