@@ -97,6 +97,11 @@ struct PQBinaryData {
     {
         return !mData.IsNull();
     }
+
+    inline const uint8_t *Data() const
+    {
+        return mData.Data();
+    }
 };
 
 struct PQBinaryDataComparator {

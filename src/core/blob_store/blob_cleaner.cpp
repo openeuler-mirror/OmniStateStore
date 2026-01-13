@@ -337,15 +337,19 @@ double BlobCleaner::CalBlobSpaceWasteRate(uint64_t minBlobId)
         CONTINUE_LOOP_AS_NULLPTR(blobFile);
         auto blobFileMeta = blobFile->GetBlobFileMeta();
         CONTINUE_LOOP_AS_NULLPTR(blobFileMeta);
-        if (blobFileMeta->GetMinExpireTime() != 0 && blobFileMeta->GetMaxExpireTime() != 0) {
+        uint64_t minExpireTime = blobFileMeta->GetMinExpireTime();
+        uint64_t maxExpireTime = blobFileMeta->GetMaxExpireTime();
+        if (minExpireTime != 0 && maxExpireTime != 0) {
             uint64_t currentTime = TimeStampUtil::GetCurrentTime();
-            if (currentTime < blobFileMeta->GetMinExpireTime()) {
+            if (currentTime < minExpireTime) {
                 expiredRatio = 0.0F;
-            } else if (currentTime > blobFileMeta->GetMaxExpireTime()) {
+            } else if (currentTime > maxExpireTime) {
                 expiredRatio = 1.0F;
+            } else if (minExpireTime == maxExpireTime) {
+                expiredRatio = 0.0F;
             } else {
-                expiredRatio = static_cast<float>(currentTime - blobFileMeta->GetMinExpireTime()) /
-                    static_cast<float>(blobFileMeta->GetMaxExpireTime() - blobFileMeta->GetMinExpireTime());
+                expiredRatio = static_cast<float>(currentTime - minExpireTime) /
+                    static_cast<float>(maxExpireTime - minExpireTime);
             }
         }
         auto validGroupRange = blobFileMeta->GetValidGroupRange();

@@ -17,7 +17,7 @@
 #include "fresh_table/memory/skiplist.h"
 #include "include/binary_data.h"
 #include "kv_table_iterator.h"
-#include "memory/memory_segment.h"
+#include "memory/fixed_size_memory_pool.h"
 #include "transform/pq_iterator.h"
 
 namespace ock {
@@ -103,14 +103,14 @@ public:
         uint32_t capacity = IO_SIZE_8M;
         auto ret = mMemManager->GetMemory(MemoryType::FILE_STORE, capacity, dataAddress, true);
         RETURN_NULLPTR_AS_NOT_OK(ret);
-        MemorySegmentRef segment = 
-            MakeRef<MemorySegment>(capacity, reinterpret_cast<uint8_t*>(dataAddress), mMemManager);
-        if (UNLIKELY(segment == nullptr)) {
+        FixedSizeMemoryPoolRef memoryPool = 
+            MakeRef<FixedSizeMemoryPool>(reinterpret_cast<uint8_t*>(dataAddress), capacity, mMemManager);
+        if (UNLIKELY(memoryPool == nullptr)) {
             mMemManager->ReleaseMemory(dataAddress);
             return nullptr;
         }
         PQBinaryDataComparator comparator;
-        auto list = std::make_shared<SkipList<PQBinaryData, PQBinaryDataComparator>>(comparator, segment,
+        auto list = std::make_shared<SkipList<PQBinaryData, PQBinaryDataComparator>>(comparator, memoryPool,
             mSeqId.fetch_add(1));
         ret = list->Initialize();
         if (UNLIKELY(ret != BSS_OK)) {

@@ -17,7 +17,7 @@ void TestSkiplist::SetUp()
     uint32_t capacity = 1024 * 1024 * 8;
     void *addr = malloc(capacity);
     ASSERT_TRUE(addr != nullptr);
-    memorySegment = MakeRef<MemorySegment>(capacity, reinterpret_cast<uint8_t *>(addr), true);
+    memoryPool = MakeRef<FixedSizeMemoryPool>(reinterpret_cast<uint8_t *>(addr), capacity, true);
 }
 
 void TestSkiplist::TearDown() {}
@@ -25,7 +25,7 @@ void TestSkiplist::TearDown() {}
 TEST_F(TestSkiplist, test_basic)
 {
     IntComparator intComp;
-    SkipList<int, IntComparator> intSkipList(intComp, memorySegment, 1);
+    SkipList<int, IntComparator> intSkipList(intComp, memoryPool, 1);
     ASSERT_EQ(intSkipList.Initialize(), BSS_OK);
     std::vector<int> keys = {10, 5, 15, 3, 7, 12, 17, 4, 2, 1, 6, 8, 11, 13, 16, 14};
     for (const auto &item : keys) {
@@ -56,7 +56,7 @@ TEST_F(TestSkiplist, test_basic)
 TEST_F(TestSkiplist, test_string_key)
 {
     StringComparator strComp;
-    SkipList<std::string, StringComparator> strSkipList(strComp, memorySegment, 1);
+    SkipList<std::string, StringComparator> strSkipList(strComp, memoryPool, 1);
     ASSERT_EQ(strSkipList.Initialize(), BSS_OK);
     std::vector<std::string> keys = {"apple", "banana", "cherry"};
     for (const auto &item : keys) {

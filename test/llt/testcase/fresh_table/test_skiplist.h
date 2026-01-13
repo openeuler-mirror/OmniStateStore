@@ -35,7 +35,7 @@ public:
             return a.compare(b);
         }
     };
-    MemorySegmentRef memorySegment;
+    FixedSizeMemoryPoolRef memoryPool;
 };
 
 

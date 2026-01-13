@@ -19,6 +19,7 @@
 #include <algorithm>
 #include <stdexcept>
 
+#include "fixed_size_memory_pool.h"
 #include "memory_segment.h"
 
 namespace ock {
@@ -27,17 +28,17 @@ namespace bss {
 template<typename Key>
 struct Node {
     Key mKey;
-    std::vector<Node<Key>*> mForward;
+    Node<Key>** mForward;
     int32_t mTopLevel;
 
     Node(const Key& k, int32_t level) : mKey(k), mTopLevel(level)
     {
-        mForward.resize(level + 1, nullptr);
+        mForward = new Node<Key>* [level + 1]();
     }
 
     ~Node()
     {
-        std::vector<Node<Key>*>().swap(mForward);
+        delete[] mForward;
     }
 };
 
@@ -45,7 +46,7 @@ template<typename Key, class Comparator>
 class SkipList {
 public:
     // 构造函数 - 必须提供比较器
-    explicit SkipList(const Comparator &comparator, MemorySegmentRef allocator, uint64_t seqId)
+    explicit SkipList(const Comparator &comparator, FixedSizeMemoryPoolRef allocator, uint64_t seqId)
         : mComparator(comparator), mAllocator(allocator), mSeqId(seqId), mDistribution(0.0, 1.0) {}
 
     BResult Initialize()
@@ -86,7 +87,7 @@ public:
         Node<Key> *current = mHead;
 
         for (int level = mCurrentMaxLevel; level >= 0; --level) {
-            while (current->mForward[level] != mTail && 
+            while (current->mForward[level] != mTail &&
                    mComparator(current->mForward[level]->mKey, key) < 0) {
                 current = current->mForward[level];
             }
@@ -95,6 +96,9 @@ public:
 
         current = current->mForward[0];
         if (current != mTail && mComparator(current->mKey, key) == 0) {
+#ifndef FLAG_FOR_UT
+        mAllocator->Free(const_cast<uint8_t *>(current->mKey.Data()));
+#endif
             current->mKey = key; // 更新键值
             return BSS_OK; // 如果键已存在，返回
         }
@@ -160,6 +164,9 @@ public:
         while (mCurrentMaxLevel > 0 && mHead->mForward[mCurrentMaxLevel] == mTail) {
             mCurrentMaxLevel--;
         }
+#ifndef FLAG_FOR_UT
+        mAllocator->Free(const_cast<uint8_t *>(current->mKey.Data()));
+#endif
         delete current;
         mSize--;
         return BSS_OK;
@@ -290,7 +297,7 @@ BResult GetMemAddr(uint32_t length, uint8_t *&addr)
     return mAllocator->Allocate(length, addr);
 }
 
-MemorySegmentRef GetAllocator()
+FixedSizeMemoryPoolRef GetAllocator()
 {
     return mAllocator;
 }
@@ -319,7 +326,7 @@ private:
     std::atomic<int32_t> mCurrentMaxLevel{0};
 
     Comparator mComparator;
-    MemorySegmentRef mAllocator;
+    FixedSizeMemoryPoolRef mAllocator;
     uint64_t mSeqId;
 
     std::default_random_engine mGenerator;

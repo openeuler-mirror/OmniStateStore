@@ -151,7 +151,7 @@ BResult LsmStore::FinishCompactionOutputFile(const CompactionProcessorRef &proce
         processor->mOutputs.emplace_back(fileMetaData);
         processor->mFileBuilder = nullptr;
         LOG_DEBUG("Finish compaction output file success, fileStoreSeqId:"
-                  << mSeqId << "filename: " << PathTransform::ExtractFileName(processor->mCurrentFileName)
+                  << mSeqId << ", filename: " << PathTransform::ExtractFileName(processor->mCurrentFileName)
                   << ", smallestKey:" << smallest->ToString() << ", largestKey:" << largest->ToString()
                   << ", fileAddress:" << fileMetaData->GetFileAddress() << ", fileId:" << fileMetaData->GetFileId()
                   << ", fileSize:" << fileMetaData->GetFileSize());
@@ -470,18 +470,109 @@ BResult LsmStore::BuildLsmStoreFlushFile(const IteratorRef<std::vector<DataSlice
     return BSS_OK;
 }
 
-BResult LsmStore::BuildLsmStoreFlushFile(const PQTableIteratorRef &iter, FileMetaDataRef &fileMetaData)
+// 判断targetKey是否在lsm level文件中不存在.
+bool LsmStore::KeyNotExistBeyondOutputLevels(const Key &key, const VersionPtr &currentVersion, uint32_t numLevels,
+    std::vector<int32_t> &levelPointers) const
+{
+    for (uint32_t level = 0; level < numLevels; level++) {
+        if (UNLIKELY(level >= currentVersion->GetLevels().size())) {
+            LOG_ERROR("Invalid level form currentVersion, levelId:" << level << ".");
+            return false;
+        }
+
+        auto fileMetaDataGroups = currentVersion->GetLevels().at(level).GetFileMetaDataGroups();
+        auto isFindKey = FindKeyInFileMetaDataGroups(key, level, levelPointers, fileMetaDataGroups);
+        if (isFindKey) {
+            return false;
+        }
+    }
+    return true;
+}
+
+bool LsmStore::FindKeyInFileMetaDataGroups(const Key &key, uint32_t level, std::vector<int32_t> &levelPointers,
+    const std::vector<FileMetaDataGroupRef> &fileMetaDataGroups) const
+{
+    for (auto &fileMetaDataGroup : fileMetaDataGroups) {
+        if (UNLIKELY(!fileMetaDataGroup->GetGroupRange()->Equals(mGroupRange))) {
+            continue;
+        }
+
+        std::vector<FileMetaDataRef> files = fileMetaDataGroup->GetFiles();
+        if (level == 0) {
+            if (FindKeyInLevel0(key, files)) {
+                return true;
+            }
+        } else {
+            if (FindKeyInOtherLevels(key, level, levelPointers, files)) {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+bool LsmStore::FindKeyInLevel0(const Key &key, const std::vector<FileMetaDataRef> &files) const
+{
+    for (const auto &fileMetaData : files) {
+        CONTINUE_LOOP_AS_NULLPTR(fileMetaData);
+        auto cmpLargest = fileMetaData->GetLargest()->CompareKey(key);
+        if (cmpLargest >= 0 && fileMetaData->GetSmallest()->CompareKey(key) <= 0) {
+            return true;
+        }
+    }
+    return false;
+}
+
+bool LsmStore::FindKeyInOtherLevels(const Key &key, uint32_t level, std::vector<int32_t> &levelPointers,
+    const std::vector<FileMetaDataRef> &files) const
+{
+    auto fileSize = static_cast<int32_t>(files.size());
+    while (levelPointers[level] < fileSize) {
+        const FileMetaDataRef &fileMetaData = files.at(levelPointers[level]);
+        CONTINUE_LOOP_AS_NULLPTR(fileMetaData);
+        auto cmpLargest = fileMetaData->GetLargest()->CompareKey(key);
+        if (cmpLargest >= 0 && fileMetaData->GetSmallest()->CompareKey(key) <= 0) {
+            return true;
+        }
+
+        if (cmpLargest > 0) {
+            break;
+        }
+        levelPointers[level] = levelPointers[level] + 1;
+    }
+    return false;
+}
+
+BResult LsmStore::BuildLsmStoreFlushFile(const PQTableIteratorRef &iter, FileMetaDataRef &fileMetaData, bool &flag)
 {
     FileInfoRef fileInfo = mFileCacheManager->AllocateFile(mFileDirectory, FileName::CreateFileName);
     RETURN_ERROR_AS_NULLPTR(fileInfo);
     FileProcHolder holder = FileProcHolder::FILE_STORE_FLUSH;  // 标记该流程是Flush写流程
     auto fileBuilder = mFileCache->CreateBuilder(fileInfo->GetFilePath(), 0, holder);
+    auto currentVersion = mVersionSet->GetCurrent();
+    auto numLevels = mConf->GetFileStoreNumLevels();
+    std::vector<int32_t> levelPointers;
+    levelPointers.resize(numLevels);
     while (iter->HasNext()) {
-        auto ret = fileBuilder->Add(iter->Next());
+        // 如果当前键值对的值类型为删除并且底层也不存在，则跳过该键值对.
+        auto keyValue = iter->Next();
+        CONTINUE_LOOP_AS_NULLPTR(keyValue);
+        if ((keyValue->value.ValueType() == ValueType::DELETE) && KeyNotExistBeyondOutputLevels(keyValue->key,
+            currentVersion, numLevels, levelPointers)) {
+            continue;
+        }
+        auto ret = fileBuilder->Add(keyValue);
         if (UNLIKELY(ret != BSS_OK)) {
             mFileCacheManager->DiscardFile(FileAddressUtil::GetFileAddressWithZeroOffset(fileInfo->GetFileId()->Get()));
             return BSS_INNER_ERR;
         }
+        flag = true;
+    }
+
+    if (!flag) {
+        LOG_WARN("All data type is delete, lower level does not have the same key, skipped for current flush.");
+        mFileCacheManager->DiscardFile(FileAddressUtil::GetFileAddressWithZeroOffset(fileInfo->GetFileId()->Get()));
+        return BSS_OK;
     }
 
     FileBlockMetaRef fileMeta;
@@ -512,8 +603,13 @@ BResult LsmStore::Put(const PQTableIteratorRef &iterator)
 {
     // create file builder.
     FileMetaDataRef fileMetaData = nullptr;
-    auto result = BuildLsmStoreFlushFile(iterator, fileMetaData);
+    bool flag = false;
+    auto result = BuildLsmStoreFlushFile(iterator, fileMetaData, flag);
     RETURN_NOT_OK_NO_LOG(result);
+    // 当前淘汰的数据全为Delete，且下层没有相同重复key，无需继续淘汰
+    if (!flag) {
+        return BSS_OK;
+    }
     CreateVersion(fileMetaData);
     return BSS_OK;
 }
