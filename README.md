@@ -96,4 +96,4 @@ rm -f BoostKit-omnistatestore_1.x.x_aarch64_xxx.tar.gz
 木兰宽松许可证（http://license.coscl.org.cn/MulanPSL2）
 
 # 源码开放
-敬请期待
+https://atomgit.com/openeuler/OmniStateStore
