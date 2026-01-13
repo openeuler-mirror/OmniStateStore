@@ -356,7 +356,18 @@ private:
     BResult BuildLsmStoreFlushFile(const IteratorRef<std::vector<DataSliceRef>> &dataSliceVectorIterator,
                                    FileMetaDataRef &fileMetaData, bool &flag);
 
-    BResult BuildLsmStoreFlushFile(const PQTableIteratorRef &iter, FileMetaDataRef &fileMetaData);
+    BResult BuildLsmStoreFlushFile(const PQTableIteratorRef &iter, FileMetaDataRef &fileMetaData, bool &flag);
+
+    bool KeyNotExistBeyondOutputLevels(const Key &key, const VersionPtr &currentVersion, uint32_t numLevels,
+        std::vector<int32_t> &levelPointers) const;
+
+    bool FindKeyInFileMetaDataGroups(const Key &key, uint32_t level, std::vector<int32_t> &levelPointers,
+        const std::vector<FileMetaDataGroupRef> &fileMetaDataGroups) const;
+
+    bool FindKeyInLevel0(const Key &key, const std::vector<FileMetaDataRef> &files) const;
+
+    bool FindKeyInOtherLevels(const Key &key, uint32_t level, std::vector<int32_t> &levelPointers,
+        const std::vector<FileMetaDataRef> &files) const;
 
     inline void NotifyStop() override
     {
