@@ -217,11 +217,6 @@ constexpr uint16_t INVALID_U16 = 0xFFFF;
 constexpr uint32_t INVALID_U32 = 0xFFFFFFFF;
 constexpr uint64_t INVALID_U64 = 0xFFFFFFFFFFFFFFFF;
 
-constexpr uint64_t IMPLEMENTER_SHIFT = 24;
-constexpr uint64_t IMPLEMENTER_MASK = 0xFF;
-constexpr uint64_t PART_NUM_SHIFT = 4;
-constexpr uint64_t PART_NUM_MASK = 0xFFF;
-
 constexpr int32_t OVERLAP_COMPARE_RESULT_CASE_0 = 0;
 constexpr int32_t OVERLAP_COMPARE_RESULT_CASE_1 = 1;
 constexpr int32_t OVERLAP_COMPARE_RESULT_CASE_2 = -1;
