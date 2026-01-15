@@ -12,12 +12,11 @@
 package com.huawei.ock.bss.snapshot;
 
 import com.huawei.ock.bss.common.BoostStateDB;
-import com.huawei.ock.bss.common.exception.BSSRuntimeException;
-import com.huawei.ock.bss.iterator.BoostKeyValueIterator;
 import com.huawei.ock.bss.iterator.BoostKeyValueStateIterator;
 import com.huawei.ock.bss.iterator.BoostQueueIterator;
-import com.huawei.ock.bss.iterator.struct.KVDataSorter;
-import com.huawei.ock.bss.iterator.struct.KVDataSorterBuilder;
+import com.huawei.ock.bss.iterator.BoostSortedKeyValueIterator;
+import com.huawei.ock.bss.iterator.SingleStateIterator;
+import com.huawei.ock.bss.iterator.serializer.KeyValueBuilder;
 
 import org.apache.flink.api.common.state.StateDescriptor;
 import org.apache.flink.api.common.typeutils.TypeSerializer;
@@ -38,7 +37,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.util.Arrays;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -115,27 +114,22 @@ public class FullBoostSnapshotResources<K> implements FullSnapshotResources<K> {
     @Override
     public KeyValueStateIterator createKVStateIterator() throws IOException {
         if (this.isIteratorCreated.compareAndSet(false, true)) {
-            KVDataSorter kvDataSorter;
-            try {
-                kvDataSorter = (new KVDataSorterBuilder<>(this.toKeyGroupNum, this.keyGroupRange, this.keySerializer,
-                    SavepointConfiguration.build(configuration), this.kvStateMetaDataMap,
-                    this.savepointDBResult)).build();
-            } catch (Exception e) {
-                throw new BSSRuntimeException("Failed to build kvDataSorter.", e);
-            }
+            KeyValueBuilder<K> keyValueBuilder =
+                new KeyValueBuilder<>(toKeyGroupNum, keySerializer, kvStateMetaDataMap);
 
-            if (this.isSavepointDBResultClosed.compareAndSet(false, true)) {
-                try {
-                    this.savepointDBResult.close();
-                } catch (Exception e) {
-                    IOUtils.closeQuietly(kvDataSorter);
-                    throw new BSSRuntimeException("Failed to close savepointDBResult.", e);
-                }
-            }
+            List<SingleStateIterator> iterators = new ArrayList<>(pqMetaDataMap.size() + kvStateMetaDataMap.size());
 
-            BoostKeyValueIterator keyValueIterator = new BoostKeyValueIterator(kvDataSorter);
-            BoostQueueIterator pqIterator = new BoostQueueIterator(this.pqMetaDataMap, this.toKeyGroupNum);
-            return new BoostKeyValueStateIterator(Arrays.asList(keyValueIterator, pqIterator), this.keyGroupRange);
+            BoostSortedKeyValueIterator<K> keyValueIterator =
+                new BoostSortedKeyValueIterator<>(savepointDBResult, keyValueBuilder, keyGroupRange);
+            iterators.add(keyValueIterator);
+
+            for (PqMetaData metaData : pqMetaDataMap.values()) {
+                BoostQueueIterator pqIterator =
+                    new BoostQueueIterator(metaData.stateSnapshot, keyGroupRange, keyGroupPrefixBytes,
+                        metaData.stateId);
+                iterators.add(pqIterator);
+            }
+            return new BoostKeyValueStateIterator(iterators, this.keyGroupRange, keyGroupPrefixBytes);
         }
         throw new IOException("Failed to create iterator repeatedly.");
     }

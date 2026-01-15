@@ -82,7 +82,7 @@ public:
         return keyHashCode;
     }
 
-    uint16_t GetStateId(uint32_t keyHashCode);
+    uint16_t GetStateId(uint32_t &keyHashCode);
 
     inline void SetStateIdProvider(const StateIdProviderRef &stateIdProvider)
     {
@@ -132,6 +132,7 @@ protected:
     TableStateIdHelperRef mStateIdHelper;
     SequenceIdFilterRef mStateFilter;
     SeqGeneratorRef mSeqGenerator;
+    uint32_t mMaxParallelism = 0;
 };
 using AbstractTableRef = std::shared_ptr<AbstractTable>;
 

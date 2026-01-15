@@ -68,4 +68,8 @@ public interface SingleStateIterator extends Closeable {
      */
     @Override
     void close();
+
+    int keyGroup();
+
+    boolean isHeapPQState();
 }

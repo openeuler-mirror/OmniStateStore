@@ -23,7 +23,7 @@ public class SavepointDBResultTestUtil extends SavepointDBResult {
     }
 
     @Override
-    public CloseableIterator<BinaryKeyValueItem> iterator() throws Exception {
+    public CloseableIterator<BinaryKeyValueItem> iterator() {
         return this.iterator;
     }
 }

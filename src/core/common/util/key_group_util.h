@@ -21,7 +21,19 @@ class KeyGroupUtil {
 public:
     static inline uint32_t ComputeKeyGroupForKeyHash(uint32_t keyHash, uint32_t maxParallelism)
     {
-        return keyHash % maxParallelism;
+        if (LIKELY(maxParallelism < 129)) {
+            return (keyHash & 0xFF000000) >> 24;
+        }
+        return (keyHash & 0xFFFF0000) >> 16;
+    }
+
+    static inline void SetKeyGroup(uint32_t &keyHashCode, uint32_t keyGroup, uint32_t maxParallelism)
+    {
+        if (LIKELY(maxParallelism < 129)) {
+            keyHashCode = (keyHashCode & 0x00FFFFFF) | ((keyGroup & 0xFF) << 24);
+        } else {
+            keyHashCode = (keyHashCode & 0x0000FFFF) | ((keyGroup & 0xFFFF) << 16);
+        }
     }
 };
 }  // namespace bss

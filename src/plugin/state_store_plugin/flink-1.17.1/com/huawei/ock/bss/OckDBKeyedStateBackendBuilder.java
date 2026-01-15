@@ -23,7 +23,6 @@ import com.huawei.ock.bss.snapshot.BoostIncrementalSnapshotStrategy;
 import com.huawei.ock.bss.snapshot.BoostSnapshotStrategyBase;
 import com.huawei.ock.bss.snapshot.BoostStateUploader;
 import com.huawei.ock.bss.snapshot.NativeBoostFullSnapshotStrategy;
-import com.huawei.ock.bss.snapshot.SavepointConfiguration;
 import com.huawei.ock.bss.state.internal.descriptor.keyed.KeyedStateDescriptor;
 import com.huawei.ock.bss.state.internal.descriptor.nskeyed.NSKeyedStateDescriptor;
 import com.huawei.ock.bss.table.api.Table;
@@ -82,13 +81,12 @@ public class OckDBKeyedStateBackendBuilder<K> extends AbstractOckDBKeyedStateBac
         StreamCompressionDecorator keyGroupCompressionDecorator,
         @Nonnull Collection<KeyedStateHandle> stateHandles,
         boolean priorityQueueAsyncSnapshot, ResourceContainer resourceContainer,
-        SavepointConfiguration savepointConfiguration,
         EmbeddedOckStateBackend.PriorityQueueStateType priorityQueueStateType,
         Configuration config) {
         super(numberOfKeyGroups, keyGroupRange, userCodeClassLoader, instanceBasePath, localRecoveryConfig,
             kvStateRegistry, fileCompatibleIdentifier, executionConfig, keySerializer, ttlTimeProvider,
             latencyTrackingStateConfig, cancelStreamRegistry, keyGroupCompressionDecorator, stateHandles,
-            priorityQueueAsyncSnapshot, resourceContainer, savepointConfiguration, priorityQueueStateType, config);
+            priorityQueueAsyncSnapshot, resourceContainer, priorityQueueStateType, config);
     }
 
     /**
@@ -156,7 +154,7 @@ public class OckDBKeyedStateBackendBuilder<K> extends AbstractOckDBKeyedStateBac
             this.kvStateRegistry, this.fileCompatibleIdentifier, this.executionConfig, this.config, this.metricGroup,
             this.keySerializerProvider.currentSchemaSerializer(), this.ttlTimeProvider, this.latencyTrackingStateConfig,
             cancelStreamRegistryForBackend, this.keyGroupCompressionDecorator, this.keyContext, priorityQueueSetFactory,
-            this.resourceContainer, this.savepointConfiguration, heapPriorityQueuesManager, checkpointSnapshotStrategy);
+            this.resourceContainer, heapPriorityQueuesManager, checkpointSnapshotStrategy);
     }
 
     private BoostSnapshotStrategyBase<K> initSavepointAndCheckpointStrategies(
