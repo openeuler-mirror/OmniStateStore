@@ -55,7 +55,6 @@ BResult ReplaceLogicalSlice::SyncReplaceChainAndSlice(LogicalSliceChainRef &logi
         if (sliceAddress->IsEvicted()) {
             evictedPageCount++;
         } else if (sliceAddress->IsTriggerFlush()) {
-            // 触发flush, 理论只有级短的时间是empty, 加while保证能filePage设置成功。
             while (!logicalSliceChain->HasFilePage()) {
                 usleep(NO_20);
             }

@@ -168,7 +168,7 @@ bool FreshTable::Get(const Key &key, Value &value)
 BResult FreshTable::Add(const KeyValue &keyValue)
 {
     IncrementFreshKeyMapSize(keyValue);
-    auto writer = [this, keyValue]() -> BResult {
+    auto writer = [this, &keyValue]() -> BResult {
         if (UNLIKELY(mActive == nullptr || mActive->GetBinaryData() == nullptr)) {
             return BSS_INNER_RETRY;
         }

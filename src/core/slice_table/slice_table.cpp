@@ -280,7 +280,7 @@ void SliceTable::Exit()
     if (mCompactManager != nullptr) {
         mCompactManager->Exit();
     }
-
+    
     if (mEvictManager != nullptr) {
         mEvictManager->Exit();
         mEvictManager = nullptr;  // 置空避免循环引用.
@@ -669,13 +669,14 @@ void SliceTablePrefixIterator::SetFileIter(const std::vector<FilePageRef> &fileP
 
 void SliceTablePrefixIterator::SetSliceIter()
 {
-    for (mCurrentSliceTableKvIterator = nullptr;
-         mCurrentSliceTableKvIterator == nullptr && mCurIndex < mSliceAddressAndDataSlices.size(); ++mCurIndex) {
-        SliceAddressRef sliceAddress = mSliceAddressAndDataSlices[mCurIndex].first;
-        DataSliceRef dataSlice = mSliceAddressAndDataSlices[mCurIndex].second;
+    size_t sliceSize = static_cast<uint32_t>(mSliceAddressAndDataSlices.size());
+    for (mCurrentSliceTableKvIterator = nullptr; mCurrentSliceTableKvIterator == nullptr && mCurIndex < sliceSize;
+        ++mCurIndex) {
+        const SliceAddressRef &sliceAddress = mSliceAddressAndDataSlices[mCurIndex].first;
+        const DataSliceRef &dataSlice = mSliceAddressAndDataSlices[mCurIndex].second;
         if (sliceAddress->IsEvicted()) {
             mLastDataSlice = nullptr;
-            mCurIndex = mSliceAddressAndDataSlices.size();
+            mCurIndex = sliceSize;
             break;
         }
         mCurrentSliceTableKvIterator = dataSlice->GetSlice()->SubIterator(mPrefixKey, false);

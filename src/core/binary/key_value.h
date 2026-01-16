@@ -18,7 +18,7 @@
 
 namespace ock {
 namespace bss {
-struct KeyValue {
+struct KeyValue : public Referable {
     Key key;
     Value value;
 
@@ -30,7 +30,7 @@ struct KeyValue {
     }
 };
 
-using KeyValueRef = std::shared_ptr<KeyValue>;
+using KeyValueRef = Ref<KeyValue>;
 using KeyValueIterator = Iterator<KeyValueRef>;
 using KeyValueIteratorRef = std::shared_ptr<KeyValueIterator>;
 using KeyValueVectorIterator = VectorIterator<KeyValueRef>;

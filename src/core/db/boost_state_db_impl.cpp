@@ -142,6 +142,9 @@ void BoostStateDBImpl::InnerClose()
         LOG_ERROR("Remove boost state db from db group failed, ret:" << result);
     }
 
+    if (mSliceTable != nullptr) {
+        mSliceTable->StopSliceTable();
+    }
     if (mFreshTransformer != nullptr) {
         mFreshTransformer->Exit();
     }

@@ -99,10 +99,10 @@ void SortedKeyValueMergingIterator::MergeValue()
             LOG_WARN("Failed to merge value. newerValue:" << newerValue.ToString()
                                                           << ", olderValue:" << olderValue.ToString());
         }
-        KeyValueRef kv = std::make_shared<KeyValue>();
+        KeyValueRef kv = MakeRef<KeyValue>();
         kv->key = mSliceTablePointer->key;
         kv->value = newerValue;
-        mCurrentEntry = kv;
+        mCurrentEntry = std::move(kv);
     }
 
     Iterator_Result result = mSliceTableIterator->HasNext();

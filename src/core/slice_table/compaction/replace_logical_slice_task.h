@@ -48,11 +48,11 @@ using ReplaceLogicalSliceRef = std::shared_ptr<ReplaceLogicalSlice>;
 
 class ReplaceLogicalSliceTask : public Runnable {
 public:
-    ReplaceLogicalSliceTask(ReplaceLogicalSliceRef &replaceLogicalSlice, LogicalSliceChainRef &logicalSlicechain,
+    ReplaceLogicalSliceTask(ReplaceLogicalSliceRef &replaceLogicalSlice, LogicalSliceChainRef &logicalSliceChain,
         uint32_t sliceIndexSlot, uint32_t compactionStartChainIndex, uint32_t compactionEndChainIndex,
         DataSliceRef &compactedDataSlice, std::vector<SliceAddressRef> &invalidSliceAddressList)
         : mReplaceLogicalSlice(replaceLogicalSlice),
-          mLogicalSliceChain(logicalSlicechain),
+          mLogicalSliceChain(logicalSliceChain),
           mSliceIndexSlot(sliceIndexSlot),
           mCompactionStartChainIndex(compactionStartChainIndex),
           mCompactionEndChainIndex(compactionEndChainIndex),
