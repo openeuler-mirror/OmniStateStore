@@ -434,20 +434,17 @@ BResult BoostHashMap::WriteValue(const Value &value, uint32_t destOffset)
 
 BResult BoostHashMap::WritePriKey(const PriKeyNode &key, uint32_t destOffset)
 {
-    uint32_t hashCode = key.HashCode();
-    RETURN_NOT_OK(mMemorySegment->CopyFrom(reinterpret_cast<uint8_t *>(&hashCode), NO_4, destOffset));
-    destOffset += NO_4;
-    uint16_t stateId = key.StateId();
-    RETURN_NOT_OK(mMemorySegment->CopyFrom(reinterpret_cast<uint8_t *>(&stateId), NO_2, destOffset));
-    destOffset += NO_2;
+    mMemorySegment->PutUint32_t(destOffset, key.HashCode());
+    destOffset += sizeof(uint32_t);
+    mMemorySegment->PutUint16_t(destOffset, key.StateId());
+    destOffset += sizeof(uint16_t);
     RETURN_NOT_OK(mMemorySegment->CopyFrom(const_cast<uint8_t *>(key.KeyData()), key.KeyLen(), destOffset));
     return BSS_OK;
 }
 
 BResult BoostHashMap::WriteSecKey(const SecKeyNode &key, uint32_t destOffset)
 {
-    uint32_t hashCode = key.HashCode();
-    RETURN_NOT_OK(mMemorySegment->CopyFrom(reinterpret_cast<uint8_t *>(&hashCode), sizeof(hashCode), destOffset));
+    mMemorySegment->PutUint32_t(destOffset, key.HashCode());
     destOffset += sizeof(uint32_t);
     RETURN_NOT_OK(mMemorySegment->CopyFrom(const_cast<uint8_t *>(key.KeyData()), key.KeyLen(), destOffset));
     return BSS_OK;
@@ -503,7 +500,7 @@ void BoostHashMap::Visit(std::function<bool(const FreshNode &)> handle) const
 
 KeyValueRef BoostHashMap::CreateKeyValue(const PriKeyNode &priKey)
 {
-    auto keyValue = std::make_shared<KeyValue>();
+    auto keyValue = MakeRef<KeyValue>();
     keyValue->key.Init(priKey, mMemorySegment);
     keyValue->value = {};
     return keyValue;
@@ -511,7 +508,7 @@ KeyValueRef BoostHashMap::CreateKeyValue(const PriKeyNode &priKey)
 
 KeyValueRef BoostHashMap::CreateKeyValue(const PriKeyNode &priKey, const FreshValueNode *valueNode)
 {
-    auto keyValue = std::make_shared<KeyValue>();
+    auto keyValue = MakeRef<KeyValue>();
     keyValue->key.Init(priKey, mMemorySegment);
     if (UNLIKELY(valueNode == nullptr)) {
         LOG_ERROR("valueNode is nullptr");
@@ -525,7 +522,7 @@ KeyValueRef BoostHashMap::CreateKeyValue(const PriKeyNode &priKey, const FreshVa
 KeyValueRef BoostHashMap::CreateKeyValue(const PriKeyNode &priKey, const SecKeyNode &secKey,
     const FreshValueNode *valueNode)
 {
-    auto keyValue = std::make_shared<KeyValue>();
+    auto keyValue = MakeRef<KeyValue>();
     keyValue->key.Init(priKey, secKey, mMemorySegment);
     if (UNLIKELY(valueNode == nullptr)) {
         LOG_ERROR("valueNode is nullptr");

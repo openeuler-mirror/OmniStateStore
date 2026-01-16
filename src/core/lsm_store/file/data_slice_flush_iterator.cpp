@@ -41,7 +41,8 @@ ByteBufferRef SliceKVIterator::CreateBuffer(uint32_t size)
 BResult SliceKVIterator::BuildKVPairList()
 {
     // get the next non-empty data slice list.
-    auto dataSliceList = NextValidDataSliceList();
+    std::vector<DataSliceRef> dataSliceList;
+    NextValidDataSliceList(dataSliceList);
     if (UNLIKELY(dataSliceList.empty())) {
         return BSS_OK;
     }
@@ -58,18 +59,17 @@ BResult SliceKVIterator::BuildKVPairList()
 
     if (dataSliceList.size() == 1) {
         // only one slice.
-        auto dataSlice = dataSliceList[0];
+        auto &dataSlice = dataSliceList[0];
         auto &sliceSpace = dataSlice->GetSlice()->GetSliceSpace();
-        auto holder = dataSlice->GetSlice()->GetByteBuffer();
         uint32_t keyCount = sliceSpace.KeyCount();
         for (uint32_t index = 0; index < keyCount; index++) {
-            auto keyValue = std::make_shared<KeyValue>();
+            auto keyValue = MakeRef<KeyValue>();
             sliceSpace.GetKeyValue(index, keyValue);
             // mKeyGroupFilter will not be null when mForSavepoint is true
             if (mForSavepoint && mKeyGroupFilter(keyValue)) {
                 continue;
             }
-            mCurrentKVList.emplace_back(keyValue);
+            mCurrentKVList.emplace_back(std::move(keyValue));
         }
     } else {
         //  merge data slice.
@@ -105,16 +105,14 @@ BResult SliceKVIterator::BuildKVPairList()
     return BSS_OK;
 }
 
-std::vector<DataSliceRef> SliceKVIterator::NextValidDataSliceList()
+void SliceKVIterator::NextValidDataSliceList(std::vector<DataSliceRef> &dataSliceList)
 {
-    std::vector<DataSliceRef> dataSliceList;
     while (mDataSliceVectorIterator->HasNext()) {
         dataSliceList = mDataSliceVectorIterator->Next();
         if (!dataSliceList.empty()) {
             break;
         }
     }
-    return dataSliceList;
 }
 
 uint32_t SliceKVIterator::GetKvCount(const std::vector<DataSliceRef> &dataSliceList)
@@ -133,12 +131,12 @@ BResult SliceKVIterator::MergeDataSlices(const std::vector<DataSliceRef> &dataSl
         auto &sliceSpace = dataSlice->GetSlice()->GetSliceSpace();
         uint32_t keyCount = sliceSpace.KeyCount();
         for (uint32_t index = 0; index < keyCount; index++) {
-            auto keyValue = std::make_shared<KeyValue>();
+            auto keyValue = MakeRef<KeyValue>();
             sliceSpace.GetKeyValue(index, keyValue);
             auto &key = keyValue->key;
             auto olderKv = kvMap.find(&key);
             if (olderKv == kvMap.end()) {
-                kvMap.emplace(&key, keyValue);
+                kvMap.emplace(&key, std::move(keyValue));
             } else {
                 auto allocator = [this](uint32_t size) { return CreateBuffer(size); };
                 auto &olderValue = olderKv->second->value;

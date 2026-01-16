@@ -23,8 +23,6 @@ namespace ock {
 namespace bss {
 static const double TRIM_RATIO = 0.9;
 
-class DLinkedNode;
-using DLinkedNodeRef = std::shared_ptr<DLinkedNode>;
 class DLinkedNode {
 public:
     explicit DLinkedNode() : key(0), value(nullptr), prev(nullptr), next(nullptr)
@@ -35,28 +33,42 @@ public:
     {
     }
 
+    // 禁止拷贝，只允许移动
+    DLinkedNode(const DLinkedNode&) = delete;
+    DLinkedNode& operator=(const DLinkedNode&) = delete;
+
+    DLinkedNode(DLinkedNode&& other) noexcept
+        : key(other.key), value(std::move(other.value)), prev(other.prev), next(other.next)
+    {
+        if (prev) prev->next = this;
+        if (next) next->prev = this;
+        // 重置 other 的 prev 和 next 指针
+        other.prev = nullptr;
+        other.next = nullptr;
+    }
+
 public:
     uint64_t key;
     BlockRef value;
-    DLinkedNodeRef prev;
-    DLinkedNodeRef next;
+    DLinkedNode* prev;
+    DLinkedNode* next;
 };
 
 class LRUCache {
 public:
     explicit LRUCache(uint64_t capacity) : mCapacity(capacity), mCurrentSize(0)
     {
-        mHead = std::make_shared<DLinkedNode>();
-        mTail = std::make_shared<DLinkedNode>();
-        mHead->next = mTail;
-        mTail->prev = mHead;
+        mHead = std::make_unique<DLinkedNode>();
+        mTail = std::make_unique<DLinkedNode>();
+        mHead->next = mTail.get();
+        mTail->prev = mHead.get();
         LOG_INFO("Create LRUCache capacity:" << capacity << " success.");
     }
 
     ~LRUCache()
     {
         Close();
-        std::unordered_map<uint64_t, DLinkedNodeRef>().swap(mCache);
+        std::unordered_map<uint64_t, std::unique_ptr<DLinkedNode>>().swap(mCache);
         std::unordered_map<ConfigRef, BoostNativeMetricPtr>().swap(mLruCachesMetricMap);
         LOG_INFO("Delete LRUCache success.");
     }
@@ -69,8 +81,9 @@ public:
             mLock.UnLock();
             return nullptr;
         }
-        DLinkedNodeRef node = iter->second;
-        MoveToHead(node); // 将节点移动到链表头部
+
+        DLinkedNode* node = iter->second.get();
+        MoveToHead(node);
         mLock.UnLock();
         return node->value;
     }
@@ -80,21 +93,27 @@ public:
         if (UNLIKELY(value == nullptr) || UNLIKELY(UINT64_MAX - value->BufferLen() < mCurrentSize)) {
             return;
         }
+
         mLock.Lock();
         auto iter = mCache.find(key);
-        if (iter != mCache.end() && iter->second != nullptr) {
-            DLinkedNodeRef node = iter->second;
+        if (iter != mCache.end()) {
+            DLinkedNode* node = iter->second.get();
             auto oldValueLen = node->value->BufferLen();
+
             UpdateCacheStat(node->value->GetBlockType(), false, oldValueLen);
             node->value = value;
             UpdateCacheStat(node->value->GetBlockType(), true, value->BufferLen());
-            MoveToHead(node); // 将节点移动到链表头部
-            mCurrentSize = mCurrentSize - oldValueLen + value->BufferLen(); // 更新当前资源
+
+            MoveToHead(node);
+            mCurrentSize = mCurrentSize - oldValueLen + value->BufferLen();
         } else {
-            DLinkedNodeRef node = std::make_shared<DLinkedNode>(key, value);
-            mCache[key] = node;
-            AddToHead(node); // 将节点插入到链表头部
-            mCurrentSize += value->BufferLen(); // 更新当前资源
+            auto nodePtr = std::make_unique<DLinkedNode>(key, value);
+            DLinkedNode* node = nodePtr.get();
+
+            mCache.emplace(key, std::move(nodePtr));
+            AddToHead(node);
+
+            mCurrentSize += value->BufferLen();
             UpdateCacheStat(value->GetBlockType(), true, value->BufferLen());
         }
         TrimToSize();
@@ -106,11 +125,14 @@ public:
         mLock.Lock();
         auto iter = mCache.find(key);
         if (iter != mCache.end()) {
-            DLinkedNodeRef node = iter->second;
+            std::unique_ptr<DLinkedNode> nodePtr = std::move(iter->second);
+            mCache.erase(iter);
+
+            DLinkedNode* node = nodePtr.get();
             UpdateCacheStat(node->value->GetBlockType(), false, node->value->BufferLen());
-            mCache.erase(key);
             RemoveNode(node);
-            mCurrentSize -= node->value->BufferLen(); // 更新当前资源
+
+            mCurrentSize -= node->value->BufferLen();
             mLock.UnLock();
             return node->value;
         }
@@ -121,12 +143,10 @@ public:
     void Close()
     {
         mLock.Lock();
-        while (!mCache.empty()) {
-            RemoveTail();
-        }
-        mHead->next = nullptr;
-        mTail->prev = nullptr;
-        mCurrentSize = 0;  // 更新当前资源
+        mCache.clear();
+        mHead->next = mTail.get();
+        mTail->prev = mHead.get();
+        mCurrentSize = 0;
         mLock.UnLock();
     }
 
@@ -136,20 +156,25 @@ public:
         uint64_t removeSize = 0;
         do {
             if (mCurrentSize > 0 && !mCache.empty()) {
-                DLinkedNodeRef node = RemoveTail();
+                DLinkedNode* node = RemoveTailNode();
                 if (UNLIKELY(node == nullptr)) {
                     break;
                 }
-                mCache.erase(node->key);
-                mCurrentSize -= node->value->BufferLen();  // 更新当前资源
-                removeSize += node->value->BufferLen();
+
+                auto iter = mCache.find(node->key);
+                if (iter != mCache.end()) {
+                    UpdateCacheStat(iter->second->value->GetBlockType(), false, iter->second->value->BufferLen());
+                    mCurrentSize -= iter->second->value->BufferLen();
+                    removeSize += iter->second->value->BufferLen();
+                    mCache.erase(iter);
+                }
             } else {
                 break;
             }
         } while (removeSize < size);
         if (UNLIKELY(removeSize < size)) {
             LOG_DEBUG("Remove eldest entry not enough, removeSize:" << removeSize << ", expectSize:" << size
-                                                                   << ", currentSize:" << mCurrentSize);
+                << ", currentSize:" << mCurrentSize);
         }
         mLock.UnLock();
     }
@@ -187,40 +212,42 @@ public:
         for (auto it = mLruCachesMetricMap.begin(); it != mLruCachesMetricMap.end(); it++) {
             CONTINUE_LOOP_AS_NULLPTR(it->second);
             it->second->UpdateCacheStat(type, isAdd, size);
-        } 
+        }
     }
-
 private:
-    void AddToHead(DLinkedNodeRef &node)
+    void AddToHead(DLinkedNode* node)
     {
-        node->prev = mHead;
+        node->prev = mHead.get();
         node->next = mHead->next;
         mHead->next->prev = node;
         mHead->next = node;
     }
 
-    void RemoveNode(DLinkedNodeRef &node)
+    void RemoveNode(DLinkedNode* node)
     {
-        if (node == mTail || node == mHead || node == nullptr) {
+        if (node == mTail.get() || node == mHead.get() || node == nullptr) {
             return;
         }
         node->prev->next = node->next;
         node->next->prev = node->prev;
+
+        // 重置指针，防止悬垂
+        node->prev = nullptr;
+        node->next = nullptr;
     }
 
-    void MoveToHead(DLinkedNodeRef &node)
+    void MoveToHead(DLinkedNode* node)
     {
         RemoveNode(node);
         AddToHead(node);
     }
 
-    DLinkedNodeRef RemoveTail()
+    DLinkedNode* RemoveTailNode()
     {
-        DLinkedNodeRef node = mTail->prev;
-        if (node == nullptr || node == mHead) {
+        DLinkedNode* node = mTail->prev;
+        if (node == mHead.get() || node == nullptr) {
             return nullptr;
         }
-        mCache.erase(node->key);
         RemoveNode(node);
         return node;
     }
@@ -228,25 +255,33 @@ private:
     void TrimToSize()
     {
         while ((mCurrentSize > (mCapacity * TRIM_RATIO)) && !mCache.empty()) {
-            DLinkedNodeRef tail = RemoveTail();
-            if (tail == nullptr) {
+            DLinkedNode* node = RemoveTailNode();
+            if (node == nullptr) {
                 return;
             }
-            mCurrentSize -= tail->value->BufferLen();  // 更新当前资源
-            LOG_DEBUG("Trim eldest entry, key:" << tail->key << "valueSize:" << tail->value->BufferLen()
-                                                << ", currentSize:" << mCurrentSize);
+
+            auto iter = mCache.find(node->key);
+            if (iter != mCache.end()) {
+                UpdateCacheStat(iter->second->value->GetBlockType(), false, iter->second->value->BufferLen());
+                mCurrentSize -= iter->second->value->BufferLen();
+                mCache.erase(iter);
+                LOG_DEBUG("Trim eldest entry, key:" << node->key << " valueSize:" << node->value->BufferLen()
+                    << ", currentSize:" << mCurrentSize);
+            }
         }
     }
 
 private:
-    std::unordered_map<uint64_t, DLinkedNodeRef> mCache;
-    DLinkedNodeRef mHead;
-    DLinkedNodeRef mTail;
+    // 哈希表拥有节点的唯一所有权
+    std::unordered_map<uint64_t, std::unique_ptr<DLinkedNode>> mCache;
+
+    std::unique_ptr<DLinkedNode> mHead;
+    std::unique_ptr<DLinkedNode> mTail;
     uint64_t mCapacity;
     uint64_t mCurrentSize;
     SpinLock mLock;
     bool mMetricEnabled = false;
-    std::unordered_map<ConfigRef, BoostNativeMetricPtr> mLruCachesMetricMap; // config作为db的标识
+    std::unordered_map<ConfigRef, BoostNativeMetricPtr> mLruCachesMetricMap;
 };
 
 }  // namespace bss

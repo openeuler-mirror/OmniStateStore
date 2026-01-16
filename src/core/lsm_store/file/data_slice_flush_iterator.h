@@ -76,7 +76,7 @@ private:
 
     ByteBufferRef CreateBuffer(uint32_t size);
 
-    std::vector<DataSliceRef> NextValidDataSliceList();
+    void NextValidDataSliceList(std::vector<DataSliceRef> &dataSliceList);
 
     uint32_t GetKvCount(const std::vector<DataSliceRef> &dataSliceList);
 

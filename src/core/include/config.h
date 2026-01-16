@@ -180,10 +180,10 @@ public:
         return NO_10 * GetFileBaseSize();
     }
 
-    // 获取SliceTable的compaction门槛, 默认值为30.
+    // 获取SliceTable的compaction门槛, 默认值为10.
     inline uint32_t GetInMemoryCompactionThreshold() const
     {
-        return NO_30;
+        return NO_10;
     }
 
     // 获取当前DB的起始Group, 在openDB的时候指定.

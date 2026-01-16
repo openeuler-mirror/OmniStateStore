@@ -389,7 +389,7 @@ TEST_F(TestSlice, test_slice_space_return_ok)
     auto &sliceSpace = mSlice->GetSliceSpace();
     std::vector<KeyValueRef> keyValue;
     for (uint32_t i = 0; i < kvCount; ++i) {
-        auto kv = std::make_shared<KeyValue>();
+        auto kv = MakeRef<KeyValue>();
         sliceSpace.GetKeyValue(i, kv);
         keyValue.emplace_back(kv);
     }

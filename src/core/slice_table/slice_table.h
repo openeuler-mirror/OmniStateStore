@@ -468,6 +468,14 @@ public:
         return mTombstoneService;
     }
 
+    void StopSliceTable()
+    {
+        mIsRunning.store(false);
+    }
+
+    bool IsRunning() {
+        return mIsRunning;
+    }
 private:
     static uint32_t ComputeIndexBucketNum(uint64_t totalMem, const ConfigRef &config);
     static uint32_t ComputeBucketGroupNum(uint32_t bucketNum, const ConfigRef &config);
@@ -531,6 +539,7 @@ private:
     void RegisterTombstoneService();
 
 private:
+    std::atomic<bool> mIsRunning{ true };
     mutable std::mutex mMutex;
     SliceBucketIndexRef mSliceBucketIndex;
     ConfigRef mConfig;

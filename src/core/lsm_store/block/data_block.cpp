@@ -300,9 +300,9 @@ KeyValueIteratorRef DataBlock::SubIterator(const Key &startKey, const Key &endKe
         if (!keyValueInfo.IsSecKeyInRange(0, startKey, endKey)) {
             return nullptr;
         }
-        auto keyValue = std::make_shared<KeyValue>();
+        auto keyValue = MakeRef<KeyValue>();
         RETURN_NULLPTR_AS_READ_BUFFER_ERROR(keyValueInfo.GetKeyAndValue(0, keyValue));
-        keyValues.emplace_back(keyValue);
+        keyValues.emplace_back(std::move(keyValue));
     } else {
         // multi secondary keys.
         // boost search left index and right index.
@@ -317,16 +317,16 @@ KeyValueIteratorRef DataBlock::SubIterator(const Key &startKey, const Key &endKe
         if (reverseOrder) {
             // reverse order, right key first, get key value and put to vector.
             for (int32_t secKeyIndex = rightIndex; secKeyIndex >= leftIndex; --secKeyIndex) {
-                auto keyValue = std::make_shared<KeyValue>();
+                auto keyValue = MakeRef<KeyValue>();
                 RETURN_NULLPTR_AS_READ_BUFFER_ERROR(keyValueInfo.GetKeyAndValue(secKeyIndex, keyValue));
-                keyValues.emplace_back(keyValue);
+                keyValues.emplace_back(std::move(keyValue));
             }
         } else {
             // reverse order, left key first, get key value and put to vector.
             for (int32_t secKeyIndex = leftIndex; secKeyIndex <= rightIndex; ++secKeyIndex) {
-                auto keyValue = std::make_shared<KeyValue>();
+                auto keyValue = MakeRef<KeyValue>();
                 RETURN_NULLPTR_AS_READ_BUFFER_ERROR(keyValueInfo.GetKeyAndValue(secKeyIndex, keyValue));
-                keyValues.emplace_back(keyValue);
+                keyValues.emplace_back(std::move(keyValue));
             }
         }
     }
@@ -349,10 +349,10 @@ KeyValueIteratorRef DataBlock::Iterator(KeyFilter keyFilter)
         uint32_t numSecKey = keyValueInfo.GetSecKeyCount();
 
         for (uint32_t secKeyIndex = 0; secKeyIndex < numSecKey; ++secKeyIndex) {
-            auto keyValue = std::make_shared<KeyValue>();
+            auto keyValue = MakeRef<KeyValue>();
             RETURN_NULLPTR_AS_READ_BUFFER_ERROR(keyValueInfo.GetKeyAndValue(secKeyIndex, keyValue));
             if (keyFilter == nullptr || !keyFilter(keyValue->key)) {
-                keyValues.emplace_back(keyValue);
+                keyValues.emplace_back(std::move(keyValue));
             }
         }
     }

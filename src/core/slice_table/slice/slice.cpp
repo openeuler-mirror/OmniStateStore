@@ -69,12 +69,7 @@ BResult ValueSpace::Put(uint32_t index, FreshValueNodePtr &value, const MemorySe
     }
     auto valType = isKvSeparate ? ValueType::SEPARATE : value->ValueType();
     if (!isValue) {
-        valType = ValueType::APPEND;
-        if (!count) {
-            valType = ValueType::DELETE;
-        } else if (deleteOrPut) {
-            valType = ValueType::PUT;
-        }
+        valType = count ? (deleteOrPut ? ValueType::PUT : ValueType::APPEND) : ValueType::DELETE;
     } else if (count > 1) {
         LOG_ERROR("Value type should not have more than one element");
     }
@@ -120,8 +115,23 @@ BResult Slice::CreateAndInitBuffer(const SliceCreateMeta &meta,
 
     // sort by rotate right HashCode.
     uint32_t rightShiftBits = NO_31 - BssMath::NumberOfLeadingZeros(indexCount);
-    CompareSliceKey comparator(rightShiftBits);
-    std::sort(kvPairs.begin(), kvPairs.end(), comparator);
+    // sort kvPairs
+    std::vector<std::pair<uint32_t, size_t>> sortedPairs;
+    sortedPairs.reserve(kvPairs.size());
+    for (size_t index = 0; index < kvPairs.size(); ++index) {
+        const auto &pair = kvPairs[index];
+        uint32_t rotatedHash = BssMath::RotateRight(pair.first.MixedHashCode(), rightShiftBits);
+        sortedPairs.emplace_back(rotatedHash, index);
+    }
+    std::sort(sortedPairs.begin(), sortedPairs.end(), [](const auto &a, const auto &b) {
+        return a.first < b.first;
+    });
+    std::vector<std::pair<SliceKey, Value>> newKvPairs;
+    newKvPairs.reserve(kvPairs.size());
+    for (const auto &pair : sortedPairs) {
+        newKvPairs.emplace_back(std::move(kvPairs[pair.second].first), std::move(kvPairs[pair.second].second));
+    }
+    kvPairs = std::move(newKvPairs);
 
     // calculate buffer size
     uint32_t totalKeySize = 0;
@@ -136,7 +146,7 @@ BResult Slice::CreateAndInitBuffer(const SliceCreateMeta &meta,
         auto stateType = StateId::GetStateType(key.StateId());
 #if SUPPORT_SLICE_SORT
         if (StateTypeUtil::HasSecKey(stateType)) {
-            sortedKeySlotList.push_back(std::pair<SliceKey, uint32_t>(key, slot));
+            sortedKeySlotList.emplace_back(key, slot);
         }
 #endif
         stateIdInterval.Update(key.StateId());
@@ -257,8 +267,14 @@ BResult Slice::CreateAndInitBuffer(const SliceCreateMeta &meta, RawDataSlice &ra
 
     // sort by rotate right HashCode.
     uint32_t rightShiftBits = NO_31 - BssMath::NumberOfLeadingZeros(indexCount);
-    CompareHashCode<uint32_t> comparator(mixHashCodeVec, rightShiftBits);
-    std::sort(indexVec.begin(), indexVec.end(), comparator);
+    std::vector<uint32_t> rotatedHashes;
+    rotatedHashes.reserve(indexVec.size());
+    for (uint32_t index : indexVec) {
+        rotatedHashes.emplace_back(BssMath::RotateRight(mixHashCodeVec[index], rightShiftBits));
+    }
+    std::sort(indexVec.begin(), indexVec.end(), [&](uint32_t a, uint32_t b) {
+        return rotatedHashes[a] < rotatedHashes[b];
+    });
 
     // calculate buffer size
     uint32_t totalKeySize = 0;
@@ -359,29 +375,6 @@ void Slice::FormatHeader(SliceHead *header, const SliceCreateMeta &meta, uint32_
     header->stateIdInterval = stateIdInterval;
 }
 
-bool Slice::SortedKeySlotListCompare(const std::pair<SliceKey, uint32_t> &first,
-                                     const std::pair<SliceKey, uint32_t> &second)
-{
-    auto key1 = first.first;
-    auto key2 = second.first;
-    auto comp = key1.PriKey().CompareStateIdFirst(key2.PriKey());
-    if (comp != 0) {
-        return comp < 0;
-    }
-    // compare second key
-    if (UNLIKELY(key1.HasSecKey() != key2.HasSecKey())) {
-        return key1.HasSecKey();
-    }
-
-    return key1.SecKey().CompareKeyNode(key2.SecKey()) < 0;
-}
-
-bool Slice::SortedKeySlotListCompareV2(const std::pair<BinaryKey, uint32_t> &first,
-                                       const std::pair<BinaryKey, uint32_t> &second)
-{
-    return first.first.ComparePrimaryKeyAndSecondKey(second.first) < 0;
-}
-
 BResult Slice::FillBuffer(const std::vector<std::pair<SliceKey, Value>> &kvPairs,
                           std::vector<std::pair<SliceKey, uint32_t>> &sortedKeySlotList)
 {
@@ -393,7 +386,10 @@ BResult Slice::FillBuffer(const std::vector<std::pair<SliceKey, Value>> &kvPairs
 
     // sort by primary and secondary key.
     if (!sortedKeySlotList.empty()) {
-        std::sort(sortedKeySlotList.begin(), sortedKeySlotList.end(), SortedKeySlotListCompare);
+        std::sort(sortedKeySlotList.begin(), sortedKeySlotList.end(),
+            [](const std::pair<SliceKey, uint32_t>& first, const std::pair<SliceKey, uint32_t>& second) {
+                return first.first.ComparePrimaryKeyAndSecondKey(second.first);
+        });
         // put sorted key index.
         uint32_t slot = 0;
         for (const auto &sortedKeySlot : sortedKeySlotList) {
@@ -401,30 +397,6 @@ BResult Slice::FillBuffer(const std::vector<std::pair<SliceKey, Value>> &kvPairs
         }
     }
 
-    return BSS_OK;
-}
-
-BResult Slice::PutKv(uint32_t curIndex, const std::pair<SliceKey, Value> &kv)
-{
-    SliceKey key = kv.first;
-    Value value = kv.second;
-
-    // update index;
-    uint32_t mixHashCode = key.MixedHashCode();
-    uint32_t indexId = mixHashCode & (mHeader->indexCount - 1);
-    mIndexSpace->Put(indexId, curIndex);
-
-    // hash code
-    mHashCodeSpace->Put(curIndex, mixHashCode);
-
-    // seqId;
-    mSeqIdSpace->Put(curIndex, value.SeqId());
-
-    // key
-    RETURN_NOT_OK(mKeySpace->Put(curIndex, key));
-
-    // value
-    RETURN_NOT_OK(mValueSpace->Put(curIndex, value));
     return BSS_OK;
 }
 
@@ -515,7 +487,10 @@ BResult Slice::FillBuffer(RawDataSlice &rawDataSlice, std::vector<std::pair<Bina
     }
     // sort by primary and secondary key.
     if (!sortedKeySlotList.empty()) {
-        std::sort(sortedKeySlotList.begin(), sortedKeySlotList.end(), SortedKeySlotListCompareV2);
+        std::sort(sortedKeySlotList.begin(), sortedKeySlotList.end(),
+            [](const std::pair<BinaryKey, uint32_t> &first, const std::pair<BinaryKey, uint32_t> &second) {
+                return first.first.ComparePrimaryKeyAndSecondKey(second.first) < 0;
+        });
         // put sorted key index.
 #if defined(__aarch64__)
 #ifdef BUILD_SVE
@@ -603,10 +578,10 @@ KeyValueIteratorRef Slice::SubIterator(const Key &prefixKey, bool skipDeleted)
 
     std::vector<KeyValueRef> keyValues;
     for (uint32_t slot = startSlot; slot <= endSlot; ++slot) {
-        auto keyValue = std::make_shared<KeyValue>();
+        auto keyValue = MakeRef<KeyValue>();
         mSliceSpace.GetKeyValue(mSliceSpace.GetIndexBySortIndex(slot), keyValue);
         if (!skipDeleted || keyValue->value.ValueType() != DELETE) {
-            keyValues.emplace_back(keyValue);
+            keyValues.emplace_back(std::move(keyValue));
         }
     }
     return std::make_shared<KeyValueVectorIterator>(std::move(keyValues));
@@ -726,12 +701,10 @@ uint32_t Slice::FindStartSortedIndexSlot(const Key &startKey)
     uint32_t low = 0;
     uint32_t high = mHeader->sortedKeyCount - 1;
 
-    Key key;
     auto &startPriKey = startKey.PriKey();
     while (low <= high) {
         uint32_t mid = low + ((high - low) >> NO_1);
-        mSliceSpace.GetKeyBySortedIndex(mid, key);
-        int32_t cmp = key.PriKey().CompareStateIdFirst(startPriKey);
+        int32_t cmp = mSliceSpace.FindPriKeyBySortedIndex(mid, startPriKey);
         if (cmp < 0) {
             low = mid + 1;
             continue;
@@ -754,12 +727,10 @@ uint32_t Slice::FindEndSortedIndexSlot(const Key &endKey)
     uint32_t low = 0;
     uint32_t high = sortedKeyCount - 1;
 
-    Key key;
     auto &endPriKey = endKey.PriKey();
     while (low <= high) {
         uint32_t mid = low + ((high - low) >> NO_1);
-        mSliceSpace.GetKeyBySortedIndex(mid, key);
-        int32_t cmp = key.PriKey().CompareStateIdFirst(endPriKey);
+        int32_t cmp = mSliceSpace.FindPriKeyBySortedIndex(mid, endPriKey);
         if (cmp > 0) {
             if (mid == 0) {
                 break;

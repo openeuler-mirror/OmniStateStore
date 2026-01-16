@@ -392,12 +392,6 @@ public:
     }
 
 private:
-    static bool SortedKeySlotListCompare(const std::pair<SliceKey, uint32_t> &first,
-                                         const std::pair<SliceKey, uint32_t> &second);
-
-    static bool SortedKeySlotListCompareV2(const std::pair<BinaryKey, uint32_t> &first,
-                                           const std::pair<BinaryKey, uint32_t> &second);
-
     BResult CreateAndInitBuffer(const SliceCreateMeta &meta,
                                 std::vector<std::pair<SliceKey, Value>> &kvPairs,
                                 std::vector<std::pair<SliceKey, uint32_t>> &sortedKeySlotList,
@@ -406,7 +400,29 @@ private:
     BResult FillBuffer(const std::vector<std::pair<SliceKey, Value>> &kvPairs,
                        std::vector<std::pair<SliceKey, uint32_t>> &sortedKeySlotList);
 
-    BResult PutKv(uint32_t curIndex, const std::pair<SliceKey, Value> &kv);
+    inline BResult PutKv(uint32_t curIndex, const std::pair<SliceKey, Value> &kv)
+    {
+        auto &key = kv.first;
+        auto &value = kv.second;
+
+        // update index;
+        uint32_t mixHashCode = key.MixedHashCode();
+        uint32_t indexId = mixHashCode & (mHeader->indexCount - 1);
+        mIndexSpace->Put(indexId, curIndex);
+
+        // hash code
+        mHashCodeSpace->Put(curIndex, mixHashCode);
+
+        // seqId;
+        mSeqIdSpace->Put(curIndex, value.SeqId());
+
+        // key
+        RETURN_NOT_OK(mKeySpace->Put(curIndex, key));
+
+        // value
+        RETURN_NOT_OK(mValueSpace->Put(curIndex, value));
+        return BSS_OK;
+    }
 
     static void FormatHeader(SliceHead *header, const SliceCreateMeta &meta, uint32_t keyCount, uint32_t indexCount,
                              uint32_t sortedKeyCount, uint32_t keyOffsetBase, uint32_t valueOffsetBase,

@@ -293,7 +293,7 @@ TEST_F(TestLsmStoreBrCov, Table_WriteValueWithNumberOfBytes_ShouldReturnInvalidP
  */
 TEST_F(TestLsmStoreBrCov, Table_ToInternalKey_ShouldReturnNull_WhenMemoryAllocationFails)
 {
-    KeyValueRef keyValue = std::make_shared<KeyValue>();
+    KeyValueRef keyValue = MakeRef<KeyValue>();
     mMemManager->mMemoryLimit = 1;
     FullKeyRef result = FullKeyUtil::ToFullKey(keyValue, mMemManager, FileProcHolder::FILE_STORE_FLUSH);
     EXPECT_EQ(result, nullptr);

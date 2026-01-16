@@ -23,7 +23,7 @@ struct PriKey {
     uint32_t mKeyDataLength;
     uint8_t *mKeyData;
     bool mWithNamespace = false;
-    inline void Parse(FreshKeyNodePtr &key)
+    inline void Parse(const FreshKeyNodePtr &key)
     {
         RETURN_AS_NULLPTR(key);
         mHashCode = key->PriKeyHashCode();  // keyHashcode ^ nsHashcode
@@ -33,7 +33,7 @@ struct PriKey {
         mWithNamespace = StateId::HasNameSpace(mStateId);
     }
 
-    int32_t CompareData(PriKey &other)
+    inline int32_t CompareData(const PriKey &other) const
     {
         uint32_t minLen = std::min(mKeyDataLength, other.mKeyDataLength);
         int32_t cmp = memcmp(mKeyData, other.mKeyData, minLen);
@@ -67,7 +67,7 @@ struct SecKey {
     uint32_t mKeyDataLength;
     uint8_t *mKeyData;
 
-    inline void Parse(FreshKeyNodePtr &key)
+    inline void Parse(FreshKeyNodePtr key)
     {
         RETURN_AS_NULLPTR(key);
         mHashCode = key->SecKeyHashCode();
@@ -75,7 +75,7 @@ struct SecKey {
         mKeyDataLength = key->SecKeyDataLen();
     }
 
-    int32_t CompareData(SecKey &other)
+    inline int32_t CompareData(const SecKey &other) const
     {
         uint32_t minLen = std::min(mKeyDataLength, other.mKeyDataLength);
         int32_t cmp = memcmp(mKeyData, other.mKeyData, minLen);
@@ -110,7 +110,7 @@ struct BinaryKey {
     bool mIsValue;
     PriKey mPrimaryKey;
     SecKey mSecondKey;
-    inline void Parse(PriKey primaryKey, SecKey secondKey)
+    inline void Parse(const PriKey &primaryKey, const SecKey &secondKey)
     {
         Parse(primaryKey, true);
         mSecondKey = secondKey;
@@ -118,7 +118,7 @@ struct BinaryKey {
         mMixedHashCode = mPrimaryKey.mHashCode ^ mSecondKey.mHashCode ^ mPrimaryKey.mStateId;
     }
 
-    inline void Parse(PriKey primaryKey, bool isValue)
+    inline void Parse(const PriKey &primaryKey, bool isValue)
     {
         hasSecondKey = false;
         mIsValue = isValue;
@@ -131,7 +131,7 @@ struct BinaryKey {
         }
     }
 
-    inline uint32_t Serialize(ByteBufferRef buffer, uint32_t offset) const
+    inline uint32_t Serialize(const ByteBufferRef &buffer, uint32_t offset) const
     {
         buffer->WriteUint16(mPrimaryKey.mStateId, offset);
         if (!hasSecondKey) {

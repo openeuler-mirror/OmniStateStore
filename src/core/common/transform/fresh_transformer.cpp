@@ -47,7 +47,7 @@ BResult FreshHandler::DivideFreshData(
     RETURN_ALLOC_FAIL_AS_NULLPTR(iterator);
     std::vector<std::pair<BinaryKey, FreshValueNodePtr>> collection;
     while (iterator->HasNext()) {
-        auto kvPair = iterator->Next();
+        const auto &kvPair = iterator->Next();
         collection.clear();
         BResult result = DoTrans(kvPair.first, kvPair.second, collection, segment);
         if (UNLIKELY(result != BSS_OK)) {
@@ -58,17 +58,20 @@ BResult FreshHandler::DivideFreshData(
             SliceIndexContextRef context =
                 mSliceTable->GetSliceBucketIndex()->GetSliceIndexContext(pair.first.mKeyHashCode, true);
             RETURN_NOT_OK_AS_FALSE(UNLIKELY(context == nullptr), BSS_ERR);
-            std::shared_ptr<RawDataSlice> rawDataSlice;
             auto finder = organizedData.find(context);
             if (finder != organizedData.end()) {
-                rawDataSlice = finder->second;
+                const auto &rawDataSlice = finder->second;
+                rawDataSlice->AddBinaryData(pair);
+                rawDataSlice->PutMixHashCode(pair.first.mMixedHashCode);
+                rawDataSlice->PutIndexVec();
             } else {
-                rawDataSlice = std::make_shared<RawDataSlice>(binaryData->GetMemorySegment(), segment->GetVersion());
-                organizedData.emplace(context, rawDataSlice);
+                std::shared_ptr<RawDataSlice> rawDataSlice
+                    = std::make_shared<RawDataSlice>(binaryData->GetMemorySegment(), segment->GetVersion());
+                rawDataSlice->AddBinaryData(pair);
+                rawDataSlice->PutMixHashCode(pair.first.mMixedHashCode);
+                rawDataSlice->PutIndexVec();
+                organizedData.emplace(context, std::move(rawDataSlice));
             }
-            rawDataSlice->AddBinaryData(pair);
-            rawDataSlice->PutMixHashCode(pair.first.mMixedHashCode);
-            rawDataSlice->PutIndexVec();
         }
     }
     return BSS_OK;
@@ -84,30 +87,28 @@ BResult FreshHandler::DoTrans(FreshKeyNodePtr key, FreshValueNodePtr value,
     primaryKey.Parse(key);
     uint16_t stateId = primaryKey.mStateId;
     StateType stateType = StateId::GetStateType(stateId);
-
     if (!StateTypeUtil::HasSecKey(stateType)) {
         BinaryKey binaryKey;
         binaryKey.Parse(primaryKey, stateType == VALUE);
-        collection.emplace_back(std::move(binaryKey), value);
+        collection.emplace_back(binaryKey, value);
         LOG_TRACE(binaryKey.ToString() << value->ToString());
         return BSS_OK;
     }
     BoostHashMapRef hashMap = MakeRef<BoostHashMap>();
     RETURN_ERROR_AS_NULLPTR(hashMap);
-    auto memorySegment = segment->GetMemorySegment();
+    const auto &memorySegment = segment->GetMemorySegment();
     RETURN_ERROR_AS_NULLPTR(memorySegment);
-
     uint32_t offset = value->MapData() - memorySegment->GetSegment();
     hashMap->Init(memorySegment, offset, false);
     auto iterator = hashMap->KVIterator();
     RETURN_ERROR_AS_NULLPTR(iterator);
     while (iterator->HasNext()) {
-        auto entry = iterator->Next();
+        const auto &entry = iterator->Next();
         SecKey secondKey;
         secondKey.Parse(entry.first);
         BinaryKey binaryKey;
         binaryKey.Parse(primaryKey, secondKey);
-        collection.emplace_back(std::move(binaryKey), entry.second);
+        collection.emplace_back(binaryKey, entry.second);
         LOG_TRACE(binaryKey.ToString() << entry.second->ToString());
     }
     return BSS_OK;
@@ -130,6 +131,9 @@ BResult FreshHandler::WriteDataToSlice(
         do {
             // 将fresh数据写入SliceTable
             ret = mSliceTable->AddSlice(bucketIndexContext, *iter.second, addSize, forceEvict);
+            if (UNLIKELY(!mSliceTable->IsRunning())) {
+                return BSS_OK;
+            }
             if (ret == BSS_OK && forceEvict) {
                 // 避免list合并, 基于当前DB, 以4M的文件粒度淘汰整个DB数据
                 mSliceTable->TryCurrentDBEvict(addSize, true, true, IO_SIZE_4M);

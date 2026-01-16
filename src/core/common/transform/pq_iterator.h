@@ -56,7 +56,7 @@ private:
 
     inline KeyValueRef Trans(const PQBinaryData &key)
     {
-        KeyValueRef kv = std::make_shared<KeyValue>();
+        KeyValueRef kv = MakeRef<KeyValue>();
         uint16_t stateId = StateId::Of(mStateId, PQ);
         kv->key = QueryKey(stateId, key.mHashCode, key.mData);
         kv->value.Init(key.mValueType, 0, nullptr, mSeqId);

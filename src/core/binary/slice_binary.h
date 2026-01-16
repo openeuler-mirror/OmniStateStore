@@ -68,6 +68,20 @@ public:
         mBuffer = buffer;
     }
 
+    inline bool ComparePrimaryKeyAndSecondKey(const SliceKey &k2) const
+    {
+        auto comp = mPriKey.CompareStateIdFirst(k2.mPriKey);
+        if (comp != 0) {
+            return comp < 0;
+        }
+        // compare second key
+        if (UNLIKELY(mHasSecKey != k2.mHasSecKey)) {
+            return mHasSecKey;
+        }
+
+        return mSecKey.CompareKeyNode(k2.mSecKey) < 0;
+    }
+
     inline uint32_t GetSerializeLength() const
     {
         return mHasSecKey ? NO_10 + mPriKey.KeyLen() + mSecKey.KeyLen() : NO_2 + mPriKey.KeyLen();
@@ -387,6 +401,48 @@ public:
         SliceKey::Of(key).Unpack(mBuffer, mKeyBase + startOffset, endOffset - startOffset, mixedHashCode);
     }
 
+    inline int32_t FindPriKey(uint32_t index, uint32_t mixedHashCode, const PriKeyNode &key) const
+    {
+        uint32_t startOffset = (index == 0) ? 0 : mKeyOffset[index - 1];
+        uint32_t endOffset = mKeyOffset[index];
+        return ComparePriKeyStateIdFirst(mBuffer, mKeyBase + startOffset, endOffset - startOffset, mixedHashCode, key);
+    }
+
+    inline int32_t ComparePriKeyStateIdFirst(const ByteBufferRef &buffer, uint32_t bufferOffset, uint32_t bufferLen,
+        uint32_t mixedHashCode, const PriKeyNode &key) const
+    {
+        const uint8_t *data = buffer->Data() + bufferOffset;
+        uint16_t stateId = *reinterpret_cast<const uint16_t *>(data);
+        int32_t cmp = BssMath::IntegerCompare(stateId, key.StateId());
+        if (cmp != 0) {
+            return cmp;
+        }
+
+        uint32_t priKeyLen;
+        const uint8_t *priKeyData;
+        uint32_t priKeyHashCode;
+        if (StateId::HasSecKey(stateId)) {
+            auto priKey = reinterpret_cast<const SlicePriKey*>(data);
+            priKeyLen = priKey->mKeyLen;
+            priKeyData = priKey->mKeyData;
+            priKeyHashCode = priKey->mKeyHashCode;
+        } else {
+            priKeyLen = bufferLen - sizeof(uint16_t);
+            priKeyData = data + sizeof(uint16_t);
+            priKeyHashCode = mixedHashCode ^ stateId;
+        }
+        cmp = BssMath::IntegerCompare(priKeyHashCode, key.KeyHashCode());
+        if (cmp != 0) {
+            return cmp;
+        }
+
+        cmp = memcmp(priKeyData, key.KeyData(), std::min(priKeyLen, key.KeyLen()));
+        if (cmp != 0) {
+            return cmp;
+        }
+        return BssMath::IntegerCompare(priKeyLen, key.KeyLen());
+    }
+
     inline void Put(uint32_t index, const Key &key)
     {
         uint32_t preOffset = index == 0 ? 0 : mKeyOffset[index - 1];
@@ -519,9 +575,20 @@ public:
         mKeySpace.Get(index, mixedHashCode, key);
     }
 
+    inline int32_t FindPriKey(uint32_t index, const PriKeyNode &key) const
+    {
+        uint32_t mixedHashCode = GetKeyMixedHashCode(index);
+        return mKeySpace.FindPriKey(index, mixedHashCode, key);
+    }
+
     inline void GetKeyBySortedIndex(uint32_t sortedIndex, Key &key) const
     {
         GetKey(mHeadSpace.GetIndexBySortedIndex(sortedIndex), key);
+    }
+
+    inline int32_t FindPriKeyBySortedIndex(uint32_t sortedIndex, const PriKeyNode &key) const
+    {
+        return FindPriKey(mHeadSpace.GetIndexBySortedIndex(sortedIndex), key);
     }
 
     inline void GetValue(uint32_t index, Value &value) const
