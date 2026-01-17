@@ -62,6 +62,17 @@
                 <flink.build.source.dir>flink-${flink.version}/</flink.build.source.dir>
             </properties>
         </profile>
+                <profile>
+            <id>flink-1.20.0</id>
+            <activation>
+                <activeByDefault>false</activeByDefault>
+            </activation>
+            <properties>
+                <flink.version>1.20.0</flink.version>
+                <flink.jar.name>1.20.0</flink.jar.name>
+                <flink.build.source.dir>flink-${flink.version}/</flink.build.source.dir>
+            </properties>
+        </profile>
     </profiles>
 
     <modules>
