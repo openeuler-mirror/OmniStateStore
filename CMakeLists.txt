@@ -158,6 +158,8 @@ add_custom_target(build_all
         COMMAND make build_bss_install_java_version_1.17.1
         COMMAND make build_bss_java_version_1.16.1
         COMMAND make build_bss_install_java_version_1.16.1
+        COMMAND make build_bss_java_version_1.20.0
+        COMMAND make build_bss_install_java_version_1.20.0
 
         WORKING_DIRECTORY ${PROJECT_TOP_BUILD_DIR}
 )
