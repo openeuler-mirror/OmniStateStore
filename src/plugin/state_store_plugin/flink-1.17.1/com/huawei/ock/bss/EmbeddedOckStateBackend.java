@@ -21,7 +21,6 @@ import com.huawei.ock.bss.ockdb.NativeLibraryLoader;
 import com.huawei.ock.bss.ockdb.OckDBLog;
 import com.huawei.ock.bss.resource.HeapMonitor;
 import com.huawei.ock.bss.resource.ResourceContainer;
-import com.huawei.ock.bss.snapshot.SavepointConfiguration;
 import com.huawei.ock.bss.util.CleanupManager;
 import com.huawei.ock.bss.util.LogSanitizer;
 
@@ -482,8 +481,7 @@ public class EmbeddedOckStateBackend extends AbstractManagedMemoryStateBackend i
             keyGroupRange, userCodeClassLoader, instanceBasePath, localRecoveryConfig, kvStateRegistry, identifier,
             executionConfig, keySerializer, ttlTimeProvider, latencyTrackingStateConfig, cancelStreamRegistry,
             keyGroupCompressionDecorator, stateHandles, checkedpriorityQueueStateType.asyncSnapshot,
-            ResourceContainer.INSTANCE,
-            SavepointConfiguration.build("", ""), checkedpriorityQueueStateType, this.config)
+            ResourceContainer.INSTANCE, checkedpriorityQueueStateType, this.config)
             .setEnableIncrementalCheckpointing(isIncrementalCheckpointsEnabled())
             .setNumberOfTransferringThreads(getNumberOfTransferThreads())
             .setTaskSlotFlag(slotFlag)
