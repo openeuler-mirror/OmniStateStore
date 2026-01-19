@@ -17,7 +17,6 @@ import com.huawei.ock.bss.common.exception.BSSRuntimeException;
 import com.huawei.ock.bss.resource.ResourceContainer;
 import com.huawei.ock.bss.snapshot.BoostSnapshotStrategyBase;
 import com.huawei.ock.bss.snapshot.FullBoostSnapshotResources;
-import com.huawei.ock.bss.snapshot.SavepointConfiguration;
 import com.huawei.ock.bss.snapshot.SavepointDBResult;
 import com.huawei.ock.bss.state.internal.KeyedListState;
 import com.huawei.ock.bss.state.internal.KeyedListStateImpl;
@@ -170,8 +169,6 @@ public class OckDBKeyedStateBackend<K> extends AbstractKeyedStateBackend<K> {
 
     private final LocalRecoveryConfig localRecoveryConfig;
 
-    private final SavepointConfiguration savepointConfiguration;
-
     private final ResourceGuard resourceGuard;
 
     private final ResourceContainer resourceContainer;
@@ -203,8 +200,7 @@ public class OckDBKeyedStateBackend<K> extends AbstractKeyedStateBackend<K> {
         TtlTimeProvider ttlTimeProvider, LatencyTrackingStateConfig latencyTrackingStateConfig,
         CloseableRegistry cancelStreamRegistryForBackend, StreamCompressionDecorator keyGroupCompressionDecorator,
         InternalKeyContext<K> keyContext, PriorityQueueSetFactory priorityQueueSetFactory,
-        ResourceContainer resourceContainer, SavepointConfiguration savepointConfiguration,
-        HeapPriorityQueuesManager heapPriorityQueuesManager,
+        ResourceContainer resourceContainer, HeapPriorityQueuesManager heapPriorityQueuesManager,
         BoostSnapshotStrategyBase<K> checkpointSnapshotStrategy) {
         super(kvStateRegistry, keySerializer, userCodeClassLoader, executionConfig, ttlTimeProvider,
             latencyTrackingStateConfig, cancelStreamRegistryForBackend, keyGroupCompressionDecorator, keyContext);
@@ -221,7 +217,6 @@ public class OckDBKeyedStateBackend<K> extends AbstractKeyedStateBackend<K> {
         this.heapPriorityQueuesManager = heapPriorityQueuesManager;
         this.priorityQueueIsAsyncSnapshot = priorityQueueIsAsyncSnapshot;
         this.resourceContainer = resourceContainer;
-        this.savepointConfiguration = savepointConfiguration;
         this.resourceGuard = new ResourceGuard();
         this.checkpointSnapshotStrategy = checkpointSnapshotStrategy;
         this.configuration = config;

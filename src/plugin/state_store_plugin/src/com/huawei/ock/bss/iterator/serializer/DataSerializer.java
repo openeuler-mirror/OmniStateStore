@@ -9,7 +9,7 @@
  * See the Mulan PSL v2 for more details.
  */
 
-package com.huawei.ock.bss.iterator.struct.serializer;
+package com.huawei.ock.bss.iterator.serializer;
 
 import org.apache.flink.api.common.typeutils.TypeSerializer;
 import org.apache.flink.api.common.typeutils.TypeSerializerSnapshot;

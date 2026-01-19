@@ -54,9 +54,8 @@ public class SavepointDBResult {
      * iterator
      *
      * @return CloseableIterator<BinaryKeyValueItem>
-     * @throws Exception Exception
      */
-    public CloseableIterator<BinaryKeyValueItem> iterator() throws Exception {
+    public CloseableIterator<BinaryKeyValueItem> iterator() {
         return new CloseableIterator<BinaryKeyValueItem>() {
             private int closeNum = 0;
 
@@ -100,7 +99,7 @@ public class SavepointDBResult {
      * close
      */
     public void close() {
-        LOG.info("Closing SavepointDBResult after + {}", (System.currentTimeMillis() - startTime));
+        LOG.info("Closing SavepointDBResult after {}", (System.currentTimeMillis() - startTime));
     }
 
     private native boolean hasNext(long snapshotId);

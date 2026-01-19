@@ -9,114 +9,49 @@
  * See the Mulan PSL v2 for more details.
  */
 
-package com.huawei.ock.bss.iterator.struct;
+package com.huawei.ock.bss.iterator.serializer;
 
 import com.huawei.ock.bss.common.BinaryKeyValueItem;
 import com.huawei.ock.bss.common.BoostStateType;
 import com.huawei.ock.bss.common.exception.BSSRuntimeException;
-import com.huawei.ock.bss.iterator.CloseableIterator;
-import com.huawei.ock.bss.iterator.struct.serializer.BinaryDataBuilder;
+import com.huawei.ock.bss.iterator.BoostSortedKeyValueIterator;
 import com.huawei.ock.bss.snapshot.FullBoostSnapshotResources;
-import com.huawei.ock.bss.snapshot.SavepointConfiguration;
-import com.huawei.ock.bss.snapshot.SavepointDBResult;
 
 import org.apache.flink.api.common.typeutils.TypeSerializer;
 import org.apache.flink.api.common.typeutils.base.ListSerializer;
 import org.apache.flink.api.common.typeutils.base.MapSerializer;
-import org.apache.flink.core.fs.Path;
-import org.apache.flink.runtime.state.CompositeKeySerializationUtils;
-import org.apache.flink.runtime.state.KeyGroupRange;
 import org.apache.flink.runtime.state.RegisteredKeyValueStateBackendMetaInfo;
 import org.apache.flink.runtime.state.RegisteredPriorityQueueStateBackendMetaInfo;
 import org.apache.flink.runtime.state.RegisteredStateMetaInfoBase;
 import org.apache.flink.runtime.state.StateSnapshotTransformer;
 import org.apache.flink.util.Preconditions;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.util.Iterator;
 import java.util.Map;
 
 import javax.annotation.Nullable;
 
-/**
- * KVDataSorterBuilder
- *
- * @param <K> key
- * @since BeiMing 25.0.T1
- */
-public class KVDataSorterBuilder<K> {
-    private static final Logger LOG = LoggerFactory.getLogger(KVDataSorterBuilder.class);
-
-    private final KeyGroupRange keyGroupRange;
-
-    private final SavepointConfiguration savepointConfiguration;
-
-    private final SavepointDBResult savepointDBResult;
+public class KeyValueBuilder<K> {
+    private final Map<String, FullBoostSnapshotResources.KvMetaData> kvStateMetaDataMap;
 
     private final BinaryDataBuilder<K> binaryDataBuilder;
 
-    private final Map<String, FullBoostSnapshotResources.KvMetaData> kvStateMetaDataMap;
-
-    private final int keyGroupPrefixBytes;
-
-    public KVDataSorterBuilder(int totalKeyGroups, KeyGroupRange keyGroupRange, TypeSerializer<K> keySerializer,
-        SavepointConfiguration savepointConfiguration,
-        Map<String, FullBoostSnapshotResources.KvMetaData> kvStateMetaDataMap, SavepointDBResult savepointDBResult) {
-        this.savepointConfiguration = savepointConfiguration;
-        this.keyGroupRange = keyGroupRange;
+    public KeyValueBuilder(int totalKeyGroups, TypeSerializer<K> keySerializer,
+        Map<String, FullBoostSnapshotResources.KvMetaData> kvStateMetaDataMap) {
         this.kvStateMetaDataMap = kvStateMetaDataMap;
-        this.savepointDBResult = savepointDBResult;
         this.binaryDataBuilder = new BinaryDataBuilder<>(keySerializer, totalKeyGroups);
-        this.keyGroupPrefixBytes = CompositeKeySerializationUtils.computeRequiredBytesInKeyGroupPrefix(totalKeyGroups);
-    }
-
-    /**
-     * build
-     *
-     * @return KVDataSorter
-     * @throws Exception Exception
-     */
-    public KVDataSorter build() throws Exception {
-        try (CloseableIterator<BinaryKeyValueItem> binaryIterator = this.savepointDBResult.iterator()) {
-            Path basePath = SortUtils.buildSavepointTemporaryPath(
-                SavepointConfiguration.decideExternalSortTemporaryPath(this.savepointConfiguration),
-                this.savepointDBResult.getSnapshotId());
-            LOG.info("Savepoint {} uses temporary path {}", this.savepointDBResult.getSnapshotId(), basePath.getName());
-
-            KVDataSorter keyGroupDataSorter = new KVDataSorter(this.keyGroupRange, basePath,
-                this.savepointConfiguration.getExternalSortMaxOutputStream(),
-                this.savepointConfiguration.getExternalSortFileSize(),
-                this.savepointConfiguration.getExternalSortBlockSize(),
-                this.savepointConfiguration.isExternalSortCompressionEnabled(),
-                this.savepointConfiguration.isExternalSortChecksumEnabled());
-
-            try {
-                KeyValueItemIteratorAdapter itemIteratorAdapter = new KeyValueItemIteratorAdapter(binaryIterator);
-                keyGroupDataSorter.init(itemIteratorAdapter);
-            } catch (Exception e) {
-                LOG.error("Failed to build data sorter for savepoint {}", this.savepointDBResult.getSnapshotId(), e);
-                keyGroupDataSorter.close();
-                throw new BSSRuntimeException(
-                    "Failed to build data sorter for savepoint " + this.savepointDBResult.getSnapshotId(), e);
-            }
-            LOG.info("Successful to build data sorter for savepoint {}", this.savepointDBResult.getSnapshotId());
-            return keyGroupDataSorter;
-        }
     }
 
     /**
      * buildKeyValueItem
      *
      * @param binaryKeyValueItem BinaryKeyValueItem
-     * @param reuseKeyValueItem  SingleKeyGroupKVState.KeyValueItem
-     * @return SingleKeyGroupKVState.KeyValueItem
+     * @return BoostSortedKeyValueIterator.KeyValueItem
      * @throws IOException IOException
      */
     @Nullable
-    private SingleKeyGroupKVState.KeyValueItem buildKeyValueItem(BinaryKeyValueItem binaryKeyValueItem,
-        @Nullable SingleKeyGroupKVState.KeyValueItem reuseKeyValueItem) throws IOException {
+    public BoostSortedKeyValueIterator.KeyValueItem buildKeyValueItem(BinaryKeyValueItem binaryKeyValueItem)
+        throws IOException {
         if (binaryKeyValueItem == null) {
             throw new BSSRuntimeException("binaryKeyValueItem is null.");
         }
@@ -143,12 +78,8 @@ public class KVDataSorterBuilder<K> {
         byte[] key = buildKey(binaryKeyValueItem, stateType, metaInfo);
         binaryValue = buildValue(binaryValue, stateType, metaInfo);
 
-        SingleKeyGroupKVState.KeyValueItem keyValueItem =
-            (reuseKeyValueItem == null) ? new SingleKeyGroupKVState.KeyValueItem() : reuseKeyValueItem;
-
-        keyValueItem.reset(binaryKeyValueItem.getKeyGroup(), kvMetaData.stateId, key, binaryValue);
-
-        return keyValueItem;
+        return new BoostSortedKeyValueIterator.KeyValueItem(binaryKeyValueItem.getKeyGroup(), kvMetaData.stateId, key,
+            binaryValue);
     }
 
     private byte[] buildKey(BinaryKeyValueItem binaryKeyValueItem, BoostStateType stateType,
@@ -215,48 +146,5 @@ public class KVDataSorterBuilder<K> {
     @SuppressWarnings({"unchecked", "rawtypes"})
     private TypeSerializer<Object> getElementSerializer(RegisteredKeyValueStateBackendMetaInfo<?, ?> metaInfo) {
         return ((ListSerializer) metaInfo.getStateSerializer()).getElementSerializer();
-    }
-
-    class KeyValueItemIteratorAdapter implements Iterator<SingleKeyGroupKVState.KeyValueItem> {
-        private final CloseableIterator<BinaryKeyValueItem> binaryItemIterator;
-
-        private SingleKeyGroupKVState.KeyValueItem currentItem;
-
-        public KeyValueItemIteratorAdapter(CloseableIterator<BinaryKeyValueItem> binaryItemIterator) {
-            this.binaryItemIterator = binaryItemIterator;
-            this.currentItem = new SingleKeyGroupKVState.KeyValueItem();
-        }
-
-        private void advance() {
-            SingleKeyGroupKVState.KeyValueItem reuseItem = this.currentItem;
-            this.currentItem = null;
-            while (this.currentItem == null && this.binaryItemIterator.hasNext()) {
-                try {
-                    this.currentItem =
-                        KVDataSorterBuilder.this.buildKeyValueItem(this.binaryItemIterator.next(), reuseItem);
-                } catch (IOException e) {
-                    throw new BSSRuntimeException("Failed to buildKeyValueItem", e);
-                }
-            }
-        }
-
-        /**
-         * hasNext
-         *
-         * @return boolean
-         */
-        public boolean hasNext() {
-            advance();
-            return (this.currentItem != null);
-        }
-
-        /**
-         * next
-         *
-         * @return SingleKeyGroupKVState.KeyValueItem
-         */
-        public SingleKeyGroupKVState.KeyValueItem next() {
-            return this.currentItem;
-        }
     }
 }

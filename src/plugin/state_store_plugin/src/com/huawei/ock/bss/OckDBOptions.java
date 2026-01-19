@@ -42,15 +42,6 @@ public class OckDBOptions {
                 "The local backup directory (on the TaskManager) where ockDB puts full slice files for checkpoints.");
 
     /**
-     * The local directory (on the TaskManager) where ockDB puts its db files.
-     */
-    public static final ConfigOption<String> SAVEPOINT_EX_SORT_DIRECTORIES =
-        ConfigOptions.key("state.backend.ockdb.savepoint.sort.local.dir")
-            .stringType()
-            .defaultValue("/usr/local/flink/savepoint/tmp")
-            .withDescription("The local directory (on the TaskManager) where ockDB puts its savepoint files.");
-
-    /**
      * The local directory (on the TaskManager) where ockDB puts its log files.
      */
     public static final ConfigOption<String> OCKDB_JNI_LOG_DIRECTORY =

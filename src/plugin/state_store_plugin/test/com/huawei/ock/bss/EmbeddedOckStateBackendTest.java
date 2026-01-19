@@ -63,7 +63,6 @@ import org.powermock.reflect.Whitebox;
 
 import java.io.File;
 import java.io.IOException;
-import java.nio.file.Paths;
 import java.util.Collection;
 import java.util.HashSet;
 
@@ -136,12 +135,10 @@ public class EmbeddedOckStateBackendTest {
         if (osName.contains("windows")) {
             config.setString(OckDBOptions.LOCAL_DIRECTORIES, WINDOWS_TEST_LOCAL_DIR);
             config.setString(OckDBOptions.OCKDB_JNI_LOG_DIRECTORY, WINDOWS_TEST_LOG_FILE);
-            config.setString(OckDBOptions.SAVEPOINT_EX_SORT_DIRECTORIES, WINDOWS_TEST_LOCAL_DIR);
             config.setString(OckDBOptions.BACKUP_DIRECTORY, WINDOWS_TEST_LOCAL_DIR);
         } else if (osName.contains("linux")) {
             config.setString(OckDBOptions.LOCAL_DIRECTORIES, LINUX_TEST_LOCAL_DIR);
             config.setString(OckDBOptions.OCKDB_JNI_LOG_DIRECTORY, LINUX_TEST_LOG_FILE);
-            config.setString(OckDBOptions.SAVEPOINT_EX_SORT_DIRECTORIES, LINUX_TEST_LOCAL_DIR);
             config.setString(OckDBOptions.BACKUP_DIRECTORY, LINUX_TEST_LOCAL_DIR);
         } else {
             throw new RuntimeException("Unsupported operating system: " + osName);
@@ -519,33 +516,5 @@ public class EmbeddedOckStateBackendTest {
         config.set(OckDBOptions.OCKDB_PRIORITY_QUEUE_TYPE, "XXX");
         EmbeddedOckStateBackend stateBackend = factory.createFromConfig(config, this.getClass().getClassLoader());
         stateBackend.getPriorityQueueStateType();
-    }
-
-    @Test
-    public void test_checkPathValid_normal() {
-        EmbeddedOckStateBackend.checkPathValid(LINUX_TEST_LOCAL_DIR, OckDBOptions.SAVEPOINT_EX_SORT_DIRECTORIES.key());
-    }
-
-    @Test(expected = IllegalConfigurationException.class)
-    public void test_checkPathValid_abnormal() {
-        EmbeddedOckStateBackend.checkPathValid(null, OckDBOptions.SAVEPOINT_EX_SORT_DIRECTORIES.key());
-    }
-
-    @Test
-    public void test_validateFilePath_normal() {
-        EmbeddedOckStateBackend.validateFilePath(OckDBOptions.SAVEPOINT_EX_SORT_DIRECTORIES.key(),
-            Paths.get(NO_EXIST_PATH), false);
-    }
-
-    @Test(expected = IllegalConfigurationException.class)
-    public void test_validateFilePath_abnormal() {
-        EmbeddedOckStateBackend.validateFilePath(OckDBOptions.SAVEPOINT_EX_SORT_DIRECTORIES.key(),
-            Paths.get(NO_EXIST_PATH), true);
-    }
-
-    @Test(expected = IllegalConfigurationException.class)
-    public void test_validateFilePath1_abnormal() {
-        EmbeddedOckStateBackend.validateFilePath(OckDBOptions.SAVEPOINT_EX_SORT_DIRECTORIES.key(),
-            Paths.get(NO_EXIST_PATH));
     }
 }

@@ -11,17 +11,16 @@
 
 package com.huawei.ock.bss.iterator;
 
-import com.huawei.ock.bss.common.exception.BSSRuntimeException;
-
 import org.apache.flink.runtime.state.KeyGroupRange;
 import org.apache.flink.runtime.state.KeyValueStateIterator;
-import org.apache.flink.util.IOUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.util.Comparator;
 import java.util.Iterator;
 import java.util.List;
+import java.util.PriorityQueue;
 
 /**
  * 实现KeyValueStateIterator接口，由kvState迭代器和pqState迭代器共同组成，供flink侧调用
@@ -31,61 +30,77 @@ import java.util.List;
 public class BoostKeyValueStateIterator implements KeyValueStateIterator {
     private static final Logger LOG = LoggerFactory.getLogger(BoostKeyValueStateIterator.class);
 
-    private final List<SingleStateIterator> keyGroupStateIterators;
+    private Comparator<SingleStateIterator> keyGroupComparator;
+
+    private final PriorityQueue<SingleStateIterator> iteratorHeap;
 
     private final Iterator<Integer> keyGroupIterator;
-
-    private int currentKeyGroup;
 
     private boolean newKeyGroup;
 
     private boolean newState;
 
-    private boolean initialized;
+    private SingleStateIterator currentIterator;
 
-    private ISingleStateIteratorWrapper currentIterator;
-
-    public BoostKeyValueStateIterator(List<SingleStateIterator> keyGroupStateIterators, KeyGroupRange keyGroupRange) {
-        this.keyGroupStateIterators = keyGroupStateIterators;
+    public BoostKeyValueStateIterator(List<SingleStateIterator> keyGroupStateIterators, KeyGroupRange keyGroupRange,
+        int keyGroupPrefixBytes) {
         this.keyGroupIterator = keyGroupRange.iterator();
-        this.currentIterator = EmptySingleStateIteratorWrapper.INSTANCE;
-        this.initialized = false;
-        LOG.info("Succeed to build BoostKeyValueStateIterator.");
+        this.keyGroupComparator = (o1, o2) -> compareKeyGroupsForByteArrays(o1.key(), o2.key(), keyGroupPrefixBytes);
+
+        // 初始化iteratorHeap
+        this.iteratorHeap = new PriorityQueue<>(keyGroupStateIterators.size(), keyGroupComparator);
+        for (SingleStateIterator it : keyGroupStateIterators) {
+            if (!it.isValid()) {
+                it.close();
+                continue;
+            }
+            iteratorHeap.offer(it);
+        }
+
+        // 根据iteratorHeap初始化currentIterator
+        if (iteratorHeap.isEmpty()) {
+            currentIterator = null;
+        } else {
+            currentIterator = iteratorHeap.remove();
+        }
+
+        LOG.info("Succeed to build BoostKeyValueStateIterator, iterator num:{}",
+            currentIterator == null ? 0 : iteratorHeap.size() + 1);
     }
 
     @Override
     public void next() throws IOException {
-        this.newKeyGroup = false;
-        boolean isPreviousValid = this.currentIterator.isValid();
-        int previousId = isPreviousValid ? this.currentIterator.kvStateId() : Integer.MIN_VALUE;
-
-        this.currentIterator.next();
-        // 根据keyGroup循环迭代list中迭代器
-        while (!this.currentIterator.isValid() && this.keyGroupIterator.hasNext()) {
-            this.currentKeyGroup = this.keyGroupIterator.next();
-            this.newKeyGroup = true;
-            // currentIterator每次next迭代的是当前keyGroup下所有迭代器的值
-            this.currentIterator = SingleStateIteratorWrapper
-                .create(this.keyGroupStateIterators, this.currentKeyGroup);
-        }
-
-        // 标识X
-        if (!this.currentIterator.isValid()) {
-            this.currentIterator = EmptySingleStateIteratorWrapper.INSTANCE;
-            return;
-        }
-
-        if (this.newKeyGroup) {
-            this.newState = true;
+        newKeyGroup = false;
+        newState = false;
+        int previousKeyGroup = currentIterator.keyGroup();
+        int previousStateId = currentIterator.kvStateId();
+        currentIterator.next();
+        if (currentIterator.isValid()) {
+            if (previousKeyGroup != currentIterator.keyGroup()) {
+                SingleStateIterator previousIterator = currentIterator;
+                iteratorHeap.offer(currentIterator);
+                currentIterator = iteratorHeap.remove();
+                newState = previousIterator.isHeapPQState() != currentIterator.isHeapPQState()
+                    || previousStateId != currentIterator.kvStateId();
+                newKeyGroup = previousKeyGroup != currentIterator.keyGroup();
+            } else {
+                newState = previousStateId != currentIterator.kvStateId();
+            }
         } else {
-            // 如果上一个迭代器不合法，则证明这是第一次调用next或上一次调用next进入了标识X的分支
-            this.newState = (!isPreviousValid || previousId != this.currentIterator.kvStateId());
+            currentIterator.close();
+            if (iteratorHeap.isEmpty()) {
+                currentIterator = null;
+            } else {
+                currentIterator = iteratorHeap.remove();
+                newState = true;
+                detectDifferentKeyGroup(previousKeyGroup);
+            }
         }
     }
 
     @Override
     public int keyGroup() {
-        return this.currentKeyGroup;
+        return this.currentIterator.keyGroup();
     }
 
     @Override
@@ -115,21 +130,28 @@ public class BoostKeyValueStateIterator implements KeyValueStateIterator {
 
     @Override
     public boolean isValid() {
-        if (!this.initialized) {
-            this.initialized = true;
-            try {
-                next();
-            } catch (IOException e) {
-                throw new BSSRuntimeException("Failed to judge isValid(), error during call next() ", e);
-            }
-        }
-        return this.currentIterator.isValid();
+        return this.currentIterator != null && this.currentIterator.isValid();
     }
 
     @Override
     public void close() {
         LOG.info("Closing savepoint iterator: BoostKeyValueStateIterator. Current iterator size: {}",
-            this.keyGroupStateIterators.size());
-        this.keyGroupStateIterators.forEach(IOUtils::closeAllQuietly);
+            this.iteratorHeap.size());
+    }
+
+    private static int compareKeyGroupsForByteArrays(byte[] a, byte[] b, int len) {
+        for (int i = 0; i < len; ++i) {
+            int diff = (a[i] & 0xFF) - (b[i] & 0xFF);
+            if (diff != 0) {
+                return diff;
+            }
+        }
+        return 0;
+    }
+
+    private void detectDifferentKeyGroup(int previousKeyGroup) {
+        if (currentIterator.keyGroup() != previousKeyGroup) {
+            newKeyGroup = true;
+        }
     }
 }

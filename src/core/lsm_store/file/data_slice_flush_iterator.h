@@ -24,8 +24,9 @@ class SliceKVIterator {
 public:
     SliceKVIterator(const IteratorRef<std::vector<DataSliceRef>> &dataSliceVectorIterator,
                     const MemManagerRef &memManager, TombstoneServiceRef tombstoneService = nullptr)
-        : mDataSliceVectorIterator(dataSliceVectorIterator), mMemManager(memManager),
-        mTombstoneService(tombstoneService)
+        : mDataSliceVectorIterator(dataSliceVectorIterator),
+		  mMemManager(memManager),
+		  mTombstoneService(tombstoneService)
     {
         mCurrentKV = mCurrentKVList.end();
         mStart = mMemManager->GetConfig()->mStartGroup;
@@ -47,7 +48,7 @@ public:
                 return result;
             }
         }
-        result = (mCurrentKV == mCurrentKVList.end()) ? Iterator_Result_End:Iterator_Result_Continue;
+        result = (mCurrentKV == mCurrentKVList.end()) ? Iterator_Result_End : Iterator_Result_Continue;
         return result;
     }
 
@@ -62,7 +63,8 @@ public:
         if (mForSavepoint) {
             // need to filter keyGroup for savepoint
             mKeyGroupFilter = [this](const KeyValueRef &keyValue) -> bool {
-                uint32_t keyGroup = keyValue->key.KeyHashCode() % mMaxParallelism;
+                uint32_t keyGroup = KeyGroupUtil::ComputeKeyGroupForKeyHash(keyValue->key.KeyHashCode(),
+                                                                            mMaxParallelism);
                 if (keyGroup < mStart || keyGroup > mEnd) {
                     return true;
                 }

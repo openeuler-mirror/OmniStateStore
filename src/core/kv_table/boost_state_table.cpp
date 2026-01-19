@@ -49,6 +49,7 @@ BResult AbstractTable::Init(const FreshTableRef &freshTable, const SliceTableMan
     mStateIdProvider = stateIdProvider;
     mSliceTable = sliceTable;
     mSeqGenerator = seqGenerator;
+    mMaxParallelism = description->GetMaxParallelism();
     if (stateIdProvider == nullptr) {
         return BSS_ERR;
     }
@@ -62,9 +63,11 @@ BResult AbstractTable::Init(const FreshTableRef &freshTable, const SliceTableMan
     return BSS_OK;
 }
 
-uint16_t AbstractTable::GetStateId(uint32_t keyHashCode)
+uint16_t AbstractTable::GetStateId(uint32_t &keyHashCode)
 {
     uint32_t keyGroupIndex = keyHashCode % mDescription->GetMaxParallelism();
+    // 先计算stateId，再修改hash，避免修改hash影响计算stateId
+    KeyGroupUtil::SetKeyGroup(keyHashCode, keyGroupIndex, mDescription->GetMaxParallelism());
     return mStateIdHelper->GetStateId(keyGroupIndex);
 }
 
@@ -97,7 +100,8 @@ void AbstractTable::Close()
 
 BResult KVTable::Put(uint32_t keyHashCode, const BinaryData &priKey, const BinaryData &value)
 {
-    QueryKey queryKey(GetStateId(keyHashCode), keyHashCode, priKey);
+    uint16_t stateId = GetStateId(keyHashCode);
+    QueryKey queryKey(stateId, keyHashCode, priKey);
     Value putVal;
     putVal.Init(ValueType::PUT, value.Length(), value.Data(), mSeqGenerator->Next());
     BResult result = mFreshTable->Put(queryKey, putVal);
@@ -107,7 +111,8 @@ BResult KVTable::Put(uint32_t keyHashCode, const BinaryData &priKey, const Binar
 
 BResult KVTable::Get(uint32_t hashCode, const BinaryData &key, BinaryData &value)
 {
-    QueryKey queryKey(GetStateId(hashCode), hashCode, key);
+    uint16_t stateId = GetStateId(hashCode);
+    QueryKey queryKey(stateId, hashCode, key);
     Value result;
 
     // 1. 从FreshTable中读取value.
@@ -141,7 +146,8 @@ bool KVTable::Contain(uint32_t hashCode, const BinaryData &key)
 
 BResult KVTable::Remove(uint32_t hashCode, const BinaryData &priKey)
 {
-    QueryKey queryKey(GetStateId(hashCode), hashCode, priKey);
+    uint16_t stateId = GetStateId(hashCode);
+    QueryKey queryKey(stateId, hashCode, priKey);
     Value putVal;
     putVal.Init(ValueType::DELETE, mSeqGenerator->Next());
     return mFreshTable->Put(queryKey, putVal);
@@ -183,7 +189,8 @@ BResult AbstractKMapTable::Put(uint32_t keyHashCode, const BinaryData &priKey,
     const BinaryData &secKey, const BinaryData &value)
 {
     KeyValue keyValue;
-    QueryKey queryKey(GetStateId(keyHashCode), keyHashCode, priKey, secKey);
+    uint16_t stateId = GetStateId(keyHashCode);
+    QueryKey queryKey(stateId, keyHashCode, priKey, secKey);
     keyValue.key = queryKey;
     Value putVal;
     putVal.Init(ValueType::PUT, value.Length(), value.Data(), mSeqGenerator->Next());
@@ -202,7 +209,8 @@ BResult AbstractKMapTable::Get(uint32_t keyHashCode, const BinaryData &priKey, c
     }
 
     // trans to dual key.
-    QueryKey queryKey(GetStateId(keyHashCode), keyHashCode, priKey, secKey);
+    uint16_t stateId = GetStateId(keyHashCode);
+    QueryKey queryKey(stateId, keyHashCode, priKey, secKey);
     Value result;
 
     // get from fresh table.
@@ -245,7 +253,8 @@ bool AbstractKMapTable::Contain(uint32_t keyHashCode, const BinaryData &key)
     }
 
     // get map iterator from fresh table.
-    QueryKey queryKey(GetStateId(keyHashCode), keyHashCode, key);
+    uint16_t stateId = GetStateId(keyHashCode);
+    QueryKey queryKey(stateId, keyHashCode, key);
 
     // value is a map, deletedKeyValues is used for storing key and map that already been deleted.
     KeyValueMap deletedKeyValues;
@@ -277,7 +286,8 @@ BResult AbstractKMapTable::Remove(uint32_t hashCode, const BinaryData &priKey, c
         return BSS_OK;
     }
     KeyValue keyValue;
-    QueryKey queryKey(GetStateId(hashCode), hashCode, priKey, secKey);
+    uint16_t stateId = GetStateId(hashCode);
+    QueryKey queryKey(stateId, hashCode, priKey, secKey);
     keyValue.key = queryKey;
     Value putVal;
     putVal.Init(ValueType::DELETE, mSeqGenerator->Next());
@@ -295,7 +305,8 @@ BResult AbstractKMapTable::Remove(uint32_t hashCode, const BinaryData &priKey)
     while (mapIterator->HasNext()) {
         KeyValueRef pair = mapIterator->Next();
         BinaryData secKey(pair->key.SecKey().KeyData(), pair->key.SecKey().KeyLen());
-        QueryKey queryKey(GetStateId(hashCode), hashCode, priKey, secKey);
+        uint16_t stateId = GetStateId(hashCode);
+        QueryKey queryKey(stateId, hashCode, priKey, secKey);
         Value putVal;
         putVal.Init(ValueType::DELETE, mSeqGenerator->Next());
         KeyValue keyValue;
@@ -314,7 +325,8 @@ MapIterator *AbstractKMapTable::EntryIterator(uint32_t hashCode, const BinaryDat
         return new (std::nothrow) MapIterator(emptyIter, emptyIter, EntryIteratorType::KMAP_ITERATOR);
     }
     // to query key.
-    QueryKey queryKey(GetStateId(hashCode), hashCode, priKey);
+    uint16_t stateId = GetStateId(hashCode);
+    QueryKey queryKey(stateId, hashCode, priKey);
 
     // get map iterator from fresh table.
     auto freshTableIterator = mFreshTable->GetMapIterator(queryKey);
@@ -384,7 +396,8 @@ KeyIterator *NsKMapTable::KeysIterator(const BinaryData &nameSpace)
 
 BResult AbstractKListTable::Put(uint32_t hashCode, const BinaryData &key, const BinaryData &value)
 {
-    QueryKey queryKey(GetStateId(hashCode), hashCode, key);
+    uint16_t stateId = GetStateId(hashCode);
+    QueryKey queryKey(stateId, hashCode, key);
     Value putVal;
     putVal.Init(ValueType::PUT, value.Length(), value.Data(), mSeqGenerator->Next());
     return mFreshTable->Put(queryKey, putVal);
@@ -392,7 +405,8 @@ BResult AbstractKListTable::Put(uint32_t hashCode, const BinaryData &key, const 
 
 BResult AbstractKListTable::Add(uint32_t hashCode, const BinaryData &key, const BinaryData &value)
 {
-    QueryKey queryKey(GetStateId(hashCode), hashCode, key);
+    uint16_t stateId = GetStateId(hashCode);
+    QueryKey queryKey(stateId, hashCode, key);
     Value addVal;
     addVal.Init(ValueType::APPEND, value.Length(), value.Data(), mSeqGenerator->Next());
     return mFreshTable->Append(queryKey, addVal);
@@ -401,7 +415,8 @@ BResult AbstractKListTable::Add(uint32_t hashCode, const BinaryData &key, const 
 ListResult AbstractKListTable::Get(uint32_t hashCode, const BinaryData &key)
 {
     // to query key.
-    QueryKey queryKey(GetStateId(hashCode), hashCode, key);
+    uint16_t stateId = GetStateId(hashCode);
+    QueryKey queryKey(stateId, hashCode, key);
     // 1. 从FreshTable中List value.
     std::deque<Value> valueInFreshTable;
     std::vector<SectionsReadContextRef> readMetas;
@@ -503,7 +518,8 @@ bool AbstractKListTable::Contain(uint32_t hashCode, const BinaryData &key)
 
 BResult AbstractKListTable::Remove(uint32_t hashCode, const BinaryData &key)
 {
-    QueryKey queryKey(GetStateId(hashCode), hashCode, key);
+    uint16_t stateId = GetStateId(hashCode);
+    QueryKey queryKey(stateId, hashCode, key);
     Value addVal;
     addVal.Init(ValueType::DELETE, mSeqGenerator->Next());
     return mFreshTable->Put(queryKey, addVal);

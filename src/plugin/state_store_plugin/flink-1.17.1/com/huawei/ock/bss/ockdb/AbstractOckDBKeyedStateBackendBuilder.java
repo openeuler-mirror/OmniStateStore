@@ -29,7 +29,6 @@ import com.huawei.ock.bss.restore.BoostRestoreOperation;
 import com.huawei.ock.bss.restore.BoostRestoreResult;
 import com.huawei.ock.bss.restore.BoostSavepointRestoreOperation;
 import com.huawei.ock.bss.snapshot.BoostSnapshotStrategyBase;
-import com.huawei.ock.bss.snapshot.SavepointConfiguration;
 import com.huawei.ock.bss.state.internal.descriptor.keyed.KeyedStateDescriptor;
 import com.huawei.ock.bss.state.internal.descriptor.nskeyed.NSKeyedStateDescriptor;
 import com.huawei.ock.bss.table.api.Table;
@@ -129,8 +128,6 @@ public abstract class AbstractOckDBKeyedStateBackendBuilder<K> extends AbstractK
 
     protected final ResourceContainer resourceContainer;
 
-    protected final SavepointConfiguration savepointConfiguration;
-
     protected int numberOfTransferringThreads;
 
     protected boolean enableIncrementalCheckpointing;
@@ -155,7 +152,6 @@ public abstract class AbstractOckDBKeyedStateBackendBuilder<K> extends AbstractK
         LatencyTrackingStateConfig latencyTrackingStateConfig, CloseableRegistry cancelStreamRegistry,
         StreamCompressionDecorator keyGroupCompressionDecorator, @Nonnull Collection<KeyedStateHandle> stateHandles,
         boolean priorityQueueAsyncSnapshot, ResourceContainer resourceContainer,
-        SavepointConfiguration savepointConfiguration,
         EmbeddedOckStateBackend.PriorityQueueStateType priorityQueueStateType, Configuration config) {
         super(kvStateRegistry, keySerializer, userCodeClassLoader.asClassLoader(), numberOfKeyGroups, keyGroupRange,
             executionConfig, ttlTimeProvider, latencyTrackingStateConfig, stateHandles, keyGroupCompressionDecorator,
@@ -168,7 +164,6 @@ public abstract class AbstractOckDBKeyedStateBackendBuilder<K> extends AbstractK
         this.keyContext = new InternalKeyContextImpl<>(keyGroupRange, numberOfKeyGroups);
         this.priorityQueueIsAsyncSnapshot = priorityQueueAsyncSnapshot;
         this.resourceContainer = resourceContainer;
-        this.savepointConfiguration = savepointConfiguration;
         this.priorityQueueStateType = priorityQueueStateType;
         this.config = config;
         this.enableIncrementalCheckpointing = false;
