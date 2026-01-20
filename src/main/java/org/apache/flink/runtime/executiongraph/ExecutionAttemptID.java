@@ -23,7 +23,6 @@ import org.apache.flink.runtime.scheduler.strategy.ExecutionVertexID;
 
 import org.apache.flink.shaded.netty4.io.netty.buffer.ByteBuf;
 
-import java.util.Locale;
 import java.util.Objects;
 
 import static org.apache.flink.util.Preconditions.checkArgument;
@@ -47,7 +46,7 @@ public class ExecutionAttemptID implements java.io.Serializable {
     public int getSubTaskFalconSize() {
         int subTaskFalconSize = (subTaskNum == 0) ? 0 : slotFalconSize / subTaskNum;
         // this log will be print when a rocksdbKeyedStateBackend is created
-        LOG.info(Locale.ROOT, "[FALCON] subTask {}'s slot have {} subTasks, so each subTask can cache {} states.",
+        LOG.info("[FALCON] subTask {}'s slot have {} subTasks, so each subTask can cache {} states.",
                 String.format("%s_%d", executionVertexId, attemptNumber), subTaskNum, subTaskFalconSize);
         return subTaskFalconSize;
     }
