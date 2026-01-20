@@ -136,6 +136,7 @@ public class RocksDBKeyedStateBackend<K> extends AbstractKeyedStateBackend<K> {
             State state = falconCache.get(cf);
             if (state instanceof RocksDBValueState) {
                 ((RocksDBValueState<?, ?, ?>) state).falconState.flush();
+                ((RocksDBValueState<?, ?, ?>) state).falconState.clearAll();
             }
         }
     }

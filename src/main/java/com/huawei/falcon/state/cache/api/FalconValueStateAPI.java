@@ -81,6 +81,11 @@ public interface FalconValueStateAPI<K, N, V> {
     void flush();
 
     /**
+     * Clear all the state in falcon cache
+     */
+    void clearAll();
+
+    /**
      * When cache size reaches upper size limit, flush the coldest state to RocksDB if needed and then remove it from
      * falcon cache. Note that we defensively check whether cache size exceeds upper size limit a lot, if so, flush and
      * clear falcon cache.
