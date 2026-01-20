@@ -1,0 +1,9 @@
+state.backend.rocksdb.options-factory: com.huawei.falcon.state.RocksDBOptOptionsFactory
+state.backend.rocksdb.falcon.use-partition-filter: true
+state.backend.rocksdb.falcon.use-range-filter: true
+state.backend.rocksdb.falcon.prefix-extractor.length: 13
+state.backend.rocksdb.falcon.use-hash-memtable: true
+state.backend.rocksdb.falcon.use-opt-join: true
+state.backend.rocksdb.falcon.use-state-cache: true
+state.backend.rocksdb.falcon.state-cache-sizeLimit: 20000
+state.backend.rocksdb.falcon.state-cache-bypass-hitRatio: 0.2
