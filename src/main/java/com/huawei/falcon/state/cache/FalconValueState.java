@@ -124,6 +124,11 @@ public class FalconValueState<K, N, V> implements FalconValueStateAPI<K, N, V> {
     }
 
     @Override
+    public void clearAll() {
+        cache.clear();
+    }
+
+    @Override
     public void removeEldestState() {
         K currentKey = valueState.getCurrentKey();
         N currentNamespace = valueState.getNamespace();
