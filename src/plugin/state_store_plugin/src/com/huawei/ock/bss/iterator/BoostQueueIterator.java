@@ -153,18 +153,8 @@ public final class BoostQueueIterator implements SingleStateIterator {
     }
 
     @Override
-    public void seek(int keyGroup) throws Exception {
-
-    }
-
-    @Override
     public int keyGroup() {
         return currentKeyGroup;
-    }
-
-    @Override
-    public boolean isHeapPQState() {
-        return true;
     }
 
     @Override

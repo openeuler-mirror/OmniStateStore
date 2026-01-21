@@ -129,7 +129,7 @@ public class FullBoostSnapshotResources<K> implements FullSnapshotResources<K> {
                         metaData.stateId);
                 iterators.add(pqIterator);
             }
-            return new BoostKeyValueStateIterator(iterators, this.keyGroupRange, keyGroupPrefixBytes);
+            return new BoostKeyValueStateIterator(iterators, keyGroupPrefixBytes);
         }
         throw new IOException("Failed to create iterator repeatedly.");
     }

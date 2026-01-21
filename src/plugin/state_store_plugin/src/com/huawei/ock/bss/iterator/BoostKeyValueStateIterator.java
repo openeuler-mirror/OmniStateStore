@@ -34,17 +34,13 @@ public class BoostKeyValueStateIterator implements KeyValueStateIterator {
 
     private final PriorityQueue<SingleStateIterator> iteratorHeap;
 
-    private final Iterator<Integer> keyGroupIterator;
-
     private boolean newKeyGroup;
 
     private boolean newState;
 
     private SingleStateIterator currentIterator;
 
-    public BoostKeyValueStateIterator(List<SingleStateIterator> keyGroupStateIterators, KeyGroupRange keyGroupRange,
-        int keyGroupPrefixBytes) {
-        this.keyGroupIterator = keyGroupRange.iterator();
+    public BoostKeyValueStateIterator(List<SingleStateIterator> keyGroupStateIterators, int keyGroupPrefixBytes) {
         this.keyGroupComparator = (o1, o2) -> compareKeyGroupsForByteArrays(o1.key(), o2.key(), keyGroupPrefixBytes);
 
         // 初始化iteratorHeap
@@ -77,11 +73,9 @@ public class BoostKeyValueStateIterator implements KeyValueStateIterator {
         currentIterator.next();
         if (currentIterator.isValid()) {
             if (previousKeyGroup != currentIterator.keyGroup()) {
-                SingleStateIterator previousIterator = currentIterator;
                 iteratorHeap.offer(currentIterator);
                 currentIterator = iteratorHeap.remove();
-                newState = previousIterator.isHeapPQState() != currentIterator.isHeapPQState()
-                    || previousStateId != currentIterator.kvStateId();
+                newState = previousStateId != currentIterator.kvStateId();
                 newKeyGroup = previousKeyGroup != currentIterator.keyGroup();
             } else {
                 newState = previousStateId != currentIterator.kvStateId();
@@ -93,7 +87,7 @@ public class BoostKeyValueStateIterator implements KeyValueStateIterator {
             } else {
                 currentIterator = iteratorHeap.remove();
                 newState = true;
-                detectDifferentKeyGroup(previousKeyGroup);
+                newKeyGroup = previousKeyGroup != currentIterator.keyGroup();
             }
         }
     }
@@ -147,11 +141,5 @@ public class BoostKeyValueStateIterator implements KeyValueStateIterator {
             }
         }
         return 0;
-    }
-
-    private void detectDifferentKeyGroup(int previousKeyGroup) {
-        if (currentIterator.keyGroup() != previousKeyGroup) {
-            newKeyGroup = true;
-        }
     }
 }

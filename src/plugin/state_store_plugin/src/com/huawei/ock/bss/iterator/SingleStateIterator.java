@@ -56,20 +56,10 @@ public interface SingleStateIterator extends Closeable {
     int kvStateId();
 
     /**
-     * seek
-     *
-     * @param keyGroup keyGroup
-     * @throws Exception Exception
-     */
-    void seek(int keyGroup) throws Exception;
-
-    /**
      * close
      */
     @Override
     void close();
 
     int keyGroup();
-
-    boolean isHeapPQState();
 }
