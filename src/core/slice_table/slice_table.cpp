@@ -164,7 +164,7 @@ BResult SliceTable::WriteValueToBlobStore(FreshValueNodePtr &curVal, uint32_t ke
         RETURN_ERROR_AS_NULLPTR(mConfig);
         RETURN_ERROR_AS_NULLPTR(mStateFilterManager);
         RETURN_ERROR_AS_NULLPTR(mBlobStore);
-        uint32_t keyGroup = KeyGroupUtil::ComputeKeyGroupForKeyHash(keyHash, mConfig->GetMaxNumberOfParallelSubtasks());
+        uint32_t keyGroup = KeyGroupUtil::ComputeKeyGroupForKeyHash(keyHash);
         int64_t tableTtl = 0;
         uint64_t expireTime = 0;
         if (mConfig->GetTtlFilterSwitch()) {
@@ -193,7 +193,7 @@ BResult SliceTable::WriteValueToBlobStore(FreshValueNodePtr &curVal, uint32_t ke
 
 BResult SliceTable::GetValueFromBlobStore(uint64_t blobId, uint32_t keyHashCode, uint64_t seqId, Value &value)
 {
-    auto keyGroup = KeyGroupUtil::ComputeKeyGroupForKeyHash(keyHashCode, mConfig->GetMaxNumberOfParallelSubtasks());
+    auto keyGroup = KeyGroupUtil::ComputeKeyGroupForKeyHash(keyHashCode);
     RETURN_INVALID_PARAM_AS_NULLPTR(mBlobStore);
     BResult result = mBlobStore->GetBlobValue(blobId, keyGroup, value);
     if (UNLIKELY(result != BSS_OK)) {

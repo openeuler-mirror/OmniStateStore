@@ -63,8 +63,7 @@ public:
         if (mForSavepoint) {
             // need to filter keyGroup for savepoint
             mKeyGroupFilter = [this](const KeyValueRef &keyValue) -> bool {
-                uint32_t keyGroup = KeyGroupUtil::ComputeKeyGroupForKeyHash(keyValue->key.KeyHashCode(),
-                                                                            mMaxParallelism);
+                uint32_t keyGroup = KeyGroupUtil::ComputeKeyGroupForKeyHash(keyValue->key.KeyHashCode());
                 if (keyGroup < mStart || keyGroup > mEnd) {
                     return true;
                 }
