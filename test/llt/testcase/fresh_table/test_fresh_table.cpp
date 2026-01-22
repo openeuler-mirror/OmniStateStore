@@ -48,7 +48,7 @@ TEST_F(TestFreshTable, test_write_big_value_and_get_ok)
     uint32_t keyHashCode = 1234;
     uint32_t keyGroupIndex = keyHashCode % NO_128;
     // 先计算stateId，再修改hash，避免修改hash影响计算stateId
-    KeyGroupUtil::SetKeyGroup(keyHashCode, keyGroupIndex, NO_128);
+    KeyGroupUtil::SetKeyGroup(keyHashCode, keyGroupIndex);
     QueryKey queryKey(stateId, keyHashCode, priKey);
     Value putVal;
     putVal.Init(ValueType::PUT, val.Length(), val.Data(), 1);
