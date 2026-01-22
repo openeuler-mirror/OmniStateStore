@@ -5,6 +5,7 @@ import com.huawei.ock.bss.common.exception.BSSRuntimeException;
 import com.huawei.ock.bss.iterator.serializer.KeyValueBuilder;
 import com.huawei.ock.bss.snapshot.SavepointDBResult;
 
+import org.apache.flink.contrib.streaming.state.iterator.SingleStateIterator;
 import org.apache.flink.core.memory.DataInputView;
 import org.apache.flink.core.memory.DataOutputView;
 import org.apache.flink.runtime.state.KeyGroupRange;
@@ -39,18 +40,18 @@ public final class BoostSortedKeyValueIterator<K> implements SingleStateIterator
     }
 
     @Override
-    public void next() throws IOException {
+    public void next() {
         currentItem = null;
         BinaryKeyValueItem binaryKeyValueItem = null;
-        while (currentItem == null && iterator.hasNext()) {
-            binaryKeyValueItem = iterator.next();
-            currentItem = keyValueBuilder.buildKeyValueItem(binaryKeyValueItem);
+        try {
+            while (currentItem == null && iterator.hasNext()) {
+                binaryKeyValueItem = iterator.next();
+                currentItem = keyValueBuilder.buildKeyValueItem(binaryKeyValueItem);
+            }
+        } catch (IOException e) {
+            throw new BSSRuntimeException("Failed to get next kv item.", e);
         }
-        if (currentItem == null) {
-            isValid = false;
-        } else {
-            isValid = true;
-        }
+        isValid = currentItem != null;
     }
 
     private boolean checkKeyGroup(int keyGroup) {
@@ -73,13 +74,8 @@ public final class BoostSortedKeyValueIterator<K> implements SingleStateIterator
     }
 
     @Override
-    public int kvStateId() {
+    public int getKvStateId() {
         return currentItem.getStateId();
-    }
-
-    @Override
-    public int keyGroup() {
-        return currentItem.getKeyGroup();
     }
 
     @Override
