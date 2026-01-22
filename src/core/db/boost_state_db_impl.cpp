@@ -26,6 +26,7 @@ std::atomic<uint64_t> AutoCloseable::GLOBAL_COUNT(0);
 BResult BoostStateDBImpl::Open(const ConfigRef &config)
 {
     mConfig = config;
+    KeyGroupUtil::Init(mConfig->GetMaxNumberOfParallelSubtasks());
     ReadWriteLock &taskSlotLock = BoostStateDbGroupMgr::GetOrCreateLock(config->GetTaskSlotFlag());
     WriteLocker<ReadWriteLock> lock(&taskSlotLock);
 

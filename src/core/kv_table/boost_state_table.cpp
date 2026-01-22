@@ -67,7 +67,7 @@ uint16_t AbstractTable::GetStateId(uint32_t &keyHashCode)
 {
     uint32_t keyGroupIndex = keyHashCode % mMaxParallelism;
     // 先计算stateId，再修改hash，避免修改hash影响计算stateId
-    KeyGroupUtil::SetKeyGroup(keyHashCode, keyGroupIndex, mMaxParallelism);
+    KeyGroupUtil::SetKeyGroup(keyHashCode, keyGroupIndex);
     return mStateIdHelper->GetStateId(keyGroupIndex);
 }
 

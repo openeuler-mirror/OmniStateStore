@@ -19,22 +19,53 @@ namespace bss {
 
 class KeyGroupUtil {
 public:
-    static inline uint32_t ComputeKeyGroupForKeyHash(uint32_t keyHash, uint32_t maxParallelism)
+    static inline void Init(uint32_t maxParallelism)
     {
-        if (LIKELY(maxParallelism < 129)) {
-            return (keyHash & 0xFF000000) >> 24;
+        if (maxParallelism < 129) {
+            mSetKeyGroupFunc = &KeyGroupUtil::SetOneByteKeyGroup;
+            mComputeKeyGroupFunc = &KeyGroupUtil::ComputeOneByteKeyGroup;
+        } else {
+            mSetKeyGroupFunc = &KeyGroupUtil::SetTwoBytesKeyGroup;
+            mComputeKeyGroupFunc = &KeyGroupUtil::ComputeTwoBytesKeyGroup;
         }
+    }
+
+    static inline uint32_t ComputeKeyGroupForKeyHash(uint32_t keyHash)
+    {
+        return (*mComputeKeyGroupFunc)(keyHash);
+    }
+
+    static inline void SetKeyGroup(uint32_t &keyHashCode, uint32_t keyGroup)
+    {
+        (*mSetKeyGroupFunc)(keyHashCode, keyGroup);
+    }
+
+    static inline uint32_t ComputeOneByteKeyGroup(uint32_t keyHash)
+    {
+        return (keyHash & 0xFF000000) >> 24;
+    }
+
+    static inline uint32_t ComputeTwoBytesKeyGroup(uint32_t keyHash)
+    {
         return (keyHash & 0xFFFF0000) >> 16;
     }
 
-    static inline void SetKeyGroup(uint32_t &keyHashCode, uint32_t keyGroup, uint32_t maxParallelism)
+    static inline void SetOneByteKeyGroup(uint32_t &keyHashCode, uint32_t keyGroup)
     {
-        if (LIKELY(maxParallelism < 129)) {
-            keyHashCode = (keyHashCode & 0x00FFFFFF) | ((keyGroup & 0xFF) << 24);
-        } else {
-            keyHashCode = (keyHashCode & 0x0000FFFF) | ((keyGroup & 0xFFFF) << 16);
-        }
+        keyHashCode = (keyHashCode & 0x00FFFFFF) | ((keyGroup & 0xFF) << 24);
     }
+
+    static inline void SetTwoBytesKeyGroup(uint32_t &keyHashCode, uint32_t keyGroup)
+    {
+        keyHashCode = (keyHashCode & 0x0000FFFF) | ((keyGroup & 0xFFFF) << 16);
+    }
+
+private:
+    using SetKeyGroupFuncPtr = void(*)(uint32_t &, uint32_t);
+    using ComputeKeyGroupFuncPtr = uint32_t(*)(uint32_t);
+
+    static SetKeyGroupFuncPtr mSetKeyGroupFunc;
+    static ComputeKeyGroupFuncPtr mComputeKeyGroupFunc;
 };
 }  // namespace bss
 }  // namespace ock
