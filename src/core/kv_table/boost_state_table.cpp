@@ -65,9 +65,9 @@ BResult AbstractTable::Init(const FreshTableRef &freshTable, const SliceTableMan
 
 uint16_t AbstractTable::GetStateId(uint32_t &keyHashCode)
 {
-    uint32_t keyGroupIndex = keyHashCode % mDescription->GetMaxParallelism();
+    uint32_t keyGroupIndex = keyHashCode % mMaxParallelism;
     // 先计算stateId，再修改hash，避免修改hash影响计算stateId
-    KeyGroupUtil::SetKeyGroup(keyHashCode, keyGroupIndex, mDescription->GetMaxParallelism());
+    KeyGroupUtil::SetKeyGroup(keyHashCode, keyGroupIndex);
     return mStateIdHelper->GetStateId(keyGroupIndex);
 }
 

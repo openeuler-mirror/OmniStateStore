@@ -738,8 +738,7 @@ BResult LsmStore::InternalGet(const Key &key, Value &value)
     VersionPtr current = GetCurrentVersion();
 
     // 2. 计算当前key的keyGroup.
-    uint32_t keyGroup = KeyGroupUtil::ComputeKeyGroupForKeyHash(key.KeyHashCode(),
-                                                                mConf->GetMaxNumberOfParallelSubtasks());
+    uint32_t keyGroup = KeyGroupUtil::ComputeKeyGroupForKeyHash(key.KeyHashCode());
     std::vector<FileMetaDataRef> filesForKey;
 
     // 3. 在当前version中逐层遍历.
@@ -776,7 +775,7 @@ BResult LsmStore::InternalGet(const Key &key, CompositeValue &value, SectionsRea
     VersionPtr current = GetCurrentVersion();
 
     // 2. 计算当前key的keyGroup.
-    auto keyGroup = KeyGroupUtil::ComputeKeyGroupForKeyHash(key.KeyHashCode(), mConf->GetMaxNumberOfParallelSubtasks());
+    auto keyGroup = KeyGroupUtil::ComputeKeyGroupForKeyHash(key.KeyHashCode());
 
     // 3. 在当前version中逐层遍历.
     std::vector<FileMetaDataRef> filesForKey;
@@ -1060,8 +1059,7 @@ KeyValueIteratorRef LsmStore::PrefixIterator(const Key &prefixKey, bool reverseO
 
 {
     VersionPtr current = GetCurrentVersion();
-    uint32_t keyGroup = KeyGroupUtil::ComputeKeyGroupForKeyHash(prefixKey.KeyHashCode(),
-                                                                mConf->GetMaxNumberOfParallelSubtasks());
+    uint32_t keyGroup = KeyGroupUtil::ComputeKeyGroupForKeyHash(prefixKey.KeyHashCode());
     auto buildFunc = [this, current, prefixKey,
                       reverseOrder](const FileMetaDataRef &fileMetaData) -> KeyValueIteratorRef {
         FullKeyFilterRef keyFilter = current->IsVersionAligned() ?

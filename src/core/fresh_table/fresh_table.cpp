@@ -441,7 +441,7 @@ BResult FreshTable::FillDataByMemorySegment(const BoostSegmentRef &boostSegment,
         BinaryKey binaryKey;
         binaryKey.Parse(primaryKey, stateType == VALUE); // 构建binaryKey获取keyGroup.
         LOG_TRACE(binaryKey.ToString());
-        auto curGroup = KeyGroupUtil::ComputeKeyGroupForKeyHash(binaryKey.mKeyHashCode, mConfig->GetMaxParallelism());
+        auto curGroup = KeyGroupUtil::ComputeKeyGroupForKeyHash(binaryKey.mKeyHashCode);
         if (!validKeyGroups.ContainsGroup(static_cast<int32_t>(curGroup))) { // 过滤掉不属于该KeyGroup的kv数据.
             continue;
         }

@@ -13,14 +13,14 @@ package com.huawei.ock.bss.snapshot;
 
 import com.huawei.ock.bss.common.BoostStateDB;
 import com.huawei.ock.bss.iterator.BoostKeyValueStateIterator;
-import com.huawei.ock.bss.iterator.BoostQueueIterator;
 import com.huawei.ock.bss.iterator.BoostSortedKeyValueIterator;
-import com.huawei.ock.bss.iterator.SingleStateIterator;
 import com.huawei.ock.bss.iterator.serializer.KeyValueBuilder;
 
 import org.apache.flink.api.common.state.StateDescriptor;
 import org.apache.flink.api.common.typeutils.TypeSerializer;
 import org.apache.flink.configuration.Configuration;
+import org.apache.flink.contrib.streaming.state.iterator.RocksQueueIterator;
+import org.apache.flink.contrib.streaming.state.iterator.SingleStateIterator;
 import org.apache.flink.runtime.state.FullSnapshotResources;
 import org.apache.flink.runtime.state.KeyGroupRange;
 import org.apache.flink.runtime.state.KeyValueStateIterator;
@@ -124,12 +124,12 @@ public class FullBoostSnapshotResources<K> implements FullSnapshotResources<K> {
             iterators.add(keyValueIterator);
 
             for (PqMetaData metaData : pqMetaDataMap.values()) {
-                BoostQueueIterator pqIterator =
-                    new BoostQueueIterator(metaData.stateSnapshot, keyGroupRange, keyGroupPrefixBytes,
+                RocksQueueIterator pqIterator =
+                    new RocksQueueIterator(metaData.stateSnapshot, keyGroupRange, keyGroupPrefixBytes,
                         metaData.stateId);
                 iterators.add(pqIterator);
             }
-            return new BoostKeyValueStateIterator(iterators, this.keyGroupRange, keyGroupPrefixBytes);
+            return new BoostKeyValueStateIterator(iterators, keyGroupPrefixBytes);
         }
         throw new IOException("Failed to create iterator repeatedly.");
     }

@@ -57,7 +57,7 @@ public:
         }
         uint64_t blobId = BlobStore::ToBlobId(value);
         uint32_t hash = key.KeyHashCode();
-        uint32_t keyGroup = KeyGroupUtil::ComputeKeyGroupForKeyHash(hash, mConfig->GetMaxParallelism());
+        uint32_t keyGroup = KeyGroupUtil::ComputeKeyGroupForKeyHash(hash);
         if (UNLIKELY(keyGroup > UINT16_MAX)) {
             LOG_ERROR("Key group is big than expected: " << keyGroup);
             return;

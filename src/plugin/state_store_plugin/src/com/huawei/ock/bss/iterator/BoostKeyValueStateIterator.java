@@ -11,14 +11,13 @@
 
 package com.huawei.ock.bss.iterator;
 
-import org.apache.flink.runtime.state.KeyGroupRange;
+import org.apache.flink.contrib.streaming.state.iterator.SingleStateIterator;
 import org.apache.flink.runtime.state.KeyValueStateIterator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.util.Comparator;
-import java.util.Iterator;
 import java.util.List;
 import java.util.PriorityQueue;
 
@@ -34,17 +33,16 @@ public class BoostKeyValueStateIterator implements KeyValueStateIterator {
 
     private final PriorityQueue<SingleStateIterator> iteratorHeap;
 
-    private final Iterator<Integer> keyGroupIterator;
-
     private boolean newKeyGroup;
 
     private boolean newState;
 
     private SingleStateIterator currentIterator;
 
-    public BoostKeyValueStateIterator(List<SingleStateIterator> keyGroupStateIterators, KeyGroupRange keyGroupRange,
-        int keyGroupPrefixBytes) {
-        this.keyGroupIterator = keyGroupRange.iterator();
+    private final int keyGroupPrefixBytes;
+
+    public BoostKeyValueStateIterator(List<SingleStateIterator> keyGroupStateIterators, int keyGroupPrefixBytes) {
+        this.keyGroupPrefixBytes = keyGroupPrefixBytes;
         this.keyGroupComparator = (o1, o2) -> compareKeyGroupsForByteArrays(o1.key(), o2.key(), keyGroupPrefixBytes);
 
         // 初始化iteratorHeap
@@ -72,19 +70,17 @@ public class BoostKeyValueStateIterator implements KeyValueStateIterator {
     public void next() throws IOException {
         newKeyGroup = false;
         newState = false;
-        int previousKeyGroup = currentIterator.keyGroup();
-        int previousStateId = currentIterator.kvStateId();
+        int previousKeyGroup = computeKeyGroup(currentIterator.key());
+        int previousStateId = currentIterator.getKvStateId();
         currentIterator.next();
         if (currentIterator.isValid()) {
-            if (previousKeyGroup != currentIterator.keyGroup()) {
-                SingleStateIterator previousIterator = currentIterator;
+            if (previousKeyGroup != computeKeyGroup(currentIterator.key())) {
                 iteratorHeap.offer(currentIterator);
                 currentIterator = iteratorHeap.remove();
-                newState = previousIterator.isHeapPQState() != currentIterator.isHeapPQState()
-                    || previousStateId != currentIterator.kvStateId();
-                newKeyGroup = previousKeyGroup != currentIterator.keyGroup();
+                newState = previousStateId != currentIterator.getKvStateId();
+                newKeyGroup = previousKeyGroup != computeKeyGroup(currentIterator.key());
             } else {
-                newState = previousStateId != currentIterator.kvStateId();
+                newState = previousStateId != currentIterator.getKvStateId();
             }
         } else {
             currentIterator.close();
@@ -93,14 +89,14 @@ public class BoostKeyValueStateIterator implements KeyValueStateIterator {
             } else {
                 currentIterator = iteratorHeap.remove();
                 newState = true;
-                detectDifferentKeyGroup(previousKeyGroup);
+                newKeyGroup = previousKeyGroup != computeKeyGroup(currentIterator.key());
             }
         }
     }
 
     @Override
     public int keyGroup() {
-        return this.currentIterator.keyGroup();
+        return computeKeyGroup(currentIterator.key());
     }
 
     @Override
@@ -115,7 +111,7 @@ public class BoostKeyValueStateIterator implements KeyValueStateIterator {
 
     @Override
     public int kvStateId() {
-        return this.currentIterator.kvStateId();
+        return this.currentIterator.getKvStateId();
     }
 
     @Override
@@ -149,9 +145,12 @@ public class BoostKeyValueStateIterator implements KeyValueStateIterator {
         return 0;
     }
 
-    private void detectDifferentKeyGroup(int previousKeyGroup) {
-        if (currentIterator.keyGroup() != previousKeyGroup) {
-            newKeyGroup = true;
+    private int computeKeyGroup(byte[] key) {
+        int keyGroup = 0;
+        for (int i = 0; i < keyGroupPrefixBytes; i++) {
+            keyGroup <<= 8;
+            keyGroup |= (key[i] & 0xFF);
         }
+        return keyGroup;
     }
 }

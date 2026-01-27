@@ -55,7 +55,7 @@ BinaryKeyValueItemRef BinaryKeyValueItemIterator::Convert(const KeyValueRef &pai
     auto binaryValue = pair->value;
 
     auto stateId = binaryRowKey.StateId();
-    auto keyGroup = KeyGroupUtil::ComputeKeyGroupForKeyHash(binaryRowKey.KeyHashCode(), mMaxParallelism);
+    auto keyGroup = KeyGroupUtil::ComputeKeyGroupForKeyHash(binaryRowKey.KeyHashCode());
 
     auto description = mStateIdProvider->GetTableDescription(stateId);
     if (description == nullptr) {

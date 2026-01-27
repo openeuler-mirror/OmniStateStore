@@ -69,8 +69,7 @@ public:
 
     inline bool Filter(const SliceKey &sliceKey, uint64_t seqId)
     {
-        auto group = KeyGroupUtil::ComputeKeyGroupForKeyHash(sliceKey.KeyHashCode(),
-                                                             mConf->GetMaxNumberOfParallelSubtasks());
+        auto group = KeyGroupUtil::ComputeKeyGroupForKeyHash(sliceKey.KeyHashCode());
         return Filter(group, sliceKey.StateId(), seqId);
     }
 
@@ -86,7 +85,7 @@ public:
     {
         Key &key = keyValue->key;
         uint32_t keyHashCode = key.PriKey().KeyHashCode();
-        auto keyGroup = KeyGroupUtil::ComputeKeyGroupForKeyHash(keyHashCode, mConf->GetMaxNumberOfParallelSubtasks());
+        auto keyGroup = KeyGroupUtil::ComputeKeyGroupForKeyHash(keyHashCode);
         Value &value = keyValue->value;
         return Filter(keyGroup, key.StateId(), value.SeqId());
     }
@@ -94,7 +93,7 @@ public:
     inline bool Filter(const Key &key, const Value &value) override
     {
         uint32_t keyHashCode = key.PriKey().KeyHashCode();
-        auto keyGroup = KeyGroupUtil::ComputeKeyGroupForKeyHash(keyHashCode, mConf->GetMaxNumberOfParallelSubtasks());
+        auto keyGroup = KeyGroupUtil::ComputeKeyGroupForKeyHash(keyHashCode);
         return Filter(keyGroup, key.StateId(), value.SeqId());
     }
 
@@ -108,7 +107,7 @@ public:
 
     inline int32_t GetGroup(uint32_t keyHashCode) const
     {
-        return KeyGroupUtil::ComputeKeyGroupForKeyHash(keyHashCode, mConf->GetMaxNumberOfParallelSubtasks());
+        return KeyGroupUtil::ComputeKeyGroupForKeyHash(keyHashCode);
     }
 
     inline bool StateFilter(uint16_t stateId, uint64_t seqId)

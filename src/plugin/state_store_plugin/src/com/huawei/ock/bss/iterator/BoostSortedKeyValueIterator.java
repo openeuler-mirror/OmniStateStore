@@ -5,6 +5,7 @@ import com.huawei.ock.bss.common.exception.BSSRuntimeException;
 import com.huawei.ock.bss.iterator.serializer.KeyValueBuilder;
 import com.huawei.ock.bss.snapshot.SavepointDBResult;
 
+import org.apache.flink.contrib.streaming.state.iterator.SingleStateIterator;
 import org.apache.flink.core.memory.DataInputView;
 import org.apache.flink.core.memory.DataOutputView;
 import org.apache.flink.runtime.state.KeyGroupRange;
@@ -18,8 +19,6 @@ import javax.annotation.Nullable;
 public final class BoostSortedKeyValueIterator<K> implements SingleStateIterator {
     private static final Logger LOG = LoggerFactory.getLogger(BoostSortedKeyValueIterator.class);
 
-    private final SavepointDBResult savepointDBResult;
-
     private CloseableIterator<BinaryKeyValueItem> iterator;
 
     private KeyValueItem currentItem;
@@ -32,7 +31,6 @@ public final class BoostSortedKeyValueIterator<K> implements SingleStateIterator
 
     public BoostSortedKeyValueIterator(SavepointDBResult savepointDBResult, KeyValueBuilder<K> keyValueBuilder,
         KeyGroupRange keyGroupRange) throws IOException {
-        this.savepointDBResult = savepointDBResult;
         this.keyValueBuilder = keyValueBuilder;
         this.isValid = false;
         this.iterator = savepointDBResult.iterator();
@@ -42,18 +40,18 @@ public final class BoostSortedKeyValueIterator<K> implements SingleStateIterator
     }
 
     @Override
-    public void next() throws IOException {
+    public void next() {
         currentItem = null;
         BinaryKeyValueItem binaryKeyValueItem = null;
-        while (currentItem == null && iterator.hasNext()) {
-            binaryKeyValueItem = iterator.next();
-            currentItem = keyValueBuilder.buildKeyValueItem(binaryKeyValueItem);
+        try {
+            while (currentItem == null && iterator.hasNext()) {
+                binaryKeyValueItem = iterator.next();
+                currentItem = keyValueBuilder.buildKeyValueItem(binaryKeyValueItem);
+            }
+        } catch (IOException e) {
+            throw new BSSRuntimeException("Failed to get next kv item.", e);
         }
-        if (currentItem == null) {
-            isValid = false;
-        } else {
-            isValid = true;
-        }
+        isValid = currentItem != null;
     }
 
     private boolean checkKeyGroup(int keyGroup) {
@@ -76,23 +74,8 @@ public final class BoostSortedKeyValueIterator<K> implements SingleStateIterator
     }
 
     @Override
-    public int kvStateId() {
+    public int getKvStateId() {
         return currentItem.getStateId();
-    }
-
-    @Override
-    public void seek(final int keyGroup) throws Exception {
-
-    }
-
-    @Override
-    public int keyGroup() {
-        return currentItem.getKeyGroup();
-    }
-
-    @Override
-    public boolean isHeapPQState() {
-        return false;
     }
 
     @Override
@@ -105,16 +88,13 @@ public final class BoostSortedKeyValueIterator<K> implements SingleStateIterator
     }
 
     public static class KeyValueItem {
-        private int keyGroup;
+        private final int keyGroup;
 
-        private int stateId;
+        private final int stateId;
 
-        private byte[] key;
+        private final byte[] key;
 
-        private byte[] value;
-
-        public KeyValueItem() {
-        }
+        private final byte[] value;
 
         public KeyValueItem(int keyGroup, int stateId, byte[] key, byte[] value) {
             this.keyGroup = keyGroup;
@@ -157,73 +137,6 @@ public final class BoostSortedKeyValueIterator<K> implements SingleStateIterator
          */
         public byte[] getValue() {
             return this.value;
-        }
-
-        /**
-         * reset
-         *
-         * @param keyGroup keyGroup
-         * @param stateId  stateId
-         * @param key      key
-         * @param value    value
-         */
-        public void reset(int keyGroup, int stateId, byte[] key, byte[] value) {
-            this.keyGroup = keyGroup;
-            this.stateId = stateId;
-            this.key = key;
-            this.value = value;
-        }
-
-        /**
-         * serialize
-         *
-         * @param item       KeyValueItem
-         * @param outputView DataOutputView
-         * @throws IOException IOException
-         */
-        static void serialize(KeyValueItem item, DataOutputView outputView) throws IOException {
-            outputView.writeInt(item.getKeyGroup());
-            outputView.writeInt(item.getStateId());
-            outputView.writeInt((item.getKey()).length);
-            outputView.write(item.getKey());
-            outputView.writeInt((item.getValue()).length);
-            outputView.write(item.getValue());
-        }
-
-        /**
-         * deserialize
-         *
-         * @param reuseItem KeyValueItem
-         * @param inputView DataInputView
-         * @return KeyValueItem
-         * @throws IOException IOException
-         */
-        static KeyValueItem deserialize(@Nullable KeyValueItem reuseItem, DataInputView inputView) throws IOException {
-            KeyValueItem item = (reuseItem == null) ? new KeyValueItem() : reuseItem;
-            int keyGroup = inputView.readInt();
-            int stateId = inputView.readInt();
-            int keyLen = inputView.readInt();
-            byte[] key = new byte[keyLen];
-            inputView.readFully(key);
-            int valueLen = inputView.readInt();
-            byte[] value = new byte[valueLen];
-            inputView.readFully(value);
-
-            item.reset(keyGroup, stateId, key, value);
-            return item;
-        }
-
-        /**
-         * of
-         *
-         * @param keyGroup keyGroup
-         * @param stateId  stateId
-         * @param key      key
-         * @param value    value
-         * @return KeyValueItem
-         */
-        public static KeyValueItem of(int keyGroup, int stateId, byte[] key, byte[] value) {
-            return new KeyValueItem(keyGroup, stateId, key, value);
         }
     }
 }
