@@ -232,7 +232,7 @@ public:
     inline std::string ToString() const
     {
         std::ostringstream oss;
-        oss << "StateId: " << mStateId << ", HashCode: " << KeyHashCode()
+        oss << "StateId: " << mStateId << ", KeyHashCode: " << KeyHashCode()
             << ", KeyLen: " << mKeyLen << ", KeyData: [";
         if (UNLIKELY(mKeyData != nullptr)) {
             uint32_t printLen = std::min(NO_20, mKeyLen);
@@ -420,6 +420,33 @@ public:
                                         key2.mPriKey.KeyLen());
         cmp = cmp > 0 ? 1 : (cmp < 0 ? -1 : 0);
         return cmp;
+    }
+
+    /**
+     * Compare with other key when creating merge iterator of PQ and KV for savepoint.
+     * @param other other key.
+     * @return If the current key is less than other, return -1. When they are equal, return 0.
+     * If the current key is greater than other, return 1.
+     */
+    inline int32_t CompareForSavepoint(const Key &other) const
+    {
+        // compare primary key.
+        int32_t cmp = mPriKey.ComparePriKeyNode(other.mPriKey);
+        if (cmp != 0) {
+            return cmp;
+        }
+        // compare state id.
+        cmp = BssMath::IntegerCompare(mPriKey.StateId(), other.StateId());
+        if (cmp != 0) {
+            return cmp;
+        }
+        // they have the same state id, just check k1 is single key or not.
+        // if it is single key, return equal.
+        if (!mHasSecKey) {
+            return 0;
+        }
+        // compare secondary key.
+        return mSecKey.CompareKeyNode(other.mSecKey);
     }
 
     /**
