@@ -68,6 +68,12 @@ public:
         PathRef destPath = std::make_shared<Path>(snapshotPath, sliceFile);
         int ret = link(sourcePath->Name().c_str(), destPath->Name().c_str());
         if (UNLIKELY(ret != 0)) {
+            if (errno == EEXIST) {
+                LOG_WARN("Create hard link failed, file already exists, from " << sourcePath->ExtractFileName()
+                                                                               << " to " << destPath->ExtractFileName()
+                                                                               << ", errno: " << strerror(errno));
+                return BSS_OK;
+            }
             LOG_ERROR("Create hard link failed, from " << sourcePath->ExtractFileName() << " to "
                                                        << destPath->ExtractFileName()
                                                        << ", errno: " << strerror(errno));
