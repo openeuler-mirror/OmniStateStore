@@ -858,11 +858,6 @@ KeyValueIteratorRef LsmStore::CreateMergingIterator(
     for (const Level &level : version->GetLevels()) {
         std::vector<FileMetaDataRef> filesForKey = filesGetter(level);
         if (level.GetLevelId() == 0 && !filesForKey.empty()) {
-            if (filesForKey.size() > NO_5 && sectionRead) {
-                iterators.emplace_back(InputSortedRun::BuildInputIterator(filesForKey, fileIteratorBuilder, mMemManager,
-                                                                          reverseOrder, sectionRead, holder));
-                continue;
-            }
             for (auto &fileMetaData : filesForKey) {
                 iterators.emplace_back(InputSortedRun::BuildInputSortedRunIterator(fileMetaData, fileIteratorBuilder));
             }
@@ -909,11 +904,6 @@ KeyValueIteratorRef LsmStore::CreateMergingIteratorForSavepoint(
                 pqIterators.emplace_back(InputSortedRun::BuildInputSortedRunIterator(fileMetaData, fileIteratorBuilder));
             }
             // level0 kv文件
-            if (kvFileMetas.size() > NO_5 && sectionRead) {
-                kvIterators.emplace_back(InputSortedRun::BuildInputIterator(kvFileMetas, fileIteratorBuilder, mMemManager,
-                                                                            reverseOrder, sectionRead, holder));
-                continue;
-            }
             for (auto &fileMetaData : kvFileMetas) {
                 kvIterators.emplace_back(InputSortedRun::BuildInputSortedRunIterator(fileMetaData, fileIteratorBuilder));
             }
