@@ -889,6 +889,7 @@ KeyValueIteratorRef LsmStore::CreateMergingIteratorForSavepoint(
     std::function<std::vector<FileMetaDataRef>(Level level)> filesGetter, bool reverseOrder, bool sectionRead,
     FileProcHolder holder)
 {
+    RETURN_NULLPTR_AS_NULLPTR(version);
     std::vector<KeyValueIteratorRef> iterators;
     std::vector<KeyValueIteratorRef> pqIterators;
     std::vector<KeyValueIteratorRef> kvIterators;
