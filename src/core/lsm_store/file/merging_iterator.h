@@ -32,13 +32,15 @@ public:
 
     MergingIterator(std::vector<KeyValueIteratorRef> iterators, const MemManagerRef &memManager,
                     std::function<void(VersionPtr &versionPtr)> cleaner, VersionPtr currentVersion, bool reverseOrder,
-                    FileProcHolder holder, bool sectionRead = false, TombstoneServiceRef tombstoneService = nullptr)
+                    FileProcHolder holder, bool sectionRead = false, TombstoneServiceRef tombstoneService = nullptr,
+                    bool isSavepoint = false)
         : mIterators(std::move(iterators)),
           mMemManager(memManager),
           mReverseOrder(reverseOrder),
           mHolder(holder),
           mSectionRead(sectionRead),
-          mTombstoneService(tombstoneService)
+          mTombstoneService(tombstoneService),
+          mIsSavepoint(isSavepoint)
     {
         mVersion = currentVersion;
         if (mVersion != nullptr) {
@@ -117,7 +119,7 @@ private:
         }
         for (auto &iterator : mIterators) {
             if (iterator != nullptr && iterator->HasNext()) {
-                mIteratorQueue.push(MakeRef<IteratorWrapper>(iterator, mReverseOrder));
+                mIteratorQueue.push(MakeRef<IteratorWrapper>(iterator, mReverseOrder, mIsSavepoint));
             }
         }
         std::vector<KeyValueIteratorRef>().swap(mIterators);
@@ -219,8 +221,8 @@ private:
     using IteratorWrapperRef = Ref<IteratorWrapper>;
     class IteratorWrapper : public Iterator<KeyValueRef> {
     public:
-        IteratorWrapper(const KeyValueIteratorRef &entryIterator, bool reverseOrder)
-            : mEntryIterator(entryIterator), mReverseOrder(reverseOrder)
+        IteratorWrapper(const KeyValueIteratorRef &entryIterator, bool reverseOrder, bool isSavepoint = false)
+            : mEntryIterator(entryIterator), mReverseOrder(reverseOrder), mIsSavepoint(isSavepoint)
         {
             mSeqId = MakeIteratorSeqId();
             Advance();
@@ -260,6 +262,10 @@ private:
         {
             auto kv1 = this->GetNextPair();
             auto kv2 = other->GetNextPair();
+            if (mIsSavepoint) {
+                return FullKey::CompareFullKeyForSavepoint(kv1->key, kv1->value.SeqId(), kv2->key, kv2->value.SeqId(),
+                                                           mReverseOrder) < 0;
+            }
             return FullKey::CompareFullKey(kv1->key, kv1->value.SeqId(), kv2->key, kv2->value.SeqId(), mReverseOrder) <
                    0;
         }
@@ -274,6 +280,7 @@ private:
         bool mReverseOrder = false;
         KeyValueRef mNextPair = nullptr;
         uint64_t mSeqId = 0;
+        bool mIsSavepoint = false;
     };
 
     struct CompareIteratorWrapper {
@@ -297,6 +304,7 @@ private:
     bool mSectionRead = false;
     TombstoneServiceRef mTombstoneService = nullptr;
     IteratorWrapperRef mPrevIterator = nullptr;
+    bool mIsSavepoint = false;
 };
 using MergingIteratorRef = std::shared_ptr<MergingIterator>;
 

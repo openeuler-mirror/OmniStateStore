@@ -146,7 +146,7 @@ public:
         };
 
         auto fileIteratorBuilder = InputSortedRun::FileIteratorWriter::Of(buildFunc);
-        return CreateMergingIterator(version, fileIteratorBuilder, filesGetter, false, true,
+        return CreateMergingIteratorForSavepoint(version, fileIteratorBuilder, filesGetter, false, true,
                                      FileProcHolder::FILE_STORE_SAVEPOINT);
     }
 
@@ -352,6 +352,11 @@ private:
                                               std::function<std::vector<FileMetaDataRef>(Level level)> filesGetter,
                                               bool reverseOrder, bool sectionRead = false,
                                               FileProcHolder holder = FileProcHolder::FILE_STORE_ITERATOR);
+    KeyValueIteratorRef CreateMergingIteratorForSavepoint(VersionPtr &version,
+                                              InputSortedRun::FileIteratorWriterRef fileIteratorBuilder,
+                                              std::function<std::vector<FileMetaDataRef>(Level level)> filesGetter,
+                                              bool reverseOrder, bool sectionRead = false,
+                                              FileProcHolder holder = FileProcHolder::FILE_STORE_ITERATOR);
 
     BResult BuildLsmStoreFlushFile(const IteratorRef<std::vector<DataSliceRef>> &dataSliceVectorIterator,
                                    FileMetaDataRef &fileMetaData, bool &flag);
@@ -458,6 +463,18 @@ private:
     }
 
     void CreateVersion(const FileMetaDataRef &fileMetaData);
+
+    static inline void DivideFileMetas(std::vector<FileMetaDataRef>& toDivide,
+        std::vector<FileMetaDataRef>& pqFileMetas, std::vector<FileMetaDataRef>& kvFileMetas)
+    {
+        for (FileMetaDataRef& fileMeta : toDivide) {
+            if (fileMeta->GetSmallest()->IsPqKey()) {
+                pqFileMetas.emplace_back(fileMeta);
+            } else {
+                kvFileMetas.emplace_back(fileMeta);
+            }
+        }
+    }
 private:
     FileStoreIDRef mFileStoreID = nullptr;
     ConfigRef mConf = nullptr;
