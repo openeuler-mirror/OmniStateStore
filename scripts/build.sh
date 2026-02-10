@@ -54,9 +54,9 @@ cp -r java/target/librocksdbjni-linux-aarch64.so ../
 
 mkdir build && cd build
 cmake .. -DWITH_GFLAGS=OFF -DWITH_JEMALLOC=OFF -DUSE_RTTI=OFF -DWITH_SNAPPY=ON -DWITH_ZLIB=ON -DWITH_LZ4=ON -DWITH_ZSTD=ON -DROCKSDB_BUILD_SHARED=ON -DCMAKE_BUILD_TYPE=Release && make -j
-cd .. && cp -r build/librocksdb.so.6.20.3 /usr/local/lib && cp -r build/librocksdb.so.6.20.3 ../
-cd /usr/local/lib && ln -snf librocksdb.so.6.20.3 librocksdb.so.6 && ln -snf librocksdb.so.6 librocksdb.so && cd -
-cp -r include/rocksdb /usr/local/include
+cd ..
+sudo cp -r build/librocksdb.* /usr/local/lib && cp -r build/librocksdb.so.6.20.3 ../librocksdb.so.6
+sudo cp -r include/rocksdb /usr/local/include
 
 # step2: build falcon dynamic library
 cd ../../cpp && mkdir build && cd build
@@ -75,6 +75,11 @@ jar -cvf flink-alg-falcon.jar .
 
 # move to output dir
 mv flink-alg-falcon.jar ../ && cd ..
-mv librocksdb.so.6.20.3 librocksdb.so.6
-zip -r BoostKit-omniruntime-omniStateStore-1.2.0.zip flink-alg-falcon.jar librocksdb.so.6
+
+touch version.txt
+echo "Product Name: Kunpeng BoostKit" >> version.txt
+echo "Product Version: ${Product_Version}" >> version.txt
+echo "Component Name: BoostKit-omniStateStore" >> version.txt
+echo "Component Version: 1.2.0" >> version.txt
+zip -r BoostKit-omniruntime-omniStateStore-1.2.0.zip flink-alg-falcon.jar librocksdb.so.6 version.txt
 mv BoostKit-omniruntime-omniStateStore-1.2.0.zip ../
