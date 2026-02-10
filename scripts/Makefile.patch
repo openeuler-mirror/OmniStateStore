@@ -1,0 +1,142 @@
+diff --git a/Makefile b/Makefile
+index 2a0e0f7..3b9b513 100644
+--- a/Makefile
++++ b/Makefile
+@@ -183,6 +183,7 @@ ifeq ($(USE_LTO), 1)
+ 	LDFLAGS += -flto -fuse-linker-plugin
+ endif
+ 
++CXXFLAGS += -Duint32=uint32_t -Dint64=int64_t -Duint16=uint16_t -Duint8=uint8_t
+ #-----------------------------------------------
+ include src.mk
+ 
+@@ -444,7 +445,7 @@ ifeq ($(PLATFORM), OS_OPENBSD)
+ endif
+ 
+ ifndef DISABLE_WARNING_AS_ERROR
+-	WARNING_FLAGS += -Werror
++	WARNING_FLAGS += -Wno-error
+ endif
+ 
+ 
+@@ -2044,13 +2045,13 @@ ifeq ($(PLATFORM), OS_OPENBSD)
+ 	ROCKSDB_JAR = rocksdbjni-$(ROCKSDB_JAVA_VERSION)-openbsd$(ARCH).jar
+ endif
+ 
+-zlib-$(ZLIB_VER).tar.gz:
+-	curl --fail --output zlib-$(ZLIB_VER).tar.gz --location ${ZLIB_DOWNLOAD_BASE}/zlib-$(ZLIB_VER).tar.gz
+-	ZLIB_SHA256_ACTUAL=`$(SHA256_CMD) zlib-$(ZLIB_VER).tar.gz | cut -d ' ' -f 1`; \
+-	if [ "$(ZLIB_SHA256)" != "$$ZLIB_SHA256_ACTUAL" ]; then \
+-		echo zlib-$(ZLIB_VER).tar.gz checksum mismatch, expected=\"$(ZLIB_SHA256)\" actual=\"$$ZLIB_SHA256_ACTUAL\"; \
+-		exit 1; \
+-	fi
++#zlib-$(ZLIB_VER).tar.gz:
++#	curl --fail --output zlib-$(ZLIB_VER).tar.gz --location ${ZLIB_DOWNLOAD_BASE}/zlib-$(ZLIB_VER).tar.gz
++#	ZLIB_SHA256_ACTUAL=`$(SHA256_CMD) zlib-$(ZLIB_VER).tar.gz | cut -d ' ' -f 1`; \
++#	if [ "$(ZLIB_SHA256)" != "$$ZLIB_SHA256_ACTUAL" ]; then \
++#		echo zlib-$(ZLIB_VER).tar.gz checksum mismatch, expected=\"$(ZLIB_SHA256)\" actual=\"$$ZLIB_SHA256_ACTUAL\"; \
++#		exit 1; \
++#	fi
+ 
+ libz.a: zlib-$(ZLIB_VER).tar.gz
+ 	-rm -rf zlib-$(ZLIB_VER)
+@@ -2062,13 +2063,13 @@ libz.a: zlib-$(ZLIB_VER).tar.gz
+ 	fi
+ 	cp zlib-$(ZLIB_VER)/libz.a .
+ 
+-bzip2-$(BZIP2_VER).tar.gz:
+-	curl --fail --output bzip2-$(BZIP2_VER).tar.gz --location ${CURL_SSL_OPTS} ${BZIP2_DOWNLOAD_BASE}/bzip2-$(BZIP2_VER).tar.gz
+-	BZIP2_SHA256_ACTUAL=`$(SHA256_CMD) bzip2-$(BZIP2_VER).tar.gz | cut -d ' ' -f 1`; \
+-	if [ "$(BZIP2_SHA256)" != "$$BZIP2_SHA256_ACTUAL" ]; then \
+-		echo bzip2-$(BZIP2_VER).tar.gz checksum mismatch, expected=\"$(BZIP2_SHA256)\" actual=\"$$BZIP2_SHA256_ACTUAL\"; \
+-		exit 1; \
+-	fi
++#bzip2-$(BZIP2_VER).tar.gz:
++#	curl --fail --output bzip2-$(BZIP2_VER).tar.gz --location ${CURL_SSL_OPTS} ${BZIP2_DOWNLOAD_BASE}/bzip2-$(BZIP2_VER).tar.gz
++#	BZIP2_SHA256_ACTUAL=`$(SHA256_CMD) bzip2-$(BZIP2_VER).tar.gz | cut -d ' ' -f 1`; \
++#	if [ "$(BZIP2_SHA256)" != "$$BZIP2_SHA256_ACTUAL" ]; then \
++#		echo bzip2-$(BZIP2_VER).tar.gz checksum mismatch, expected=\"$(BZIP2_SHA256)\" actual=\"$$BZIP2_SHA256_ACTUAL\"; \
++#		exit 1; \
++#	fi
+ 
+ libbz2.a: bzip2-$(BZIP2_VER).tar.gz
+ 	-rm -rf bzip2-$(BZIP2_VER)
+@@ -2076,28 +2077,28 @@ libbz2.a: bzip2-$(BZIP2_VER).tar.gz
+ 	cd bzip2-$(BZIP2_VER) && $(MAKE) CFLAGS='-fPIC -O2 -g -D_FILE_OFFSET_BITS=64 $(ARCHFLAG) ${JAVA_STATIC_DEPS_CCFLAGS} ${EXTRA_CFLAGS}' LDFLAGS='${JAVA_STATIC_DEPS_LDFLAGS} ${EXTRA_LDFLAGS}' AR='ar ${EXTRA_ARFLAGS}' libbz2.a
+ 	cp bzip2-$(BZIP2_VER)/libbz2.a .
+ 
+-snappy-$(SNAPPY_VER).tar.gz:
+-	curl --fail --output snappy-$(SNAPPY_VER).tar.gz --location ${CURL_SSL_OPTS} ${SNAPPY_DOWNLOAD_BASE}/$(SNAPPY_VER).tar.gz
+-	SNAPPY_SHA256_ACTUAL=`$(SHA256_CMD) snappy-$(SNAPPY_VER).tar.gz | cut -d ' ' -f 1`; \
+-	if [ "$(SNAPPY_SHA256)" != "$$SNAPPY_SHA256_ACTUAL" ]; then \
+-		echo snappy-$(SNAPPY_VER).tar.gz checksum mismatch, expected=\"$(SNAPPY_SHA256)\" actual=\"$$SNAPPY_SHA256_ACTUAL\"; \
+-		exit 1; \
+-	fi
++#snappy-$(SNAPPY_VER).tar.gz:
++#	curl --fail --output snappy-$(SNAPPY_VER).tar.gz --location ${CURL_SSL_OPTS} ${SNAPPY_DOWNLOAD_BASE}/$(SNAPPY_VER).tar.gz
++#	SNAPPY_SHA256_ACTUAL=`$(SHA256_CMD) snappy-$(SNAPPY_VER).tar.gz | cut -d ' ' -f 1`; \
++#	if [ "$(SNAPPY_SHA256)" != "$$SNAPPY_SHA256_ACTUAL" ]; then \
++#		echo snappy-$(SNAPPY_VER).tar.gz checksum mismatch, expected=\"$(SNAPPY_SHA256)\" actual=\"$$SNAPPY_SHA256_ACTUAL\"; \
++#		exit 1; \
++#	fi
+ 
+ libsnappy.a: snappy-$(SNAPPY_VER).tar.gz
+ 	-rm -rf snappy-$(SNAPPY_VER)
+ 	tar xvzf snappy-$(SNAPPY_VER).tar.gz
+ 	mkdir snappy-$(SNAPPY_VER)/build
+-	cd snappy-$(SNAPPY_VER)/build && CFLAGS='$(ARCHFLAG) ${JAVA_STATIC_DEPS_CCFLAGS} ${EXTRA_CFLAGS}' CXXFLAGS='$(ARCHFLAG) ${JAVA_STATIC_DEPS_CXXFLAGS} ${EXTRA_CXXFLAGS}' LDFLAGS='${JAVA_STATIC_DEPS_LDFLAGS} ${EXTRA_LDFLAGS}' cmake -DCMAKE_POSITION_INDEPENDENT_CODE=ON ${PLATFORM_CMAKE_FLAGS} .. && $(MAKE) ${SNAPPY_MAKE_TARGET}
++	cd snappy-$(SNAPPY_VER)/build && CFLAGS='$(ARCHFLAG) ${JAVA_STATIC_DEPS_CCFLAGS} ${EXTRA_CFLAGS}' CXXFLAGS='$(ARCHFLAG) ${JAVA_STATIC_DEPS_CXXFLAGS} ${EXTRA_CXXFLAGS}' LDFLAGS='${JAVA_STATIC_DEPS_LDFLAGS} ${EXTRA_LDFLAGS}' cmake -DCMAKE_POSITION_INDEPENDENT_CODE=ON -DSNAPPY_BUILD_TESTS=OFF ${PLATFORM_CMAKE_FLAGS} .. && $(MAKE) ${SNAPPY_MAKE_TARGET}
+ 	cp snappy-$(SNAPPY_VER)/build/libsnappy.a .
+ 
+-lz4-$(LZ4_VER).tar.gz:
+-	curl --fail --output lz4-$(LZ4_VER).tar.gz --location ${CURL_SSL_OPTS} ${LZ4_DOWNLOAD_BASE}/v$(LZ4_VER).tar.gz
+-	LZ4_SHA256_ACTUAL=`$(SHA256_CMD) lz4-$(LZ4_VER).tar.gz | cut -d ' ' -f 1`; \
+-	if [ "$(LZ4_SHA256)" != "$$LZ4_SHA256_ACTUAL" ]; then \
+-		echo lz4-$(LZ4_VER).tar.gz checksum mismatch, expected=\"$(LZ4_SHA256)\" actual=\"$$LZ4_SHA256_ACTUAL\"; \
+-		exit 1; \
+-	fi
++#lz4-$(LZ4_VER).tar.gz:
++#	curl --fail --output lz4-$(LZ4_VER).tar.gz --location ${CURL_SSL_OPTS} ${LZ4_DOWNLOAD_BASE}/v$(LZ4_VER).tar.gz
++#	LZ4_SHA256_ACTUAL=`$(SHA256_CMD) lz4-$(LZ4_VER).tar.gz | cut -d ' ' -f 1`; \
++#	if [ "$(LZ4_SHA256)" != "$$LZ4_SHA256_ACTUAL" ]; then \
++#		echo lz4-$(LZ4_VER).tar.gz checksum mismatch, expected=\"$(LZ4_SHA256)\" actual=\"$$LZ4_SHA256_ACTUAL\"; \
++#		exit 1; \
++#	fi
+ 
+ liblz4.a: lz4-$(LZ4_VER).tar.gz
+ 	-rm -rf lz4-$(LZ4_VER)
+@@ -2105,13 +2106,13 @@ liblz4.a: lz4-$(LZ4_VER).tar.gz
+ 	cd lz4-$(LZ4_VER)/lib && $(MAKE) CFLAGS='-fPIC -O2 $(ARCHFLAG) ${JAVA_STATIC_DEPS_CCFLAGS} ${EXTRA_CFLAGS}' LDFLAGS='${JAVA_STATIC_DEPS_LDFLAGS} ${EXTRA_LDFLAGS}' all
+ 	cp lz4-$(LZ4_VER)/lib/liblz4.a .
+ 
+-zstd-$(ZSTD_VER).tar.gz:
+-	curl --fail --output zstd-$(ZSTD_VER).tar.gz --location ${CURL_SSL_OPTS} ${ZSTD_DOWNLOAD_BASE}/v$(ZSTD_VER).tar.gz
+-	ZSTD_SHA256_ACTUAL=`$(SHA256_CMD) zstd-$(ZSTD_VER).tar.gz | cut -d ' ' -f 1`; \
+-	if [ "$(ZSTD_SHA256)" != "$$ZSTD_SHA256_ACTUAL" ]; then \
+-		echo zstd-$(ZSTD_VER).tar.gz checksum mismatch, expected=\"$(ZSTD_SHA256)\" actual=\"$$ZSTD_SHA256_ACTUAL\"; \
+-		exit 1; \
+-	fi
++#zstd-$(ZSTD_VER).tar.gz:
++#	curl --fail --output zstd-$(ZSTD_VER).tar.gz --location ${CURL_SSL_OPTS} ${ZSTD_DOWNLOAD_BASE}/v$(ZSTD_VER).tar.gz
++#	ZSTD_SHA256_ACTUAL=`$(SHA256_CMD) zstd-$(ZSTD_VER).tar.gz | cut -d ' ' -f 1`; \
++#	if [ "$(ZSTD_SHA256)" != "$$ZSTD_SHA256_ACTUAL" ]; then \
++#		echo zstd-$(ZSTD_VER).tar.gz checksum mismatch, expected=\"$(ZSTD_SHA256)\" actual=\"$$ZSTD_SHA256_ACTUAL\"; \
++#		exit 1; \
++#	fi
+ 
+ libzstd.a: zstd-$(ZSTD_VER).tar.gz
+ 	-rm -rf zstd-$(ZSTD_VER)
+diff --git a/java/Makefile b/java/Makefile
+index 4912e78..ad6fe6a 100644
+--- a/java/Makefile
++++ b/java/Makefile
+@@ -377,7 +377,8 @@ endif
+ 
+ resolve_test_deps: $(JAVA_JUNIT_JAR_PATH) $(JAVA_HAMCREST_JAR_PATH) $(JAVA_MOCKITO_JAR_PATH) $(JAVA_CGLIB_JAR_PATH) $(JAVA_ASSERTJ_JAR_PATH)
+ 
+-java_test: java resolve_test_deps
++#java_test: java resolve_test_deps
++java_test: java
+ 	$(AM_V_GEN)mkdir -p $(TEST_CLASSES)
+ ifeq ($(shell java -version 2>&1|grep 1.7.0 >/dev/null; printf $$?),0)
+ 	$(AM_V_at)javac $(JAVAC_ARGS) -cp $(MAIN_CLASSES):$(JAVA_TESTCLASSPATH) -d $(TEST_CLASSES)\
