@@ -8,32 +8,32 @@ git config --global http.postBuffer 524288000
 git config --global http.lowSpeedLimit 0
 git config --global http.lowSpeedTime 999999
 git config --global core.compression 0
-#git clone https://gitee.com/mirrors_ververica/frocksdb.git
-git clone https://github.com/ververica/frocksdb.git
+git clone https://gitee.com/mirrors_ververica/frocksdb.git
+#git clone https://github.com/ververica/frocksdb.git
 cd frocksdb && git checkout FRocksDB-6.20.3
 
-#git clone https://gitee.com/gooray/snappy.git
-git clone https://github.com/google/snappy.git
+git clone https://gitee.com/gooray/snappy.git
+#git clone https://github.com/google/snappy.git
 cd snappy && git checkout tags/1.1.8 && cd ..
 mv snappy snappy-1.1.8 && tar -czvf snappy-1.1.8.tar.gz snappy-1.1.8/ && rm -rf snappy-1.1.8
 
-#git clone https://gitee.com/loswdarmy/lz4.git
-git clone https://github.com/lz4/lz4.git
+git clone https://gitee.com/loswdarmy/lz4.git
+#git clone https://github.com/lz4/lz4.git
 cd lz4 && git checkout tags/v1.9.3 && cd ..
 mv lz4 lz4-1.9.3 && tar -czvf lz4-1.9.3.tar.gz lz4-1.9.3/ && rm -rf lz4-1.9.3
 
-#git clone https://gitee.com/langxm2006/zlib.git
-git clone https://github.com/madler/zlib.git
+git clone https://gitee.com/langxm2006/zlib.git
+#git clone https://github.com/madler/zlib.git
 cd zlib && git checkout tags/v1.2.13 && cd ..
 mv zlib zlib-1.2.13 && tar -czvf zlib-1.2.13.tar.gz zlib-1.2.13/ && rm -rf zlib-1.2.13
 
-#git clone https://gitee.com/ak17/bzip2.git
-git clone https://gitlab.com/bzip2/bzip2.git
+git clone https://gitee.com/ak17/bzip2.git
+#git clone https://gitlab.com/bzip2/bzip2.git
 cd bzip2 && git checkout tags/bzip2-1.0.8 && cd ..
 mv bzip2 bzip2-1.0.8 && tar -czvf bzip2-1.0.8.tar.gz bzip2-1.0.8/ && rm -rf bzip2-1.0.8
 
-#git clone https://gitee.com/ak17/zstd.git
-git clone https://github.com/facebook/zstd.git
+git clone https://gitee.com/ak17/zstd.git
+#git clone https://github.com/facebook/zstd.git
 cd zstd && git checkout tags/v1.4.9 && cd ..
 mv zstd zstd-1.4.9 && tar -czvf zstd-1.4.9.tar.gz zstd-1.4.9/ && rm -rf zstd-1.4.9
 
