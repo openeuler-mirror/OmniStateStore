@@ -52,7 +52,7 @@ jbyteArray FalconCache::get(JNIEnv *env, jlong rocksdbHandle, jlong cfHandle, jl
         hitCnt++;
 
         // value in cache will not be null all the time
-        ROCKSDB_NAMESPACE::Slice value_slice = state_pos->second;
+        ROCKSDB_NAMESPACE::Slice val_slice = state_pos->second;
 
         //jbyteArray jVal = FalconUtil::JniUtil::copyBytes(env, value_slice.ToString());
         jsize len = static_cast<jsize>(val_slice.size());
