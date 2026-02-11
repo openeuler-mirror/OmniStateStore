@@ -8,6 +8,41 @@
 const int CACHE_SIZE_UPPER_LIMIT_RATIO = 2;
 const int BYPASS_CHECK_PERIOD = 20000;
 
+inline void copyDataTojVal(void* dst, const void* src, size_t len) {
+    uint8_t* jArray = static_cast<uint8_t*>(dst);
+    const uint8_t* sliceData = static_cast<const uint8_t*>(src);
+
+    while (((uintptr_t)jArray & 15) && len > 0) {
+        *jArray++ = *sliceData++;
+        len--;
+    }
+
+    while (len >= 64) {
+        uint8x16_t v0 = vld1q_u8(sliceData);
+        uint8x16_t v1 = vld1q_u8(sliceData + 16);
+        uint8x16_t v2 = vld1q_u8(sliceData + 32);
+        uint8x16_t v3 = vld1q_u8(sliceData + 48);
+
+        vst1q_u8(jArray, v0);
+        vst1q_u8(jArray + 16, v1);
+        vst1q_u8(jArray + 32, v2);
+        vst1q_u8(jArray + 48, v3);
+
+        sliceData += 64;
+        jArray += 64;
+        len -= 64;
+    }
+
+    while (len >= 16) {
+        vst1q_u8(jArray, vld1q_u8(sliceData));
+        sliceData += 16;
+        jArray += 16;
+        len -= 16;
+    }
+
+    memcpy(jArray, sliceData, len);
+}
+
 jbyteArray FalconCache::get(JNIEnv *env, jlong rocksdbHandle, jlong cfHandle, jlong writeOptionsHandle,
                             ROCKSDB_NAMESPACE::Slice key_slice)
 {
@@ -18,7 +53,22 @@ jbyteArray FalconCache::get(JNIEnv *env, jlong rocksdbHandle, jlong cfHandle, jl
 
         // value in cache will not be null all the time
         ROCKSDB_NAMESPACE::Slice value_slice = state_pos->second;
-        jbyteArray jVal = FalconUtil::JniUtil::copyBytes(env, value_slice.ToString());
+
+        //jbyteArray jVal = FalconUtil::JniUtil::copyBytes(env, value_slice.ToString());
+        jsize len = static_cast<jsize>(val_slice.size());
+        jbyteArray jVal = env->NewByteArray(len);
+        if (jVal == nullptr) {
+            return nullptr;
+        }
+
+        if (len >= 64) {
+            jboolean is_copy;
+            jbyte* array_elems = env->GetByteArrayElements(jVal, &is_copy);
+            copyDataTojVal(array_elems, val_slice.data(), len);
+            env->ReleaseByteArrayElements(jVal, array_elems, 0);
+        } else {
+            env->SetByteArrayRegion(jVal, 0, len, reinterpret_cast<const jbyte*>(val_slice.data()));
+        }
 
         // if falcon cache hit, directly delete key_slice
         delete[] key_slice.data_;
