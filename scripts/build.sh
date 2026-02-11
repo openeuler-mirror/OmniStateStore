@@ -49,18 +49,18 @@ cp -r ../../scripts/Makefile.patch ./
 patch -p1 < Makefile.patch
 
 chmod 777 -R build_tools
-make -j 16 rocksdbjavastatic
+make -j 8 rocksdbjavastatic
 cp -r java/target/librocksdbjni-linux-aarch64.so ../
 
 mkdir build && cd build
-cmake .. -DWITH_GFLAGS=OFF -DWITH_JEMALLOC=OFF -DUSE_RTTI=OFF -DWITH_SNAPPY=ON -DWITH_ZLIB=ON -DWITH_LZ4=ON -DWITH_ZSTD=ON -DROCKSDB_BUILD_SHARED=ON -DCMAKE_BUILD_TYPE=Release && make -j
+cmake .. -DWITH_GFLAGS=OFF -DWITH_JEMALLOC=OFF -DUSE_RTTI=OFF -DWITH_SNAPPY=ON -DWITH_ZLIB=ON -DWITH_LZ4=ON -DWITH_ZSTD=ON -DROCKSDB_BUILD_SHARED=ON -DCMAKE_BUILD_TYPE=Release && make -j8
 cd ..
 sudo cp -r build/librocksdb.* /usr/local/lib && cp -r build/librocksdb.so.6.20.3 ../librocksdb.so.6
 sudo cp -r include/rocksdb /usr/local/include
 
 # step2: build falcon dynamic library
 cd ../../cpp && mkdir build && cd build
-cmake .. -DCMAKE_BUILD_TYPE=Release && make -j
+cmake .. -DCMAKE_BUILD_TYPE=Release && make -j8
 cd .. && cp -r build/libfalcon.so ../3rdparty
 
 # step3: build flink-alg-falcon.jar
