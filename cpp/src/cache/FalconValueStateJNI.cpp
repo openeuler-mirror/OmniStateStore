@@ -40,11 +40,7 @@ JNIEXPORT jbyteArray JNICALL Java_com_huawei_falcon_state_cache_FalconValueState
 
     auto falcon_cache = reinterpret_cast<FalconCache*>(falconHandle);
     if (falcon_cache != nullptr) {
-        jbyteArray value = falcon_cache->get(env, rocksdbHandle, cfHandle, writeOptionsHandle, key_slice);
-        if (falcon_cache->bypassCache()) {
-            falcon_cache->updateSizeLimit(env, rocksdbHandle, cfHandle, writeOptionsHandle, 0);
-        }
-        return value;
+        return falcon_cache->get(env, rocksdbHandle, cfHandle, writeOptionsHandle, key_slice);
     } else {
         FalconException::FalconExceptionJni::ThrowNew(env, "[FALCON] invalid falcon cache handle when getting state.",
             ROCKSDB_NAMESPACE::Status::InvalidArgument("Invalid Falcon Cache Handle."));
