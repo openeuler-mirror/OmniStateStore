@@ -13,7 +13,7 @@ JNIEXPORT jlong JNICALL Java_com_huawei_falcon_state_cache_FalconValueState_init
 {
     auto cache = new FalconCache(cacheBypassThreshold);
     FALCON_LOG("successfully init falcon cache object. If cache hitRatio < " << cacheBypassThreshold << ", falcon cache"
-                "will be bypassed.");
+                " will be bypassed.");
     return reinterpret_cast<jlong>(cache);
 }
 
