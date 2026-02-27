@@ -138,7 +138,7 @@ public:
 private:
     unsigned long long accessCnt{}; // frequency of accessing falcon cache, use this type (2^64) to avoid overflow
     unsigned long long hitCnt{}; // frequency of hitting falcon cache
-    float hitThreshold{}; // if cache hit ratio is less than hitThreshold, bypass falcon cache
+    double hitThreshold{}; // if cache hit ratio is less than hitThreshold, bypass falcon cache
     int cacheSizeLimit{}; // stateCache size limit, 0 means disable falcon cache, otherwise enable falcon cache
     std::unordered_map<ROCKSDB_NAMESPACE::Slice, ROCKSDB_NAMESPACE::Slice, FalconHash<ROCKSDB_NAMESPACE::Slice>,
         FalconEqual<ROCKSDB_NAMESPACE::Slice, ROCKSDB_NAMESPACE::Slice>> cache = {};

@@ -85,6 +85,7 @@ import javax.annotation.Nonnull;
 
 import java.io.File;
 import java.io.IOException;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -118,7 +119,7 @@ public class RocksDBKeyedStateBackend<K> extends AbstractKeyedStateBackend<K> {
 
     // -------------------------------- FALCON Implementation --------------------------------
     // if enableMerge is true, enable merge optimization
-    boolean enableMerge = GlobalConfiguration.loadConfiguration().get(
+    private final boolean enableMerge = GlobalConfiguration.loadConfiguration().get(
             ConfigOptions.key("state.backend.rocksdb.falcon.use-merge")
                     .booleanType()
                     .defaultValue(false)
@@ -168,7 +169,20 @@ public class RocksDBKeyedStateBackend<K> extends AbstractKeyedStateBackend<K> {
      */
     public <N, SV, S extends State, IS extends S> void InitFalconCache(StateDescriptor<S, SV> stateDesc,
            IS createdState, Tuple2<ColumnFamilyHandle, RegisteredKeyValueStateBackendMetaInfo<N, SV>> registerResult) {
-        if (createdState instanceof RocksDBValueState && !stateDesc.getTtlConfig().isEnabled() && enableFalconCache) {
+        boolean udfEnableTtl = stateDesc.getTtlConfig().isEnabled();
+        boolean sqlEnableTtl = GlobalConfiguration.loadConfiguration().get(
+            ConfigOptions.key("table.exec.state.ttl")
+                .durationType()
+                .defaultValue(Duration.ofMillis(0))
+                .withDescription(
+                        "Specifies a minimum time interval for how long idle state "
+                                + "(i.e. state which was not updated), will be retained. State will never be "
+                                + "cleared until it was idle for less than the minimum time, and will be cleared "
+                                + "at some time after it was idle. Default is never clean-up the state. "
+                                + "NOTE: Cleaning up state requires additional overhead for bookkeeping. "
+                                + "Default value is 0, which means that it will never clean up state.")
+        ).toMillis() > 0;
+        if (createdState instanceof RocksDBValueState && enableFalconCache && !udfEnableTtl && !sqlEnableTtl) {
             // store the reference of all the created states who use falcon cache.
             falconCache.put(registerResult.f0, createdState);
 
