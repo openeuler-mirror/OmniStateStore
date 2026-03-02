@@ -5,7 +5,7 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON) # use -f PIC to build jni
 
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=armv8.2-a+sve+crc -D__ARM_FEATURE_CRC32=1 -D__ARM_FEATURE_SVE=1")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=armv8.2-a+sve2+crc -D__ARM_FEATURE_CRC32=1 -D__ARM_FEATURE_SVE=1")
 
 # set include path, include falcon header files, and java、rocksdb header files
 find_package(JNI REQUIRED)
