@@ -19,73 +19,19 @@ static inline uint8_t check_equal(const uint8_t* p, const uint8_t* q, uint32_t l
 {
     while (len > 0) {
         svbool_t pg = svwhilelt_b8_u32(0, len);
-        svuint8_t a = svld1_u8(pg, p);
+        svuint8_t a = svld1_u8(pg, p); // 从内存加载数据到 SVE 向量寄存器
         svuint8_t b = svld1_u8(pg, q);
-
-        // 比较并检查差异
-        svbool_t diff = svcmpne(pg, a, b);
+        svbool_t diff = svcmpne(pg, a, b); // 比较两个向量是否不相等
         if (svptest_any(svptrue_b8(), diff)) {
-            return false;
+            return false; // true说明有不匹配，返回false
         }
 
-        size_t vl = svcntb();
-        p += vl;
-        q += vl;
-        len -= vl;
+        size_t sve_vec_bytes = svcntb();
+        p += sve_vec_bytes;
+        q += sve_vec_bytes;
+        len -= sve_vec_bytes;
     }
     return true;
-}
-
-static inline uint64_t sve_extract_u64(svuint64_t vec, size_t idx) noexcept {
-    uint64_t result = 0;
-    // 内联汇编：将向量vec的第idx个64位元素（.d表示64位双字）赋值给result
-    // %0: 输出变量result，%1: 输入向量vec（w表示SVE向量寄存器），%2: 输入索引idx
-    __asm__ __volatile__(
-        "st1d %1.d, p0, [%3]\n"        // 将整个向量存到栈上
-        "ldr %0, [%3, %2, lsl #3]\n"   // 从偏移处读取第 idx 个元素
-        : "=r"(result)
-        : "w"(vec), "r"(idx), "r"(&result)  // 需要临时栈空间
-        : "memory", "p0"
-    );
-    return result;
-}
-
-static inline uint32_t do_crc_for_valid_bytes(uint32_t crc, size_t valid_bytes, uint64_t qword)
-{
-    switch (valid_bytes) { // 按有效字节选择对应CRC指令，避免零填充影响结果
-        case 8:
-            crc = __builtin_aarch64_crc32cx(crc, qword);
-            break;
-        case 7:
-            crc = __builtin_aarch64_crc32cw(crc, static_cast<uint32_t>(qword >> 32));
-            crc = __builtin_aarch64_crc32ch(crc, static_cast<uint16_t>(qword >> 16));
-            crc = __builtin_aarch64_crc32cb(crc, static_cast<uint8_t>(qword));
-            break;
-        case 6:
-            crc = __builtin_aarch64_crc32cw(crc, static_cast<uint32_t>(qword >> 32));
-            crc = __builtin_aarch64_crc32ch(crc, static_cast<uint16_t>(qword >> 16));
-            break;
-        case 5:
-            crc = __builtin_aarch64_crc32cw(crc, static_cast<uint32_t>(qword >> 32));
-            crc = __builtin_aarch64_crc32cb(crc, static_cast<uint8_t>(qword >> 16));
-            break;
-        case 4:
-            crc = __builtin_aarch64_crc32cw(crc, static_cast<uint32_t>(qword));
-            break;
-        case 3:
-            crc = __builtin_aarch64_crc32ch(crc, static_cast<uint16_t>(qword));
-            crc = __builtin_aarch64_crc32cb(crc, static_cast<uint8_t>(qword >> 16));
-            break;
-        case 2:
-            crc = __builtin_aarch64_crc32ch(crc, static_cast<uint16_t>(qword));
-            break;
-        case 1:
-            crc = __builtin_aarch64_crc32cb(crc, static_cast<uint8_t>(qword));
-            break;
-        default:
-            break;
-    }
-    return crc;
 }
 
 // 工具：混合两个 64-bit 值（基于 SplitMix64）
@@ -105,66 +51,59 @@ struct FalconHash {
             return 0;
         }
 
-        const size_t vl = svcntb();  // 向量长度（字节）：16/32/64
-        const size_t vl_u64 = vl / 8; // 64-bit 元素个数
-
+        const size_t sve_vec_bytes = svcntd();  // 向量长度（字节）：16/32/64
         // 初始化 SVE 状态向量
         svuint64_t state = svdup_u64(0x1234567890abcdefULL);
-        svuint64_t mixer = svdup_u64(0x9e3779b97f4a7c15ULL);
+        svuint64_t mixer = svdup_u64(0x9e3779b97f4a7c15ULL); // 乘法常数，用于扩散比特，类似 Fibonacci hashing
         uint64_t seed = len;
 
-        // 对齐前导字节
-        size_t offset = 0;
-        while (((uintptr_t)(data + offset) & 7) && offset < len) {
-            seed = __builtin_aarch64_crc32cb(seed, data[offset]);
-            ++offset;
+         // 强制 8 字节对齐指针（关键优化）
+        const uint64_t* ptr64 = reinterpret_cast<const uint64_t*>((reinterpret_cast<uintptr_t>(data) + 7) & ~7);
+        __builtin_prefetch(ptr64, 0, 3); // 预取当前块到L1，可读写，高优先级
+        // 处理前导未对齐字节（使后续 64-bit 加载对齐）
+        size_t offset = reinterpret_cast<const uint8_t*>(ptr64) - data;
+        uint64_t hash = seed;
+        for (size_t i = 0; i < offset && i < len; ++i) {
+            hash = __builtin_aarch64_crc32cb(hash, data[i]);
         }
 
-        const uint64_t* ptr = reinterpret_cast<const uint64_t*>(data + offset);
-        size_t remaining = len - offset;
+        size_t remaining = (len > offset) ? (len - offset) : 0;
+        size_t num_qwords = remaining / 8;  // 64-bit 块数
 
-        // SVE 主循环：每次处理 vl 字节
-        // 使用 WHILELT 确保不越界
-        size_t i = 0;
-        while (i + vl <= remaining) {
-            svbool_t pg = svwhilelt_b8_u64(i, remaining);
+        // SVE 主循环：明确使用 64-bit 元素计数
+        while (num_qwords >= sve_vec_bytes) {
+            svbool_t pg = svptrue_b64();  // 全谓词，明确 64-bit
+            svuint64_t vals = svld1_u64(pg, ptr64);
+            // 混合
+            state = sveor_u64_x(pg, state, vals);
+            state = svmul_u64_x(pg, state, mixer);
+            // 更新 mixer（标量方式更高效）
+            uint64_t m = svaddv_u64(pg, mixer);
+            mixer = svdup_u64(m + 0x9e3779b97f4a7c15ULL);
 
-            // 加载 vl 字节
-            svuint8_t bytes = svld1_u8(pg, data + offset + i);
-            svuint64_t vals = svreinterpret_u64_u8(bytes);
-
-            // 混合：state = (state ^ vals) * mixer
-            state = sveor_u64_z(pg, state, vals);
-            state = svmul_u64_z(pg, state, mixer);
-
-            // 旋转 mixer 保持熵
-            mixer = svadd_u64_z(pg, mixer, svdup_u64(0x9e3779b97f4a7c15ULL));
-            i += vl;
+            ptr64 += sve_vec_bytes;
+            num_qwords -= sve_vec_bytes;
         }
 
-        // 规约 SVE 向量到标量
-        uint64_t hash = svlasta_u64(svptrue_b64(), state) ^ seed;
+        // 合并状态到 hash
+        hash ^= svaddv_u64(svptrue_b64(), state);
 
-        // 处理剩余字节（标量）
-        const uint8_t* tail = data + offset + i;
-        remaining -= i;
-
-        while (remaining >= 8) {
-            hash = mix(hash, *reinterpret_cast<const uint64_t*>(tail));
+        // 处理剩余 64-bit 块（标量）
+        const uint8_t* tail = reinterpret_cast<const uint8_t*>(ptr64);
+        while (num_qwords > 0) {
+            hash = mix(hash, *ptr64++);
+            --num_qwords;
             tail += 8;
-            remaining -= 8;
         }
 
         // 最后 <8 字节
-        if (remaining > 0) {
-            uint64_t last = 0;
-            memcpy(&last, tail, remaining);
-            hash = mix(hash, last ^ (remaining << 56));
+        remaining = remaining % 8;
+        for (size_t i = 0; i < remaining; ++i) {
+            hash = __builtin_aarch64_crc32cb(hash, tail[i]);
         }
 
         // 最终化
         hash = mix(hash, hash >> 32);
-        hash = mix(hash, hash >> 16);
         return static_cast<std::size_t>(hash);
     }
 };
