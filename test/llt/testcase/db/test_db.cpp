@@ -2874,6 +2874,8 @@ TEST_F(TestDB, test_pqTable_add)
         }
         ValidatePQ();
     }
+    CleanCurrentVersion();
+    ValidateFiles();
 }
 
 TEST_F(TestDB, test_pqTable_add_lsm)
@@ -2891,6 +2893,35 @@ TEST_F(TestDB, test_pqTable_add_lsm)
         }
         ValidatePQ();
     }
+    CleanCurrentVersion();
+    ValidateFiles();
+}
+
+TEST_F(TestDB, test_pq_iterator_open_close)
+{
+    std::vector<OperationConfig> operationsConfig = {
+        { 0.9, PQTableAdd },
+        { 0.1, PQTableRemove },
+    };
+    for (uint32_t i = 0; i < NO_7; i++) {
+        for (uint32_t j = 0; j < NO_10000; j++) {
+            executeOperation(operationsConfig);
+        }
+        if (i < NO_3) {
+            pqTable->TriggerSegmentFlush(true);
+        }
+    }
+    for (int i = 0; i < NO_1000; i++) {
+        std::vector<uint8_t> randomData = GetRandomData();
+        uint32_t hashcode = HashForTest(randomData.data(), randomData.size());
+        uint32_t groupId = hashcode % 128;
+        std::vector<uint8_t> prefix = GetPrefix(groupId);
+        BinaryData data(prefix.data(), prefix.size());
+        auto it = pqTable->KeyIterator(data);
+        delete it;
+    }
+    CleanCurrentVersion();
+    ValidateFiles();
 }
 
 TEST_F(TestDB, test_cp_lsm_and_get_return_ok_with_blob)
