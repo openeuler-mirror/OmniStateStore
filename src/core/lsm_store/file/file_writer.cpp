@@ -40,7 +40,6 @@ BResult FileWriter::Add(const KeyValueRef &keyValue)
         mFilterBlockWriter->Add(keyValue->key.MixedHashCode());
     }
     mStateIdInterval.Update(keyValue->key.StateId());
-    LOG_TRACE("Add file builder success, " << keyValue->ToString());
     return BSS_OK;
 }
 

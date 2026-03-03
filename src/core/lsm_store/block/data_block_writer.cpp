@@ -186,7 +186,6 @@ BResult DataBlockWriter::WriteSecondaryKeyAndValue(const KeyValueRef &keyValue, 
     if (mIndexBuilder != nullptr) {
         mIndexBuilder->Add(primaryKeyIndex, secondaryKeyIndex, key.MixedHashCode());
     }
-    LOG_TRACE("Write secondary key and value, " << keyValue->key.ToString() << " " << keyValue->value.ToString());
     return BSS_OK;
 }
 
@@ -233,7 +232,6 @@ BResult DataBlockWriter::Add(const KeyValueRef &keyValue)
         mLastKeyValue = keyValue;
         mPrimaryOffset.emplace_back(mPrimaryOutputView->GetOffset());
         // write primary key.
-        LOG_TRACE("Write primary key, " << keyValue->key.ToString() << " " << keyValue->value.ToString());
         return FullKeyUtil::WritePriKey(mLastKeyValue->key, mPrimaryOutputView);
     }
 
