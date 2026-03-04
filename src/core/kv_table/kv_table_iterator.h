@@ -240,6 +240,9 @@ public:
     ~PQKeyIterator()
     {
         free(const_cast<uint8_t *>(mGroupId.Data()));
+        if (mFileIterator != nullptr) {
+            mFileIterator->Close();
+        }
     }
 
     BResult Init(const BinaryData &data, std::vector<PQSkipList> &skipList, const KeyValueIteratorRef &fileIterator)
