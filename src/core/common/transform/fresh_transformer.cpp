@@ -91,7 +91,6 @@ BResult FreshHandler::DoTrans(FreshKeyNodePtr key, FreshValueNodePtr value,
         BinaryKey binaryKey;
         binaryKey.Parse(primaryKey, stateType == VALUE);
         collection.emplace_back(binaryKey, value);
-        LOG_TRACE(binaryKey.ToString() << value->ToString());
         return BSS_OK;
     }
     BoostHashMapRef hashMap = MakeRef<BoostHashMap>();
@@ -109,7 +108,6 @@ BResult FreshHandler::DoTrans(FreshKeyNodePtr key, FreshValueNodePtr value,
         BinaryKey binaryKey;
         binaryKey.Parse(primaryKey, secondKey);
         collection.emplace_back(binaryKey, entry.second);
-        LOG_TRACE(binaryKey.ToString() << entry.second->ToString());
     }
     return BSS_OK;
 }

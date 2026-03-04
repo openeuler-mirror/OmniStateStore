@@ -105,7 +105,6 @@ BResult KVTable::Put(uint32_t keyHashCode, const BinaryData &priKey, const Binar
     Value putVal;
     putVal.Init(ValueType::PUT, value.Length(), value.Data(), mSeqGenerator->Next());
     BResult result = mFreshTable->Put(queryKey, putVal);
-    LOG_TRACE(queryKey.ToString() << putVal.ToString());
     return result;
 }
 
@@ -195,7 +194,6 @@ BResult AbstractKMapTable::Put(uint32_t keyHashCode, const BinaryData &priKey,
     Value putVal;
     putVal.Init(ValueType::PUT, value.Length(), value.Data(), mSeqGenerator->Next());
     keyValue.value = putVal;
-    LOG_TRACE(queryKey.ToString() << putVal.ToString());
     auto ret = mFreshTable->Add(keyValue);
     PeakFilterAdd(priKey, secKey);
     return ret;
@@ -292,7 +290,6 @@ BResult AbstractKMapTable::Remove(uint32_t hashCode, const BinaryData &priKey, c
     Value putVal;
     putVal.Init(ValueType::DELETE, mSeqGenerator->Next());
     keyValue.value = putVal;
-    LOG_TRACE(queryKey.ToString() << putVal.ToString());
     return mFreshTable->Add(keyValue);
 }
 

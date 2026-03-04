@@ -141,8 +141,6 @@ BResult SliceKVIterator::MergeDataSlices(const std::vector<DataSliceRef> &dataSl
                 auto allocator = [this](uint32_t size) { return CreateBuffer(size); };
                 auto &olderValue = olderKv->second->value;
                 auto &newerValue = keyValue->value;
-                LOG_TRACE("Flush slice to file, before merge, olderKeyValue:" << olderKv->second->ToString()
-                                                        << ", newerKeyValue:" << keyValue->ToString());
                 auto deleteAction = [this](const Key &key1, const Value &oldValue) -> void {
                     if (mTombstoneService != nullptr) {
                         mTombstoneService->DeleteValue(key1, oldValue);
@@ -154,7 +152,6 @@ BResult SliceKVIterator::MergeDataSlices(const std::vector<DataSliceRef> &dataSl
                                                                    << ", olderValue:" << olderValue.ToString());
                     return BSS_ERR;
                 }
-                LOG_TRACE("Flush slice to file, after merge, keyValue:" << olderKv->second->ToString());
             }
         }
     }

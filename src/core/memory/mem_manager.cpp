@@ -334,6 +334,7 @@ uint32_t MemManager::CalcFreshTableSize()
 
     if (mMemoryLimit >= IO_SIZE_640M) {
         segmentSize = IO_SIZE_64M;
+        segmentCount = mDbRefCount.load() >= 3 ? segmentCount + 1 : segmentCount;
     } else if (mMemoryLimit >= IO_SIZE_320M) {
         segmentSize = IO_SIZE_32M;
     } else {
