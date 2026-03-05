@@ -1,0 +1,266 @@
+# 1 版本说明书
+<font size=3> 本文档提供OmniStateStore的版本信息和特性更新情况。</font>
+
+---
+
+## 1.1 版本配套说明
+### 产品版本信息
+<font size=3>
+<table>
+  <tbody>
+    <tr>
+      <td style="text-align: left;">产品名称</td>
+      <td style="text-align: left;">Kunpeng BoostKit</td>
+    </tr>
+    <tr>
+      <td style="text-align: left;">产品版本</td>
+      <td style="text-align: left;">26.0.0</td>
+    </tr>
+    <tr>
+      <td style="text-align: left;">软件名称和版本</td>
+      <td style="text-align: left;">OmniStateStore 1.2.0</td>
+    </tr>
+  </tbody>
+</table>
+</font>
+
+### 软件版本配套说明
+<font size=3>
+<table>
+  <thead>
+    <tr>
+      <th style="text-align: left;">项目</th>
+      <th style="text-align: left;">版本</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td style="text-align: left;">操作系统</td>
+      <td style="text-align: left;">openEuler 22.03 LTS SP3</td>
+    </tr>
+    <tr>
+      <td style="text-align: left;">GCC</td>
+      <td style="text-align: left;">10.3.1</td>
+    </tr>
+    <tr>
+      <td style="text-align: left;">JDK</td>
+      <td style="text-align: left;">毕昇JDK 1.8.0_432</td>
+    </tr>
+    <tr>
+      <td style="text-align: left;">Flink</td>
+      <td style="text-align: left;">1.16.3</td>
+    </tr>
+    <tr>
+      <td style="text-align: left;">FRocksDB</td>
+      <td style="text-align: left;">6.20.3</td>
+    </tr>
+  </tbody>
+</table>
+</font>
+
+### 硬件版本配套说明
+<font size=3>
+<table>
+  <tbody>
+    <tr>
+      <td style="text-align: left;">处理器</td>
+      <td style="text-align: left;">鲲鹏920系列处理器</td>
+    </tr>
+    <tr>
+      <td style="text-align: left;">内存大小</td>
+      <td style="text-align: left;">32GB以上</td>
+    </tr>
+  </tbody>
+</table>
+</font>
+
+### 病毒扫描结果
+<font size=3>
+本软件包、版本文档、产品文档经过防病毒软件扫描，未发现病毒。详细信息如下：
+<table>
+  <tbody>
+    <tr>
+      <td style="text-align: left;">Engine Name</td>
+      <td style="text-align: left;">QiAnXin</td>
+    </tr>
+    <tr>
+      <td style="text-align: left;">Engine Version</td>
+      <td style="text-align: left;">8.0.5.5260</td>
+    </tr>
+    <tr>
+      <td style="text-align: left;">Virus Lib Version</td>
+      <td style="text-align: left;">2025-12-10 08:00:00.0</td>
+    </tr>
+    <tr>
+      <td style="text-align: left;">Scan Time</td>
+      <td style="text-align: left;">2025-12-11 22:44:53</td>
+    </tr>
+    <tr>
+      <td style="text-align: left;">Scan Result</td>
+      <td style="text-align: left;">OK</td>
+    </tr>
+  </tbody>
+</table>
+<table>
+  <tbody>
+    <tr>
+      <td style="text-align: left;">Engine Name</td>
+      <td style="text-align: left;">Bitdefender</td>
+    </tr>
+    <tr>
+      <td style="text-align: left;">Engine Version</td>
+      <td style="text-align: left;">7.5.1.200224</td>
+    </tr>
+    <tr>
+      <td style="text-align: left;">Virus Lib Version</td>
+      <td style="text-align: left;">7.99958</td>
+    </tr>
+    <tr>
+      <td style="text-align: left;">Scan Time</td>
+      <td style="text-align: left;">2025-12-11 22:45:17</td>
+    </tr>
+    <tr>
+      <td style="text-align: left;">Scan Result</td>
+      <td style="text-align: left;">OK</td>
+    </tr>
+  </tbody>
+</table>
+<table>
+  <tbody>
+    <tr>
+      <td style="text-align: left;">Engine Name</td>
+      <td style="text-align: left;">Kaspersky</td>
+    </tr>
+    <tr>
+      <td style="text-align: left;">Engine Version</td>
+      <td style="text-align: left;">12.0.0.6672</td>
+    </tr>
+    <tr>
+      <td style="text-align: left;">Virus Lib Version</td>
+      <td style="text-align: left;">2025-12-11 10:04:00</td>
+    </tr>
+    <tr>
+      <td style="text-align: left;">Scan Time</td>
+      <td style="text-align: left;">2025-12-11 22:44:59</td>
+    </tr>
+    <tr>
+      <td style="text-align: left;">Scan Result</td>
+      <td style="text-align: left;">OK</td>
+    </tr>
+  </tbody>
+</table>
+</font>
+
+---
+
+## 1.2 版本更新情况说明
+## V1.2.0
+### 更新说明
+<font size=3> 当前版本旨在解决大数据场景下，针对大状态下IO性能较差的问题，优化Flink对RocksDB的使用效率，提升Flink的IO性能。</font>
+
+### 新增特性
+<font size=3>
+
+- **Flink语义状态缓存算法**：同Key状态优先在内存中完成聚合，减少状态对RocksDB的访问频次；<br>
+- **Flink智能多留感知算法**：对于仅需要点读、点写的状态，将memTable数据结构替换为HashLinkList, 提升状态点读和点写效率；<br>
+- **使用merge替换状态RMW**：减少Join算子的状态更新开销；<br>
+- **双流Join数据缓存算法**：减少StreamJoinOperator的状态范围查询次数；<br>
+- **动态Filter技术**：过滤冗余状态查询操作；<br>
+</font>
+
+### 修改特性
+<font size=3> 无 </font>
+
+### 删除特性
+<font size=3> 删除KV分离、Priority Queue持久化存储等特性。 </font>
+
+### 已解决的问题
+<font size=3> 无 </font>
+
+### 遗留问题
+<font size=3> 无 </font>
+
+---
+
+## V1.1.0
+### 更新说明
+<font size=3> 当前版本解决了大数据场景下针对大状态下IO性能较差的问题，实现了一种新型的状态存储方式，提升了Flink的IO性能。</font>
+
+### 新增特性
+<font size=3>
+
+- 支持对接Flink Metric框架，并实现部分常用的Metric指标。
+- 支持Priority Queue持久化存储。
+- 支持KV分离存储。
+</font>
+
+### 修改特性
+<font size=3> 无 </font>
+
+### 删除特性
+<font size=3> 无 </font>
+
+### 已解决的问题
+<font size=3> 无 </font>
+
+### 遗留问题
+<font size=3> 无 </font>
+
+---
+
+## V1.0.0
+
+### 更新说明
+
+<font size=3> 当前版本解决了大数据场景下针对大状态下IO性能较差的问题，实现了一种新型的状态存储方式，提升了Flink的IO性能。</font>
+
+### 新增特性
+<font size=3> 无 </font>
+
+### 修改特性
+<font size=3> 无 </font>
+
+### 删除特性
+<font size=3> 无 </font>
+
+### 已解决的问题
+<font size=3> 无 </font>
+
+### 遗留问题
+<font size=3> 无 </font>
+
+---
+
+## 1.3 版本配套文档
+### 版本配套文档
+<font size=3>
+
+<table>
+  <thead>
+    <tr>
+      <th style="text-align: left;">文档名称</th>
+      <th style="text-align: left;">内容简介</th>
+      <th style="text-align: left;">交付形式</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td style="text-align: left;">《Kunpeng BoostKit 25.3.0 大数据OmniRuntime 1.9.0 版本说明书》</td>
+      <td style="text-align: left;">本文档提供OmniRuntime的版本发布信息</td>
+      <td style="text-align: left;">开源仓</td>
+    </tr>
+    <tr>
+      <td style="text-align: left;">《Kunpeng BoostKit 25.3.0 大数据OmniRuntime 特性指南》</td>
+      <td style="text-align: left;">本文档提供OmniRuntime安装部署等指导</td>
+      <td style="text-align: left;">开源仓</td>
+    </tr>
+  </tbody>
+</table>
+
+
+### 获取文档的方法
+
+<font size=3>您可以通过访问[鲲鹏社区](https://www.hikunpeng.com/document/detail/zh/kunpengbds/overview/kunpengbds.html)浏览和获取相关文档。</font>
+
+
+

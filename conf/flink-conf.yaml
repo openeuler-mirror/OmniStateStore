@@ -1,3 +1,24 @@
+#==============================================================================
+# JM and TM parameters
+#==============================================================================
+taskmanager.memory.process.size: 8G
+jobmanager.rpc.address: 172.19.0.2
+jobmanager.rpc.port: 6123
+jobmanager.memory.process.size: 8G
+taskmanager.numberOfTaskSlots: 2
+parallelism.default: 16
+io.tmp.dirs: /data/tmp
+
+#==============================================================================
+# choose rocksdb as backend type
+#==============================================================================
+state.backend: rocksdb
+state.backend.rocksdb.localdir: /data/rocksdb
+state.backend.incremental: true
+
+#==============================================================================
+# omniStateStore parameters
+#==============================================================================
 state.backend.rocksdb.options-factory: com.huawei.falcon.state.RocksDBOptOptionsFactory
 state.backend.rocksdb.falcon.use-partition-filter: true
 state.backend.rocksdb.falcon.use-range-filter: true
