@@ -74,16 +74,7 @@ public:
 
     inline LogicalSliceChainRef GetLogicChainedSlice(uint32_t bucketIndex)
     {
-        ReadLocker<ReadWriteLock> lk(&mLocks[bucketIndex % LOCKS_NUM]);
-        if (UNLIKELY(bucketIndex >= mMappingTable.size())) {
-            LOG_ERROR("Slice bucketIndex " << bucketIndex << " over limit of mapping table size");
-            return nullptr;
-        }
-        return mMappingTable[bucketIndex];
-    }
-
-    inline LogicalSliceChainRef GetLogicChainedSliceWithoutLock(uint32_t bucketIndex)
-    {
+        ReadLocker<ReadWriteLock> lk(&mMappingLocks[bucketIndex % LOCKS_NUM]);
         if (UNLIKELY(bucketIndex >= mMappingTable.size())) {
             LOG_ERROR("Slice bucketIndex " << bucketIndex << " over limit of mapping table size");
             return nullptr;
@@ -97,7 +88,7 @@ public:
             LOG_ERROR("Invalid bucketIndex: " << bucketIndex);
             return;
         }
-        WriteLocker<ReadWriteLock> lk(&mLocks[bucketIndex % LOCKS_NUM]);
+        WriteLocker<ReadWriteLock> lk(&mMappingLocks[bucketIndex % LOCKS_NUM]);
         mMappingTable[bucketIndex] = logicalSliceChain;
     }
 
@@ -116,7 +107,7 @@ public:
     }
 
     void UpdateLogicalSliceChain(uint32_t bucketIndex, const LogicalSliceChainRef &oldLogicalSliceChain,
-                                 const LogicalSliceChainRef &newLogicalSliceChain, bool isLock = false);
+                                 const LogicalSliceChainRef &newLogicalSliceChain);
 
     HashCodeRangeRef ComputeHashCodeRange(uint32_t startBucket, uint32_t endBucket);
 
@@ -172,7 +163,7 @@ public:
             LOG_ERROR("Invalid bucketIndex: " << bucketIndex);
             return;
         }
-        WriteLocker<ReadWriteLock> lk(&mLocks[bucketIndex % LOCKS_NUM]); // 互斥compaction流程去替换bucketIndex上的logicChain
+        WriteLocker<ReadWriteLock> lk(&mMappingLocks[bucketIndex % LOCKS_NUM]); // 互斥compaction流程去替换bucketIndex上的logicChain
         auto sliceChain = mMappingTable[bucketIndex];
         if (UNLIKELY(sliceChain == nullptr)) {
             LOG_ERROR("Invalid bucket index:" << bucketIndex);
@@ -201,7 +192,8 @@ public:
 private:
     ConfigRef mConfig = nullptr;
     uint32_t mTotalBucketNum = 0;
-    std::array<ReadWriteLock, LOCKS_NUM> mLocks; // 该锁保护mMappingTable的修改.
+    std::array<ReadWriteLock, LOCKS_NUM> mLocks;
+    std::array<ReadWriteLock, LOCKS_NUM> mMappingLocks; // 该锁保护mMappingTable的修改.
     std::vector<LogicalSliceChainRef> mMappingTable;  // 挂载sliceChain的数组.
     bool mIsRestoreBuild = false;
 };
