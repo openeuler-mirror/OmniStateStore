@@ -225,6 +225,10 @@ constexpr int32_t OVERLAP_COMPARE_RESULT_CASE_4 = -2;
 constexpr int32_t ERROR_CASE_DIV_BY_ZERO = -3;
 
 constexpr uint64_t BLOCK_COMMON_MAGIC_NUM = 5126532UL;
+
+// time constants
+constexpr uint32_t ONE_MINUTE_IN_MS = 60 * 1000;
+constexpr uint32_t TWO_MINUTES_IN_MS = ONE_MINUTE_IN_MS * 2;
 }
 }
 

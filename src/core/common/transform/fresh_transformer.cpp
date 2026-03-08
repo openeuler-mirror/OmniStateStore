@@ -42,6 +42,7 @@ BResult FreshHandler::DivideFreshData(
         return BSS_ERR;
     }
 
+    auto start = std::chrono::steady_clock::now();
     // 从segment获取迭代器依次转换加到rawDataSlice中.
     auto iterator = binaryData->KVIterator();
     RETURN_ALLOC_FAIL_AS_NULLPTR(iterator);
@@ -73,6 +74,13 @@ BResult FreshHandler::DivideFreshData(
                 organizedData.emplace(context, std::move(rawDataSlice));
             }
         }
+    }
+
+    auto end = std::chrono::steady_clock::now();
+    auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+    if (UNLIKELY(elapsed.count() > ONE_MINUTE_IN_MS)) {
+        LOG_WARN("Divide fresh segment: " << segment->GetSegmentId() << " data cost time:" << elapsed.count()
+                                          << " ms.");
     }
     return BSS_OK;
 }
@@ -121,6 +129,7 @@ BResult FreshHandler::WriteDataToSlice(
         return BSS_OK;
     }
 
+    auto start = std::chrono::steady_clock::now();
     BResult ret = BSS_OK;
     for (const auto &iter : organizedData) {
         SliceIndexContextRef bucketIndexContext = iter.first;
@@ -150,6 +159,11 @@ BResult FreshHandler::WriteDataToSlice(
             self->CompactCallback(logicalSliceChain, bucketIndex, compactionStartChainIndex, compactionEndChainIndex,
                                   compactedDataSlice, invalidSliceAddressList);
         });
+    }
+    auto end = std::chrono::steady_clock::now();
+    auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+    if (UNLIKELY(elapsed.count() > ONE_MINUTE_IN_MS)) {
+        LOG_WARN("Write fresh data to slice cost time:" << elapsed.count() << " ms.");
     }
     return ret;
 }
