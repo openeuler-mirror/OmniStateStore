@@ -163,7 +163,7 @@ public:
             LOG_ERROR("Invalid bucketIndex: " << bucketIndex);
             return;
         }
-        WriteLocker<ReadWriteLock> lk(&mMappingLocks[bucketIndex % LOCKS_NUM]); // 互斥compaction流程去替换bucketIndex上的logicChain
+        ReadLocker<ReadWriteLock> lk(&mMappingLocks[bucketIndex % LOCKS_NUM]); // 互斥compaction流程去替换bucketIndex上的logicChain
         auto sliceChain = mMappingTable[bucketIndex];
         if (UNLIKELY(sliceChain == nullptr)) {
             LOG_ERROR("Invalid bucket index:" << bucketIndex);
