@@ -101,7 +101,14 @@ public:
             return BSS_OK;
         }
         LOG_INFO("begin to flush fresh segment:" << segment->GetSegmentId());
-        return mHandle->Handle(segment);
+        auto start = std::chrono::steady_clock::now();
+        BResult res = mHandle->Handle(segment);
+        auto end = std::chrono::steady_clock::now();
+        auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+        if (UNLIKELY(elapsed.count() > TWO_MINUTES_IN_MS)) {
+            LOG_WARN("Flush fresh segment: " << segment->GetSegmentId() << " cost time:" << elapsed.count() << " ms.");
+        }
+        return res;
     }
 
 private:

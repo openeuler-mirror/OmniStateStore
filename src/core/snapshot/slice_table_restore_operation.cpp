@@ -350,7 +350,7 @@ BResult SliceTableRestoreOperation::DirectReplaceCompositeSlice(const SliceIndex
     }
 
     LogicalSliceChainRef newLogicalSliceChain = sliceChains[0];
-    mSliceBucketIndex->UpdateLogicalSliceChain(bucketIndex, logicalSliceChain, newLogicalSliceChain, true);
+    mSliceBucketIndex->UpdateLogicalSliceChain(bucketIndex, logicalSliceChain, newLogicalSliceChain);
     return BSS_OK;
 }
 
@@ -411,7 +411,7 @@ void SliceTableRestoreOperation::SyncUpdateChain(const LogicalSliceChainRef &old
                                                  const LogicalSliceChainRef &newLogicalSliceChain,
                                                  uint32_t sliceIndexSlot)
 {
-    mSliceBucketIndex->UpdateLogicalSliceChain(sliceIndexSlot, oldLogicalSliceChain, newLogicalSliceChain, true);
+    mSliceBucketIndex->UpdateLogicalSliceChain(sliceIndexSlot, oldLogicalSliceChain, newLogicalSliceChain);
 }
 
 }  // namespace bss

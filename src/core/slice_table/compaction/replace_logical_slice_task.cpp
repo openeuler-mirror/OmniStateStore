@@ -104,7 +104,7 @@ BResult ReplaceLogicalSlice::SyncUpdateChain(LogicalSliceChainRef &oldLogicalSli
     LogicalSliceChainRef &newLogicalSliceChain, uint32_t sliceIndexSlot)
 {
     // 替换sliceChain
-    mBucketIndex->UpdateLogicalSliceChain(sliceIndexSlot, oldLogicalSliceChain, newLogicalSliceChain, false);
+    mBucketIndex->UpdateLogicalSliceChain(sliceIndexSlot, oldLogicalSliceChain, newLogicalSliceChain);
     return BSS_OK;
 }
 

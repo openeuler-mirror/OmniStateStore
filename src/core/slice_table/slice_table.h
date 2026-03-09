@@ -332,7 +332,7 @@ public:
             return BSS_INNER_ERR;
         }
         mSliceBucketIndex->LockWrite(bucketIndex);
-        if (UNLIKELY(logicalSliceChain != mSliceBucketIndex->GetLogicChainedSliceWithoutLock(bucketIndex))) {
+        if (UNLIKELY(logicalSliceChain != mSliceBucketIndex->GetLogicChainedSlice(bucketIndex))) {
             LOG_ERROR("Slice chain not matched.");
             mSliceBucketIndex->Unlock(bucketIndex);
             return BSS_INNER_ERR;
@@ -374,7 +374,7 @@ public:
             mBucketGroupManager->GetBucketGroupVector()[0]);
         newLogicalSliceChain->SetBaseSliceIndex(logicalSliceChain->GetBaseSliceIndex() - curIndex);
         auto invalidSliceAddress = std::vector<SliceAddressRef>();
-        mSliceBucketIndex->UpdateLogicalSliceChain(bucketIndex, logicalSliceChain, newLogicalSliceChain, false);
+        mSliceBucketIndex->UpdateLogicalSliceChain(bucketIndex, logicalSliceChain, newLogicalSliceChain);
         mSliceBucketIndex->Unlock(bucketIndex);
         return BSS_OK;
     }

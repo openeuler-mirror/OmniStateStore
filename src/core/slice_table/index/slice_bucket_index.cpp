@@ -36,22 +36,18 @@ BResult SliceBucketIndex::Initialize(uint32_t totalBucketNum, const ConfigRef &c
 }
 
 void SliceBucketIndex::UpdateLogicalSliceChain(uint32_t bucketIndex, const LogicalSliceChainRef &oldLogicalSliceChain,
-                                               const LogicalSliceChainRef &newLogicalSliceChain, bool isLock)
+                                               const LogicalSliceChainRef &newLogicalSliceChain)
 {
     if (!CheckIndex(bucketIndex)) {
         LOG_ERROR("Invalid bucketIndex: " << bucketIndex);
         return;
     }
-    if (isLock) {
-        LockWrite(bucketIndex);
-    }
+
+    WriteLocker<ReadWriteLock> lk(&mMappingLocks[bucketIndex % LOCKS_NUM]);
     if (LIKELY(mMappingTable[bucketIndex] == oldLogicalSliceChain)) {
         mMappingTable[bucketIndex] = newLogicalSliceChain;
     } else {
         LOG_ERROR("Update logic chained slice failed, bucketIndex:" << bucketIndex);
-    }
-    if (isLock) {
-        Unlock(bucketIndex);
     }
 }
 
@@ -88,10 +84,9 @@ SliceIndexContextRef SliceBucketIndex::InternalGetSliceIndexContext(uint32_t buc
             LOG_ERROR("Create logical chained slice failed, bucketIndex:" << bucketIndex);
             return nullptr;
         }
-        LockWrite(bucketIndex);
+        WriteLocker<ReadWriteLock> lk(&mMappingLocks[bucketIndex % LOCKS_NUM]);
         mMappingTable[bucketIndex] = newLogicalSliceChain;
         auto ret = std::make_shared<SliceIndexContext>(newLogicalSliceChain, bucketIndex);
-        Unlock(bucketIndex);
         return ret;
     }
     return std::make_shared<SliceIndexContext>(logicalSliceChain, bucketIndex);

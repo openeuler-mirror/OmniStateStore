@@ -45,7 +45,7 @@ BResult SliceTableSnapshot::GenSliceTableIndexSnapshot()
     // 遍历当前每个bucket的sliceChain.
     for (uint32_t idx = 0; idx < mTotalBucketNum; idx++) {
         mSliceBucketIndex->LockWrite(idx);
-        LogicalSliceChainRef curLogicSliceChain = mSliceBucketIndex->GetLogicChainedSliceWithoutLock(idx);
+        LogicalSliceChainRef curLogicSliceChain = mSliceBucketIndex->GetLogicChainedSlice(idx);
         if (UNLIKELY(curLogicSliceChain == nullptr)) {
             LOG_ERROR("Current logic slice chain is nullptr.");
             mSliceBucketIndex->Unlock(idx);
