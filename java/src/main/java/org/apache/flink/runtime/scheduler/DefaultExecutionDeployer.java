@@ -59,9 +59,8 @@ public class DefaultExecutionDeployer implements ExecutionDeployer {
 
     // -------------------------------- FALCON Implementation --------------------------------
     /**
-     * When successfully assigning all the subTasks to physical slots, initialize falcon heap memory management system.
-     * <p> First, calculate the number of subTasks in each slot/{@link AllocationID}. Then, add this info to each
-     * subTask/{@link ExecutionAttemptID}.
+     * Before submitting subTasks to TaskManager, calculate the number of subTasks in each slot, and add this info into
+     * each subTask/{@link ExecutionAttemptID}.
      * <p> Note that {@link ExecutionAttemptID} will be used to create tdd for subTask, and tdd can be accessed in
      * TaskManager. In this way, for each subTask, we can get "the number for subTasks sharing the same slot" when
      * initializing StreamTask in TaskManager.
@@ -74,38 +73,29 @@ public class DefaultExecutionDeployer implements ExecutionDeployer {
                 ConfigOptions.key("state.backend.rocksdb.falcon.use-state-cache")
                         .booleanType()
                         .defaultValue(false)
-                        .withDescription("If true, falcon cache will be used for RocksDBValueState/RocksDBMapState.")
+                        .withDescription("If true, falcon cache will be used for RocksDBValueState.")
+        );
+        // the number of task slot configured in flink-conf.yaml
+        final int numSlot = GlobalConfiguration.loadConfiguration().get(
+                ConfigOptions.key("parallelism.default")
+                        .intType()
+                        .defaultValue(1)
+                        .withDescription("The number of task slot, which is configured in flink-conf.yaml.")
         );
 
         if (enableFalconCache) {
             // this log will be print only once in JobManager
             log.info("[FALCON] initializing falcon cache heap memory management system.");
             // step1: get the number of subTasks in each physical slot
-            Map<AllocationID, Integer> numSubTaskInSlot = new HashMap<>();
-            for (final ExecutionDeploymentHandle deploymentHandle : deploymentHandles) {
-                // get allocationId of current subTask from deploy handle
-                final CompletableFuture<LogicalSlot> slotAssigned = deploymentHandle.getLogicalSlotFuture();
-                checkState(slotAssigned.isDone());
-                AllocationID allocationId = slotAssigned.join().getAllocationId();
-                // update mapping from slot to the number of subTasks in slot
-                if (numSubTaskInSlot.containsKey(allocationId)) {
-                    int currentCnt = numSubTaskInSlot.get(allocationId);
-                    numSubTaskInSlot.put(allocationId, currentCnt + 1);
-                } else {
-                    numSubTaskInSlot.put(allocationId, 1);
-                }
-            }
+            int numSubTask = deploymentHandles.size(); // total number of subTasks
+            int subTaskNum = (numSlot <= 0) ? numSubTask : (numSubTask / numSlot); // the number of subTask in each slot
 
             // step2: add "the number for subTasks sharing the same slot" to each subTask/ExecutionAttemptID
             for (final ExecutionDeploymentHandle deploymentHandle : deploymentHandles) {
-                ExecutionVertexID executionVertexId = deploymentHandle.getRequiredVertexVersion().getExecutionVertexId();
-                AllocationID allocationId = deploymentHandle.getLogicalSlotFuture().join().getAllocationId();
-                int subTaskNum = numSubTaskInSlot.get(allocationId);
-
                 deploymentHandle.getExecution().getAttemptId().setSubTaskNum(subTaskNum);
                 if (deploymentHandles.size() <= 32) { // avoid too much log printing
-                    log.info("[FALCON] subTask {}: slot {} has {} subTasks", executionVertexId.toString(), allocationId,
-                            subTaskNum);
+                    log.info("[FALCON] subTask {}: current slot has {} subTasks",
+                             deploymentHandle.getRequiredVertexVersion().getExecutionVertexId().toString(), subTaskNum);
                 }
             }
         }
