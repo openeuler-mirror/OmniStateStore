@@ -75,9 +75,9 @@ RocksDBVauleState是Flink中常用的一种状态，而状态在RocksDB中均以
 **Flink的双流Join算子处理逻辑<br>**
 对于Flink的StreamingJoinOperator，其Join流程包含以下几步：
 
-- 从输入数据中提取join key；
-- 依据join key，在对表的RocksDB中范围查询以join key为前缀的状态；
-- 输入数据与范围查询结果依次完成join，并输出join结果；
+- 从输入数据中提取join key。
+- 依据join key，在对表的RocksDB中范围查询以join key为前缀的状态。
+- 输入数据与范围查询结果依次完成join，并输出join结果。
 - 根据输入数据，更新输入表的RocksDB。
 
 **问题<br>**
@@ -88,8 +88,8 @@ RocksDBVauleState是Flink中常用的一种状态，而状态在RocksDB中均以
 对于Flink的StreamingJoinOperator，omniStateStore的Join流程包含以下几步：
 
 - 从输入数据中提取join key，将数据插入到数据缓存中，并将数据按照join key聚合；当数据缓存容量超过阈值时，触发批量join操作。
-- 对于相同join key的一批数据，依据join key，在对表的RocksDB中范围查询以join key为前缀的状态；
-- 相同join key的一批数据与范围查询结果两两完成join，并输出join结果；
+- 对于相同join key的一批数据，依据join key，在对表的RocksDB中范围查询以join key为前缀的状态。
+- 相同join key的一批数据与范围查询结果两两完成join，并输出join结果。
 - 根据相同join key的一批数据，更新输入表的RocksDB。
 </font>
 

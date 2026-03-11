@@ -161,11 +161,11 @@
 ### 新增特性
 <font size=3>
 
-- **Flink语义状态缓存算法**：同Key状态优先在内存中完成聚合，减少状态对RocksDB的访问频次；<br>
-- **Flink智能多留感知算法**：对于仅需要点读、点写的状态，将memTable数据结构替换为HashLinkList, 提升状态点读和点写效率；<br>
-- **使用merge替换状态RMW**：减少Join算子的状态更新开销；<br>
-- **双流Join数据缓存算法**：减少StreamJoinOperator的状态范围查询次数；<br>
-- **动态Filter技术**：过滤冗余状态查询操作；<br>
+- **Flink语义状态缓存算法**：同Key状态优先在内存中完成聚合，减少状态对RocksDB的访问频次。<br>
+- **Flink智能多留感知算法**：对于仅需要点读、点写的状态，将memTable数据结构替换为HashLinkList, 提升状态点读和点写效率。<br>
+- **使用merge替换状态RMW**：减少Join算子的状态更新开销。<br>
+- **双流Join数据缓存算法**：减少StreamJoinOperator的状态范围查询次数。<br>
+- **动态Filter技术**：过滤冗余状态查询操作。<br>
 </font>
 
 ### 修改特性
