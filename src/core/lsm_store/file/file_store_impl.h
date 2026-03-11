@@ -120,16 +120,21 @@ public:
 
     KeyValueIteratorRef PrefixIterator(const Key &prefixKey, bool reverseOrder);
 
-    KeyValueIteratorRef IteratorForSavepoint(VersionPtr &version)
+    KeyValueIteratorRef IteratorForSavepoint(VersionPtr &version, bool isPQ)
     {
         version->Retain();
 
-        auto filesGetter = [](Level level) -> std::vector<FileMetaDataRef> {
+        auto filesGetter = [isPQ](Level level) -> std::vector<FileMetaDataRef> {
             auto groups = level.GetFileMetaDataGroups();
             std::vector<FileMetaDataRef> result;
             for (auto &group : groups) {
                 for (auto &fileMetaData : group->GetFiles()) {
-                    result.push_back(fileMetaData);
+                    if (isPQ && fileMetaData->GetSmallest()->IsPqKey()) {
+                        result.push_back(fileMetaData);
+                    }
+                    if (!isPQ && !fileMetaData->GetSmallest()->IsPqKey()) {
+                        result.push_back(fileMetaData);
+                    }
                 }
             }
             return result;
@@ -146,7 +151,7 @@ public:
         };
 
         auto fileIteratorBuilder = InputSortedRun::FileIteratorWriter::Of(buildFunc);
-        return CreateMergingIteratorForSavepoint(version, fileIteratorBuilder, filesGetter, false, true,
+        return CreateMergingIterator(version, fileIteratorBuilder, filesGetter, false, true,
                                      FileProcHolder::FILE_STORE_SAVEPOINT);
     }
 
@@ -348,11 +353,6 @@ private:
     void CleanOldVersion(const VersionPtr &oldVersion);
 
     KeyValueIteratorRef CreateMergingIterator(VersionPtr &version,
-                                              InputSortedRun::FileIteratorWriterRef fileIteratorBuilder,
-                                              std::function<std::vector<FileMetaDataRef>(Level level)> filesGetter,
-                                              bool reverseOrder, bool sectionRead = false,
-                                              FileProcHolder holder = FileProcHolder::FILE_STORE_ITERATOR);
-    KeyValueIteratorRef CreateMergingIteratorForSavepoint(VersionPtr &version,
                                               InputSortedRun::FileIteratorWriterRef fileIteratorBuilder,
                                               std::function<std::vector<FileMetaDataRef>(Level level)> filesGetter,
                                               bool reverseOrder, bool sectionRead = false,

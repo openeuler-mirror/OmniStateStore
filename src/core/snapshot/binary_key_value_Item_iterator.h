@@ -90,13 +90,14 @@ using BlobValueTransformFunc = std::function<BResult(uint64_t, uint32_t, uint64_
 class BinaryKeyValueItemIterator : public Iterator<BinaryKeyValueItemRef> {
 public:
     BinaryKeyValueItemIterator(const StateIdProviderRef &stateIdProvider, uint32_t maxParallelism,
-                               const KeyValueIteratorRef &binaryIterator, const MemManagerRef &memManager,
-                               const BlobValueTransformFunc &func)
+                               const KeyValueIteratorRef &kvIterator, const KeyValueIteratorRef &pqIterator,
+                               const MemManagerRef &memManager, const BlobValueTransformFunc &func)
         : mStateIdProvider(stateIdProvider),
           mMaxParallelism(maxParallelism),
-          mBinaryIterator(binaryIterator),
           mMemManager(memManager),
-          mTransFunc(func)
+          mTransFunc(func),
+          mKVIterator(kvIterator),
+          mPQIterator(pqIterator)
     {
     }
 
@@ -104,16 +105,37 @@ public:
 
     BinaryKeyValueItemRef Next() override;
 
+    void Close() override;
+
 public:
     StateIdProviderRef mStateIdProvider = nullptr;
     uint32_t mMaxParallelism = 0;
-    KeyValueIteratorRef mBinaryIterator = nullptr;
     BinaryKeyValueItemRef mCurrentItem = nullptr;
     MemManagerRef mMemManager = nullptr;
     std::function<BResult(uint64_t, uint32_t, uint64_t, Value &)> mTransFunc;
+    KeyValueIteratorRef mKVIterator = nullptr;
+    KeyValueIteratorRef mPQIterator = nullptr;
+    BinaryKeyValueItemRef mKVItem = nullptr;
+    BinaryKeyValueItemRef mPQItem = nullptr;
 
 private:
     void Advance();
+
+    void AdvancePQIterator();
+
+    void AdvanceKVIterator();
+
+    void SetCurrentAsPQ()
+    {
+        mCurrentItem = std::move(mPQItem);
+        mPQItem = nullptr;
+    }
+
+    void SetCurrentAsKV()
+    {
+        mCurrentItem = std::move(mKVItem);
+        mKVItem = nullptr;
+    }
 
     BinaryKeyValueItemRef Convert(const KeyValueRef &pair, BinaryKeyValueItemRef &reuseItem);
 

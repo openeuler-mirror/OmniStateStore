@@ -20,7 +20,7 @@ bool SavepointDataView::MultipleFileStoreIterator::HasNext()
     RETURN_FALSE_AS_NULLPTR(mLsmStores);
     while ((mCurrentIterator == nullptr || !mCurrentIterator->HasNext()) && mLsmStores->HasNext()) {
         auto fileStore = mLsmStores->Next();
-        mCurrentIterator = mSavepointDataViewImpl->BuildFileStoreSnapshotIterator(fileStore);
+        mCurrentIterator = mSavepointDataViewImpl->BuildFileStoreSnapshotIterator(fileStore, mIsPQ);
     }
     return (mCurrentIterator != nullptr && mCurrentIterator->HasNext());
 }
@@ -30,28 +30,36 @@ KeyValueRef SavepointDataView::MultipleFileStoreIterator::Next()
     return mCurrentIterator->Next();
 }
 
+void SavepointDataView::MultipleFileStoreIterator::Close()
+{
+    if (mCurrentIterator != nullptr) {
+        mCurrentIterator->Close();
+    }
+}
+
 IteratorRef<BinaryKeyValueItemRef> SavepointDataView::SavepointIterator()
 {
     return mCurrentIterator;
 }
 
-KeyValueIteratorRef SavepointDataView::CreateSortedKeyValueIterator()
+KeyValueIteratorRef SavepointDataView::CreateSortedKeyValueIterator(
+    const std::pair<SliceTableSnapshotOperatorRef, FileStoreSnapshotOperatorRef>& tuple)
 {
-    auto tuple = FindFileStoreMapping();
     if (tuple.first == nullptr || tuple.second == nullptr) {
         LOG_ERROR("FileStore is nullptr");
         return nullptr;
     }
     auto sliceTableIterator = tuple.first->SnapshotIterator();
 
-    KeyValueIteratorRef multipleFileStoreIterator = std::make_shared<MultipleFileStoreIterator>(this, tuple.second);
+    KeyValueIteratorRef multipleFileStoreIterator = std::make_shared<MultipleFileStoreIterator>(this, tuple.second,
+        false);
     auto result = std::make_shared<SortedKeyValueMergingIterator>();
     result->Init(sliceTableIterator, multipleFileStoreIterator, mMemManager, true,
                  FileProcHolder::FILE_STORE_SAVEPOINT);
     return result;
 }
 
-KeyValueIteratorRef SavepointDataView::BuildFileStoreSnapshotIterator(const LsmStoreRef &lsmStore)
+KeyValueIteratorRef SavepointDataView::BuildFileStoreSnapshotIterator(const LsmStoreRef &lsmStore, bool isPQ)
 {
     VersionPtr version = lsmStore->GetVersionForSnapshot(mSnapshotId);
     if (version == nullptr) {
@@ -59,7 +67,7 @@ KeyValueIteratorRef SavepointDataView::BuildFileStoreSnapshotIterator(const LsmS
                                                       << lsmStore->GetFileStoreId()->ToString());
         return {};
     }
-    return lsmStore->IteratorForSavepoint(version);
+    return lsmStore->IteratorForSavepoint(version, isPQ);
 }
 
 std::pair<SliceTableSnapshotOperatorRef, FileStoreSnapshotOperatorRef> SavepointDataView::FindFileStoreMapping()
@@ -88,6 +96,9 @@ std::pair<SliceTableSnapshotOperatorRef, FileStoreSnapshotOperatorRef> Savepoint
 
 void SavepointDataView::Close()
 {
+    if (mCurrentIterator != nullptr) {
+        mCurrentIterator->Close();
+    }
     mSnapshotManager->NotifySavepointAbort(mSnapshotId);
 }
 

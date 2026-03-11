@@ -877,77 +877,9 @@ KeyValueIteratorRef LsmStore::CreateMergingIterator(
         return nullptr;
     }
 
-    auto cleaner = [this](VersionPtr versionPtr) { return this->ReleaseVersionFinally(versionPtr); };
+    auto cleaner = [this](VersionPtr &versionPtr) { this->ReleaseVersionFinally(versionPtr); };
     auto result = std::make_shared<MergingIterator>(iterators, mMemManager, cleaner, version, reverseOrder, holder,
                                                     sectionRead, nullptr);
-    ReleaseVersionFinally(version);
-    return result;
-}
-
-KeyValueIteratorRef LsmStore::CreateMergingIteratorForSavepoint(
-    VersionPtr &version, InputSortedRun::FileIteratorWriterRef fileIteratorBuilder,
-    std::function<std::vector<FileMetaDataRef>(Level level)> filesGetter, bool reverseOrder, bool sectionRead,
-    FileProcHolder holder)
-{
-    RETURN_NULLPTR_AS_NULLPTR(version);
-    std::vector<KeyValueIteratorRef> iterators;
-    std::vector<KeyValueIteratorRef> pqIterators;
-    std::vector<KeyValueIteratorRef> kvIterators;
-
-    for (const Level &level : version->GetLevels()) {
-        std::vector<FileMetaDataRef> filesForKey = filesGetter(level);
-        std::vector<FileMetaDataRef> pqFileMetas;
-        std::vector<FileMetaDataRef> kvFileMetas;
-        DivideFileMetas(filesForKey, pqFileMetas, kvFileMetas);
-        if (level.GetLevelId() == 0 && !filesForKey.empty()) {
-            // level0 pq文件
-            for (auto &fileMetaData : pqFileMetas) {
-                pqIterators.emplace_back(InputSortedRun::BuildInputSortedRunIterator(fileMetaData, fileIteratorBuilder));
-            }
-            // level0 kv文件
-            for (auto &fileMetaData : kvFileMetas) {
-                kvIterators.emplace_back(InputSortedRun::BuildInputSortedRunIterator(fileMetaData, fileIteratorBuilder));
-            }
-            continue;
-        }
-        // level0+ pq文件
-        std::vector<InputSortedRunRef> pqInputSortedRunList =
-            InputSortedRun::BuildInputSortedRun(pqFileMetas, reverseOrder ?
-                                                                 mVersionSet->GetFileMetaDataReverseComparator() :
-                                                                 mVersionSet->GetFileMetaDataComparator());
-        // level0+ kv文件
-        std::vector<InputSortedRunRef> kvInputSortedRunList =
-            InputSortedRun::BuildInputSortedRun(kvFileMetas, reverseOrder ?
-                                                                 mVersionSet->GetFileMetaDataReverseComparator() :
-                                                                 mVersionSet->GetFileMetaDataComparator());
-
-        for (auto &pqInputSortedRun : pqInputSortedRunList) {
-            pqIterators.emplace_back(pqInputSortedRun->GetIterator(fileIteratorBuilder));
-        }
-        for (auto &kvInputSortedRun : kvInputSortedRunList) {
-            kvIterators.emplace_back(kvInputSortedRun->GetIterator(fileIteratorBuilder));
-        }
-    }
-
-    if (pqIterators.empty() && kvIterators.empty()) {
-        ReleaseVersionFinally(version);
-        return nullptr;
-    }
-    auto cleaner = [this](VersionPtr versionPtr) { return this->ReleaseVersionFinally(versionPtr); };
-    if (pqIterators.empty()) {
-        iterators = kvIterators;
-    } else if (kvIterators.empty()) {
-        iterators = pqIterators;
-    } else {
-        // pq比较时需要用通用的compare
-        iterators.emplace_back(std::make_shared<MergingIterator>(pqIterators, mMemManager, cleaner, version,
-                                                                 reverseOrder, holder, sectionRead, nullptr));
-        iterators.emplace_back(std::make_shared<MergingIterator>(kvIterators, mMemManager, cleaner, version,
-                                                                 reverseOrder, holder, sectionRead, nullptr, true));
-    }
-
-    auto result = std::make_shared<MergingIterator>(iterators, mMemManager, cleaner, version, reverseOrder, holder,
-                                                    sectionRead, nullptr, true);
     ReleaseVersionFinally(version);
     return result;
 }

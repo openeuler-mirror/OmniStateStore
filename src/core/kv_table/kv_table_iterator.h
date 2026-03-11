@@ -240,6 +240,10 @@ public:
     ~PQKeyIterator()
     {
         free(const_cast<uint8_t *>(mGroupId.Data()));
+	}
+
+	void Close() override
+	{
         if (mFileIterator != nullptr) {
             mFileIterator->Close();
         }
