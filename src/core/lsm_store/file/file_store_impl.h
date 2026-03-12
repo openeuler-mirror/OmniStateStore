@@ -131,8 +131,7 @@ public:
                 for (auto &fileMetaData : group->GetFiles()) {
                     if (isPQ && fileMetaData->GetSmallest()->IsPqKey()) {
                         result.push_back(fileMetaData);
-                    }
-                    if (!isPQ && !fileMetaData->GetSmallest()->IsPqKey()) {
+                    } else if (!isPQ && !fileMetaData->GetSmallest()->IsPqKey()) {
                         result.push_back(fileMetaData);
                     }
                 }
