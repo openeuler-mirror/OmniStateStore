@@ -119,6 +119,9 @@ struct FalconEqual {
         const uint8_t* p = reinterpret_cast<const uint8_t*>(a.data());
         const uint8_t* q = reinterpret_cast<const uint8_t*>(b.data());
         uint32_t len = a.size();
+        if (len > 0 && (p == nullptr || q == nullptr)) {
+            return false;
+        }
         const uint32_t sve_vec_bytes = svcntb(); // 每个SVE向量的字节数（如16/32/64）
 
         while (len >= sve_vec_bytes) {
