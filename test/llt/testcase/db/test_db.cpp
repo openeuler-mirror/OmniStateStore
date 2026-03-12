@@ -1118,6 +1118,8 @@ void ValidatePQ()
             LOG_INFO("Total: " << total);
         }
         ASSERT_EQ(total, realTotal);
+        iter->Close();
+        iter1->Close();
         delete iter;
         delete iter1;
     }
@@ -2918,6 +2920,7 @@ TEST_F(TestDB, test_pq_iterator_open_close)
         std::vector<uint8_t> prefix = GetPrefix(groupId);
         BinaryData data(prefix.data(), prefix.size());
         auto it = pqTable->KeyIterator(data);
+        it->Close();
         delete it;
     }
     CleanCurrentVersion();

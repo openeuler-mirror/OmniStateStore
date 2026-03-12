@@ -69,7 +69,7 @@ void SortedKeyValueMergingIterator::Advance()
 
 void SortedKeyValueMergingIterator::MergeValue()
 {
-    int32_t cmp = mSliceTablePointer->key.CompareForSavepoint(mLsmIteratorPointer->key);
+    int32_t cmp = mSliceTablePointer->key.Compare(mLsmIteratorPointer->key);
     if (cmp < 0) {
         mCurrentEntry = mSliceTablePointer;
         Iterator_Result result = mSliceTableIterator->HasNext();

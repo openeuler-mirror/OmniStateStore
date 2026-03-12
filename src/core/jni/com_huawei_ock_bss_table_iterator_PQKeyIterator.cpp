@@ -93,6 +93,7 @@ JNIEXPORT jboolean JNICALL Java_com_huawei_ock_bss_table_iterator_PQKeyIterator_
         LOG_ERROR("PQKeyIterator is nullptr.");
         return false;
     }
+    iter->Close();
     delete iter;
     return true;
 }

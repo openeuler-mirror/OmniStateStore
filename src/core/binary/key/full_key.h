@@ -151,29 +151,6 @@ public:
         return BssMath::IntegerCompare(seqId2, seqId1);
     }
 
-    /**
-     * Compare key and value seqId for savepoint.
-     * @param key1 key one
-     * @param seqId1 seqId one
-     * @param key2 key two
-     * @param seqId2 seqId two
-     * @param reverseOrder reverse order, default is false.
-     * @return If the current key is less than other, return -1. If they are equal, return 0.
-     * If the current key is greater than other, return 1. The larger the seqId, the newer it is.
-     * When sorting in ascending order, the new key value should be in front of the old key value.
-     */
-    inline static int32_t CompareFullKeyForSavepoint(const Key &key1, uint64_t seqId1, const Key &key2, uint64_t seqId2,
-                                                     bool reverseOrder = false)
-    {
-        int32_t cmp = key1.CompareForSavepoint(key2);
-        if (cmp != 0) {
-            return reverseOrder ? -cmp : cmp;
-        }
-        // The larger the seqId, the newer it is. When sorting in ascending order, the new key value should be in front
-        // of the old key value.
-        return BssMath::IntegerCompare(seqId2, seqId1);
-    }
-
     inline uint32_t GetFullKeyLen()
     {
         // 27 包含stateId 2 seqId and valueType 9 priKey: hashcode 4 keyLen 4 secKey：hashcode 4 keyLen：4

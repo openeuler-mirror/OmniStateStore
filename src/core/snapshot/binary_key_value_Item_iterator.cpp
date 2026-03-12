@@ -35,17 +35,74 @@ BinaryKeyValueItemRef BinaryKeyValueItemIterator::Next()
     return mCurrentItem;
 }
 
+void BinaryKeyValueItemIterator::Close()
+{
+    if (mKVIterator != nullptr) {
+        mKVIterator->Close();
+    }
+    if (mPQIterator != nullptr) {
+        mPQIterator->Close();
+    }
+}
+
 void BinaryKeyValueItemIterator::Advance()
 {
-    auto prevItem = mCurrentItem;
-    mCurrentItem = nullptr;
-    while (mCurrentItem == nullptr && mBinaryIterator->HasNext()) {
-        auto pair = mBinaryIterator->Next();
+    AdvanceKVIterator();
+    AdvancePQIterator();
+
+    if (mKVItem == nullptr) {
+        SetCurrentAsPQ();
+        return;
+    }
+    if (mPQItem == nullptr) {
+        SetCurrentAsKV();
+        return;
+    }
+
+    if (mKVItem->mKeyGroup <= mPQItem->mKeyGroup) {
+        SetCurrentAsKV();
+    } else {
+        SetCurrentAsPQ();
+    }
+}
+
+void BinaryKeyValueItemIterator::AdvancePQIterator()
+{
+    if (mPQItem != nullptr) {
+        return;
+    }
+    auto prevItem = mPQItem;
+    mPQItem = nullptr;
+    if (mPQIterator == nullptr) {
+        return;
+    }
+    while (mPQItem == nullptr && mPQIterator->HasNext()) {
+        auto pair = mPQIterator->Next();
         if (pair->value.ValueType() == ValueType::DELETE) {
             continue;
         }
 
-        mCurrentItem = Convert(pair, prevItem);
+        mPQItem = Convert(pair, prevItem);
+    }
+}
+
+void BinaryKeyValueItemIterator::AdvanceKVIterator()
+{
+    if (mKVItem != nullptr) {
+        return;
+    }
+    auto prevItem = mKVItem;
+    mKVItem = nullptr;
+    if (mKVIterator == nullptr) {
+        return;
+    }
+    while (mKVItem == nullptr && mKVIterator->HasNext()) {
+        auto pair = mKVIterator->Next();
+        if (pair->value.ValueType() == ValueType::DELETE) {
+            continue;
+        }
+
+        mKVItem = Convert(pair, prevItem);
     }
 }
 
