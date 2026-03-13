@@ -45,13 +45,6 @@ public:
         }
     }
 
-    void Close() override
-    {
-        if (mLsmIterator != nullptr) {
-            mLsmIterator->Close();
-        }
-    }
-
     ByteBufferRef CreateBuffer(uint32_t size)
     {
         uintptr_t dataAddress = FileMemAllocator::Alloc(mMemManager, mHolder, size, __FUNCTION__);

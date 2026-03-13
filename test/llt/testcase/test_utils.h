@@ -29,7 +29,7 @@
 namespace ock {
 namespace bss {
 namespace test {
-inline std::vector<uint8_t> GetRandomData()
+inline std::vector<uint8_t> GetRandomData(bool useRandomLen = true, uint32_t length = 200)
 {
     std::random_device rd;
     std::mt19937 gen(g_testSeed++);
@@ -41,7 +41,9 @@ inline std::vector<uint8_t> GetRandomData()
     std::uniform_int_distribution<> LenDist(lenBegin, lenEnd);
     std::uniform_int_distribution<> byteDist(byteBegin, byteEnd);
 
-    uint32_t length = LenDist(gen);
+    if (useRandomLen) {
+        length = LenDist(gen);
+    }
     std::vector<uint8_t> data(length);
 
     for (uint32_t i = 0; i < length; ++i) {

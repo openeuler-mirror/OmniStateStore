@@ -585,7 +585,7 @@ std::vector<uint8_t> GetPrefix(uint32_t groupId)
 }
 void PQTableAdd(uint32_t groupStart = 0, uint32_t groupEnd = UINT32_MAX, bool useMDb = true)
 {
-    std::vector<uint8_t> randomData = GetRandomData();
+    std::vector<uint8_t> randomData = GetRandomData(false, 200);
     uint32_t hashcode = HashForTest(randomData.data(), randomData.size());
     uint32_t groupId = hashcode % 128;
     std::vector<uint8_t> prefix = GetPrefix(groupId);
@@ -599,7 +599,7 @@ void PQTableAdd(uint32_t groupStart = 0, uint32_t groupEnd = UINT32_MAX, bool us
 
 void PQTableRemove(uint32_t groupStart = 0, uint32_t groupEnd = UINT32_MAX, bool useMDb = true)
 {
-    std::vector<uint8_t> randomData = GetRandomData();
+    std::vector<uint8_t> randomData = GetRandomData(false, 200);
     uint32_t hashcode = HashForTest(randomData.data(), randomData.size());
     uint32_t groupId = hashcode % 128;
     std::vector<uint8_t> prefix = GetPrefix(groupId);
