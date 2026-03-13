@@ -3,20 +3,20 @@
 
 ---
 
-## 使用omniStateStore
+## 使用OmniStateStore
 <font size=3>
 
 **步骤1**&emsp;根据业务使用情况和运行环境，设置$FLINK_HOME/conf/flink-conf.yaml文件中的相关配置项。请注意，需要在JobManager和所有TaskManager中同步进行修改。<br>
 
-&emsp;&emsp;&emsp;&emsp;配置项格式为[配置项名称] + [英文冒号] + [空格] + [配置项值]，参数配置方法请参阅[配置项说明](#12-配置项说明)，配置样例如下：<br>
+&emsp;&emsp;&emsp;&emsp;配置项格式为[配置项名称] + [英文冒号] + [空格] + [配置项值]，参数配置方法请参阅[配置项说明](#配置项说明)，配置样例如下：<br>
 <div style="margin-left: 50px;">
 
 ```
-## 配置使用rocksdb状态后端
+## 配置使用Rocksdb状态后端
 state.backend: rocksdb
 state.backend.rocksdb.localdir: /data/rocksdb
 
-## omniStateStore配置参数
+## OmniStateStore配置参数
 state.backend.rocksdb.options-factory: com.huawei.falcon.state.RocksDBOptOptionsFactory
 state.backend.rocksdb.falcon.use-partition-filter: true
 state.backend.rocksdb.falcon.use-range-filter: true
@@ -30,13 +30,13 @@ state.backend.rocksdb.falcon.use-merge: true
 ```
 </div>
 
-**步骤2**&emsp;启动Flink任务，查看日志中配置项是否正确配置，并在Flink日志中观测是否成功使能OmniStateStore。详细观测方式请参阅[OmniStateStore使能观测方法](#13-omnistate特性使能情况观测方式)。
+**步骤2**&emsp;启动Flink任务，查看日志中配置项是否正确配置，并在Flink日志中观测是否成功使能OmniStateStore。详细观测方式请参阅[OmniStateStore特性使能情况观测方式](#omnistatestore特性使能情况观测方式)。
 
 </font>
 
 ---
 
-## 1.2 配置项说明
+## 配置项说明
 <font size=3>
 
 **表1** OmniStateStore配置项说明

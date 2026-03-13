@@ -11,7 +11,7 @@
 
 **图1** OmniStateStore运行报错截图
 
-<a href="./figures/omniStateStore faq1.png"><img src="./figures/omniStateStore faq1.png" alt="faq" width="1200" /></a>
+<a href="./figures/OmniStateStore faq1.png"><img src="./figures/OmniStateStore faq1.png" alt="faq" width="1200" /></a>
 
 **问题原因<br>**
 目前，OmniStateStore只支持Flink 1.16.3 + FRocksDB 6.20.3。由于OmniStateStore需要对Flink进行轻量级代码修改，若用户也自行修改了Flink代码，二者可能产生冲突。<br>
@@ -32,12 +32,12 @@ Flink任务运行时未成功加载librocksdb.so.6，导致任务运行失败。
 
 **图2** OmniStateStore JobManager运行报错截图
 
-<a href="./figures/omniStateStore faq2-1.png"><img src="./figures/omniStateStore faq2-1.png" alt="faq" width="1200" /></a>
+<a href="./figures/OmniStateStore faq2-1.png"><img src="./figures/OmniStateStore faq2-1.png" alt="faq" width="1200" /></a>
 
 
 **图3** OmniStateStore TaskManager运行报错截图
 
-<a href="./figures/omniStateStore faq2-2.png"><img src="./figures/omniStateStore faq2-2.png" alt="faq" width="1200" /></a>
+<a href="./figures/OmniStateStore faq2-2.png"><img src="./figures/OmniStateStore faq2-2.png" alt="faq" width="1200" /></a>
 
 **问题原因<br>**
 OmniStateStore运行时依赖librocksdb.so.6，而Flink任务会从LD_LIBRARY_PATH目录中加载该动态库。若未按照要求将动态库部署到指定路径中，或是未正确配置LD_LIBRARY_PATH环境变量，将导致任务运行失败。

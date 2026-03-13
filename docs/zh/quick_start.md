@@ -3,7 +3,7 @@
 
 ---
 
-## 1 使用说明
+## 使用说明
 <font size=3>
 OmniStateStore的加速特性包含动态Filter技术、Flink语义状态缓存和Merge读写优化，具体地，可以拆分为以下子特性：<br>
 
@@ -22,7 +22,7 @@ OmniStateStore特性的使能过程中，存在以下约束：<br>
 
 ---
 
-## 2 环境准备
+## 环境准备
 <font size=3>
 
 按照下表准备OmniStateStore的**编译环境**，以支持快速完成OmniStateStore安装。
@@ -92,7 +92,7 @@ OmniStateStore特性的使能过程中，存在以下约束：<br>
 
 ---
 
-## 3 操作步骤
+## 操作步骤
 <font size=3>
 
 **步骤1**&emsp;下载[OmniStateStore源码](https://gitcode.com/openeuler/OmniStateStore.git)，选择falcon分支。
