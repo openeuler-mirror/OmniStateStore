@@ -1,11 +1,11 @@
-# 1 OmniStateStore最佳实践
-<font size=3>本文档提供OmniStateStore的最佳实践样例，用户可以参阅本文档提供的实践样例，快速熟悉omniStateStore的使用场景和加速效果。</font>
+# OmniStateStore最佳实践
+<font size=3>提供OmniStateStore的最佳实践样例，用户可以参阅本文档提供的实践样例，快速熟悉OmniStateStore的使用场景和加速效果。</font>
 
 ---
-## 1.1 运行环境
+## 运行环境
 <font size=3>
 
-本实施例在鲲鹏920系列服务器上验证omniStateStore的加速效果，任务运行的硬件和软件信息如下表所示：<br>
+本实施例在鲲鹏920系列服务器上验证OmniStateStore的加速效果，任务运行的硬件和软件信息如下表所示：<br>
 
 **表1** 实施例运行硬件和软件配置
 <table>
@@ -61,7 +61,7 @@
 </font>
 
 ---
-## 1.2 Flink部署方式
+## Flink部署方式
 <font size=3>
 本实施例使用容器化方式部署Flink集群。具体地，本实施例创建一个JobManager容器和两个TaskManager容器，容器配置均为8C32GB。其中每个TaskManager容器中部署4个TaskManager，每个TaskManager部署2个Slot。JobManager和TaskManager都分配8GB内存。<br>
 实施例使用的Flink配置如下：<br>
@@ -82,32 +82,32 @@ state.backend.incremental: true
 </font>
 
 ---
-## 1.3 测试用例
+## 测试用例
 <font size=3>
 
-本实施例基于nexmark0.3-Q4用例完成测试，其中nexmark的获取方式请参阅[下载链接](https://github.com/nexmark/nexmark/releases/tag/v0.2.0)，使用方式请参阅[使用说明](#15-nexmark使用说明)。<br>
+本实施例基于nexmark0.3-Q4用例完成测试，其中Nexmark的获取方式请参阅[下载链接](https://github.com/nexmark/nexmark/releases/tag/v0.2.0)，使用方式请参阅[使用说明](#nexmark使用说明)。<br>
 该用例执行的操作是双流Join + AGG, 用例运行情况如下图所示：<br>
 
 **表1** nexmark q4 用例运行示意图
 
-<a href="./docs/zh/figures/nexmark web ui.png"><img src="./docs/zh/figures/nexmark web ui.png" alt="webUI" width="1000" /></a>
+<a href="./figures/Nexmark任务运行网页截图.png"><img src="./figures/Nexmark任务运行网页截图.png" alt="webUI" width="1000" /></a>
 
 
-其中，双流Join操作主要使用RocksDBMapState，AGG操作主要使用RocksDBValueState。通过采集火焰图信息，可以观测到该用例RocksDB占比超过60%，是该用例的主要性能瓶颈。火焰图信息如下图所示：
+双流Join操作主要使用RocksDBMapState，AGG操作主要使用RocksDBValueState。通过采集火焰图信息，可以观测到该用例RocksDB占比超过60%，是该用例的主要性能瓶颈。火焰图信息如下图所示：
 
 **表2** nexmark q4 用例CPU火焰图
 
-<a href="./docs/zh/figures/nexmark flame graph.png"><img src="./docs/zh/figures/nexmark flame graph.png" alt="flame graph" width="1000" /></a>
+<a href="./figures/Nexmark任务火焰图.png"><img src="./figures/Nexmark任务火焰图.png" alt="flame graph" width="1000" /></a>
 
-为了创建足够数量的状态以验证omniStateStore的加速效果，本实施例使用1亿数据量运行nexmark。nexmark的配置文件样例请参阅[nexmark.yaml](#15-nexmark使用说明)。
+为了创建足够数量的状态以验证omniStateStore的加速效果，本实施例使用1亿数据量运行nexmark。Nexmark的配置文件样例请参阅[nexmark.yaml](#nexmark使用说明)。
 
 </font>
 
 ---
-## 1.4 omniStateStore实践
+## OmniStateStore实践
 <font size=3>
 
-本实施例按照[omniStateStore安装指南](installation_guide.md)和[omniStateStore使用指南](user_guide.md)完成omniStateStore的安装和使能，在Flink日志中观察到以下日志信息，表示omniStateStore成功使能：
+本实施例按照[OmniStateStore安装指南](installation_guide.md)和[OmniStateStore使用指南](user_guide.md)完成OmniStateStore的安装和使能，在Flink日志中观察到以下日志信息，表示OmniStateStore使能成功。
 
 ```
 2026-03-03 16:00:52,972 INFO  org.apache.flink.runtime.taskexecutor.TaskExecutor           [] - [FALCON] configuring falcon cache heap memory management system. current TM have 2 slots, so each slot can cache 10000 states.
@@ -143,28 +143,28 @@ state.backend.incremental: true
 2026-03-03 16:00:54,838 INFO  org.apache.flink.contrib.streaming.state.RocksDBKeyedStateBackend [] - [FALCON] <accState, VALUE> enable falcon cache, and update falcon cache size of each state to 2500.
 2026-03-03 16:00:54,855 INFO  org.apache.flink.contrib.streaming.state.RocksDBKeyedStateBackend [] - [FALCON] <accState, VALUE> enable falcon cache, and update falcon cache size of each state to 2500.
 ```
-使用原生Flink运行nexmark0.3-Q4用例，任务的单核吞吐量为20.52；使能omniStateStore状态存储加速后，该任务的单核吞吐量上升至37.26。**若以单核吞吐量作为性能评价指标，omniStateStore性能提升81.58%。**
+使用原生Flink运行nexmark0.3-Q4用例，任务的单核吞吐量为20.52；使能OmniStateStore状态存储加速后，该任务的单核吞吐量上升至37.26。**若以单核吞吐量作为性能评价指标，OmniStateStore性能提升81.58%。**
 
 </font>
 
 ---
-## 1.5 nexmark使用说明
+## Nexmark使用说明
 <font size=3>
 
-**步骤一**&emsp;下载Nexmark软件包，下载链接为[link](https://github.com/nexmark/nexmark/releases/tag/v0.2.0)。
+**步骤1**&emsp;下载Nexmark软件包，下载链接为[Link](https://github.com/nexmark/nexmark/releases/tag/v0.2.0)。
 
-**步骤二**&emsp;在环境上部署nexmark软件包，以/opt目录为例：
+**步骤2**&emsp;在环境上部署Nexmark软件包，以“/opt”目录为例：
 ```
 cd /opt
 unzip nexmark-flink.zip
 rm -rf nexmark-flink.zip
 mv nexmark-flink nexmark
 ```
-**步骤三**&emsp;将nexmark的jar包部署到Flink的lib目录下：
+**步骤3**&emsp;将Nexmark的JAR包部署到Flink的lib目录下：
 ```
 cp -r /opt/nexmark/lib/nexmark-flink-0.2-SNAPSHOT.jar $FLINK_HOME/lib/
 ```
-**步骤四**&emsp;修改nexmark的测试配置，即修改/opt/nexmark/conf/nexmark.yaml文件，配置样例如下：
+**步骤4**&emsp;修改nexmark的测试配置，即修改“/opt/nexmark/conf/nexmark.yaml”文件，配置样例如下：
 ```
 # The metric reporter server host.
 nexmark.metric.reporter.host: 172.19.0.2
@@ -221,7 +221,7 @@ flink.rest.port: 8081
 nexmark.metric.monitor.delay: 8s
 ```
 
-**步骤五**&emsp;启动Flink集群，并运行nexmark的指定用例：
+**步骤5**&emsp;启动Flink集群，并运行Nexmark的指定用例。
 ```
 cd $FLINK_HOME/bin && ./start-cluster.sh
 cd /opt/nexmark/bin && ./setup_cluster.sh

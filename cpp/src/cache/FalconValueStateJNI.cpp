@@ -42,6 +42,7 @@ JNIEXPORT jbyteArray JNICALL Java_com_huawei_falcon_state_cache_FalconValueState
     if (falcon_cache != nullptr) {
         return falcon_cache->get(env, rocksdbHandle, cfHandle, writeOptionsHandle, key_slice);
     } else {
+        delete[] key;
         FalconException::FalconExceptionJni::ThrowNew(env, "[FALCON] invalid falcon cache handle when getting state.",
             ROCKSDB_NAMESPACE::Status::InvalidArgument("Invalid Falcon Cache Handle."));
         return nullptr;
@@ -57,12 +58,14 @@ JNIEXPORT void JNICALL Java_com_huawei_falcon_state_cache_FalconValueState_put(J
     env->GetByteArrayRegion(jKey, jKeyOffset, jKeyLen, key);
     if (env->ExceptionCheck()) {  // exception thrown: ArrayIndexOutOfBoundsException
         delete[] key;
+        return;
     }
     jbyte* value = new jbyte[jValLen];
     env->GetByteArrayRegion(jVal, jValOffset, jValLen, value);
     if (env->ExceptionCheck()) {  // exception thrown: ArrayIndexOutOfBoundsException
         delete[] value;
         delete[] key;
+        return;
     }
     ROCKSDB_NAMESPACE::Slice key_slice(reinterpret_cast<char*>(key), jKeyLen);
     ROCKSDB_NAMESPACE::Slice value_slice(reinterpret_cast<char*>(value), jValLen);
@@ -74,6 +77,8 @@ JNIEXPORT void JNICALL Java_com_huawei_falcon_state_cache_FalconValueState_put(J
             falcon_cache->updateSizeLimit(env, rocksdbHandle, cfHandle, writeOptHandle, 0);
         }
     } else {
+        delete[] key;
+        delete[] value;
         FalconException::FalconExceptionJni::ThrowNew(env, "[FALCON] invalid falcon cache handle when putting state.",
             ROCKSDB_NAMESPACE::Status::InvalidArgument("Invalid Falcon Cache Handle."));
     }
@@ -88,6 +93,7 @@ JNIEXPORT void JNICALL Java_com_huawei_falcon_state_cache_FalconValueState_delet
     env->GetByteArrayRegion(jKey, jKeyOffset, jKeyLen, key);
     if (env->ExceptionCheck()) {  // exception thrown: ArrayIndexOutOfBoundsException
         delete[] key;
+        return;
     }
     ROCKSDB_NAMESPACE::Slice key_slice(reinterpret_cast<char*>(key), jKeyLen);
 
@@ -98,6 +104,7 @@ JNIEXPORT void JNICALL Java_com_huawei_falcon_state_cache_FalconValueState_delet
             falcon_cache->updateSizeLimit(env, rocksdbHandle, cfHandle, writeOptHandle, 0);
         }
     } else {
+        delete[] key;
         FalconException::FalconExceptionJni::ThrowNew(env, "[FALCON] invalid falcon cache handle when removing state.",
             ROCKSDB_NAMESPACE::Status::InvalidArgument("Invalid Falcon Cache Handle."));
     }

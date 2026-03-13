@@ -1,17 +1,17 @@
-# 1 快速入门
-<font size=3> 本文档提供OmniStateStore的快速入门指南，用户可以参考本文档快速使能特性并验证OmniStateStore的加速能力。</font>
+# 快速入门
+<font size=3> 提供OmniStateStore的快速入门指南，用户可以参考本文档快速使能特性并验证OmniStateStore的加速能力。</font>
 
 ---
 
-## 1.1 使用说明
+## 使用说明
 <font size=3>
 OmniStateStore的加速特性包含动态Filter技术、Flink语义状态缓存和Merge读写优化，具体地，可以拆分为以下子特性：<br>
 
-- 通过**Flink语义状态缓存算法**，同Key状态优先在内存中完成聚合，减少状态对RocksDB的访问频次。<br>
-- 通过**Flink智能多留感知算法**，对于仅需要点读、点写的状态，将memTable数据结构替换为HashLinkList, 提升状态点读和点写效率。<br>
-- 通过**使用merge替换状态RMW**，减少Join算子的状态更新开销。<br>
-- 通过**双流Join数据缓存算法**，减少StreamJoinOperator的状态范围查询次数。<br>
-- 通过**动态Filter技术**，过滤冗余状态查询操作。<br>
+- 通过**Flink语义状态缓存算法**，同Key状态优先在内存中完成聚合，减少状态对RocksDB的访问频次；<br>
+- 通过**Flink智能多留感知算法**，对于仅需要点读、点写的状态，将memTable数据结构替换为HashLinkList, 提升状态点读和点写效率；<br>
+- 通过**使用merge替换状态RMW**，减少Join算子的状态更新开销；<br>
+- 通过**双流Join数据缓存算法**，减少StreamJoinOperator的状态范围查询次数；<br>
+- 通过**动态Filter技术**，过滤冗余状态查询操作；<br>
 
 OmniStateStore特性的使能过程中，存在以下约束：<br>
 - **版本兼容性**：本项目适用于Flink1.16.3 + RocksDB6.20.3架构，仅在指定版本下保证数据一致性和特性加速效果。
@@ -22,10 +22,10 @@ OmniStateStore特性的使能过程中，存在以下约束：<br>
 
 ---
 
-## 1.2 环境准备
+## 环境准备
 <font size=3>
 
-按照下表准备OmniStateStore的**编译环境**，以支持快速完成OmniStateStore安装。具体地，各软件的安装流程请参考[软件安装指导](./installation_guide.md/#14-其他软件安装指导)。
+按照下表准备OmniStateStore的**编译环境**，以支持快速完成OmniStateStore安装。
 
 **表1** OmniStateStore编译环境准备
 <table>
@@ -54,12 +54,12 @@ OmniStateStore特性的使能过程中，存在以下约束：<br>
     </tr>
     <tr>
       <td style="text-align: left;">GCC</td>
-      <td style="text-align: left;">GCC 10.3.1</td>
+      <td style="text-align: left;">10.3.1</td>
     </tr>
   </tbody>
 </table>
 
-按照下表搭建OmniStateStore的**运行环境**，以支持快速验证OmniStateStore在有状态用例上的加速效果。具体地，各软件的安装流程请参考[软件安装指导](./installation_guide.md/#14-其他软件安装指导)。
+按照下表搭建OmniStateStore的**运行环境**，以支持快速验证OmniStateStore在有状态用例上的加速效果。
 
 **表2** OmniStateStore运行环境准备
 <table>
@@ -72,15 +72,19 @@ OmniStateStore特性的使能过程中，存在以下约束：<br>
   <tbody>
     <tr>
       <td style="text-align: left;">Flink</td>
-      <td style="text-align: left;">Apache Flink 1.16.3</td>
+      <td style="text-align: left;">1.16.3</td>
+    </tr>
+    <tr>
+      <td style="text-align: left;">RocksDB</td>
+      <td style="text-align: left;">FRocksDB 6.20.3FRocksDB 6.20.3</td>
     </tr>
     <tr>
       <td style="text-align: left;">Nexmark</td>
-      <td style="text-align: left;">Nexmark0.3</td>
+      <td style="text-align: left;">0.3</td>
     </tr>
     <tr>
       <td style="text-align: left;">Docker</td>
-      <td style="text-align: left;">Docker18.09.0</td>
+      <td style="text-align: left;">18.09.0</td>
     </tr>
   </tbody>
 </table>
@@ -88,25 +92,25 @@ OmniStateStore特性的使能过程中，存在以下约束：<br>
 
 ---
 
-## 1.3 操作步骤
+## 操作步骤
 <font size=3>
 
-**步骤一**&emsp;下载源码。从[gitCode](https://gitcode.com/openeuler/OmniStateStore.git)上下载omniStateStore的falcon分支源码。
+**步骤1**&emsp;下载[OmniStateStore源码](https://gitcode.com/openeuler/OmniStateStore.git)，选择falcon分支。
 
-**步骤二**&emsp;编译源码。使用[sh build.sh](../../scripts/build.sh)编译omniStateStore，在项目根目录生成BoostKit-omniruntime-omniStateStore-1.2.0.zip。omniStateStore的详细安装流程请参阅[installation_guide.md](./installation_guide.md)。
+**步骤2**&emsp;编译OmniStateStore源码。<br>使用[sh build.sh](../../scripts/build.sh)编译OmniStateStore，在项目根目录生成BoostKit-omniruntime-omniStateStore-1.2.0.zip。OmniStateStore的详细安装流程请参见[安装指南](./installation_guide.md)。
 
-**步骤三**&emsp;环境部署。使用docker部署Flink容器化运行环境，创建一个JobManager容器和两个TaskManager容器，容器配置均为8C32GB。JobManager分配8GB内存，单个TaskManager分配2个TaskSlot和8GB内存。具体地容器创建方式请参阅[Flink容器化部署教程](#14-flink集群容器化部署教程)。
+**步骤3**&emsp;部署环境。<br>使用Docker部署Flink的容器化运行环境，包括一个JobManager容器和两个TaskManager容器，容器配置均为8C32GB。其中，JobManager分配8GB内存，单个TaskManager分配2个TaskSlot和8GB内存。
 
-**步骤四**&emsp;设置环境变量。在容器中部署指定版本的Flink和Nexmark，并配置JAVA_HOME，FLINK_HOME环境变量。此外，将LD_LIBRARY_PATH配置为
+**步骤4**&emsp;设置环境变量。<br>在容器中部署指定版本的Flink和Nexmark，并配置JAVA_HOME，FLINK_HOME环境变量。此外，将LD_LIBRARY_PATH配置为：<br>
 ```
 LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$JAVA_HOME/lib:$JAVA_HOME/jre/lib/aarch64:$JAVA_HOME/jre/lib/aarch64/server:/usr/local/lib
 ```
 
-**步骤五**&emsp;安装omniStateStore。解压BoostKit-omniruntime-omniStateStore-1.2.0.zip，将librocksd.so.6拷贝到/usr/local/lib目录下，将flink-alg-falcon.jar拷贝到$FLINK_HOME/lib目录下。
+**步骤5**&emsp;安装OmniStateStore。<br>解压BoostKit-omniruntime-omniStateStore-1.2.0.zip，将librocksd.so.6拷贝到“/usr/local/lib”目录下，将flink-alg-falcon.jar拷贝到“$FLINK_HOME/lib”目录下。<br>拷贝完成后即完成安装，无需额外配置。
 
-**步骤六**&emsp;配置omniStateStore参数。参考[flink-conf.yaml](../../conf/flink-conf.yaml)，在$FLINK_HOME/conf/flink-conf.yaml中配置omniStateStore参数以使能加速特性，并指定使用rocksbd状态后端。
+**步骤6**&emsp;配置OmniStateStore参数。<br>参考[flink-conf.yaml](../../conf/flink-conf.yaml)，在“$FLINK_HOME/conf/flink-conf.yaml”中配置omniStateStore参数以使能加速特性，并指定使用RocksDB状态后端。
 
-**步骤七**&emsp;加速效果验证。使用原生Flink运行nexmark q4用例，记录任务的单核吞吐。使能omniStateStore运行nexmark q4用例，观测到任务单核吞吐相比原生Flink有显著提升。用户可以在Flink的运行日志中搜索以下关键字，若观测到以下关键字，表示成功使能omniStateStore加速特性。<br>
+**步骤7**&emsp;验证加速效果。<br>使用原生Flink运行Nexmark q4用例，记录任务的单核吞吐量。随后使能OmniStateStore运行相同用例，观察任务单核吞吐量相比原生Flink是否有明显提升。<br>用户可以在Flink的运行日志中搜索以下关键字，来确认OmniStateStore特性已启用成功。<br>
 
 ```
 [FALCON] enable miniBatch process for StreaminJoinOperator.
@@ -115,23 +119,5 @@ LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$JAVA_HOME/lib:$JAVA_HOME/jre/lib/aarch64:$JAVA
 [FALCON] <accState, VALUE> enable falcon cache.
 [FALCON] merge operation is used for left-records.
 ```
-</font>
-
----
-
-## 1.4 Flink集群容器化部署教程
-<font size=3>
-
-**步骤一**&emsp;下载openEuler22.03基础镜像，并参考[软件部署教程](./installation_guide.md/#14-其他软件安装指导)安装JDK，Maven，GCC，Flink，然后提交为新的镜像，命名为flink:latest。
-
-**步骤二**&emsp;参考以下命令完成Flink容器化集群搭建
-```
-docker run -it -d --name flink_JM --privileged -v /media:/media -v $DOCKER_DATA_PATH:/home/data -v $DATA_PATH:/data -p 8081:8081 --cpus=8 --cpuset-cpus=0-7 --cpuset-mems=0 -m 32G flink:latest "/usr/sbin/init"
-docker run -it -d --name flink_TM_001 --privileged -v /media:/media -v $DOCKER_DATA_PATH:/home/data -v $DATA_PATH:/data --cpus=8 --cpuset-cpus=80-87 --cpuset-mems=1 -m 32G flink:latest "/usr/sbin/init"
-docker run -it -d --name flink_TM_002 --privileged -v /media:/media -v $DOCKER_DATA_PATH:/home/data -v $DATA_PATH:/data --cpus=8 --cpuset-cpus=160-167 --cpuset-mems=2 -m 32G flink:latest "/usr/sbin/init"
-docker network create -d bridge --subnet 172.19.0.1/24 --gateway 172.19.0.1 my-flink-network
-docker network connect --ip 172.19.0.2  my-flink-network flink_JM
-docker network connect --ip 172.19.0.3  my-flink-network flink_TM_001
-docker network connect --ip 172.19.0.4  my-flink-network flink_TM_002
-```
+若成功匹配到相关日志信息，说明OmniStateStore已生效，任务性能已得到优化。
 </font>

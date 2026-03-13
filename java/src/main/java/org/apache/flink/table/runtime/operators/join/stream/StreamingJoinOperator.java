@@ -25,6 +25,11 @@ import java.util.ArrayList;
 import org.apache.flink.configuration.ConfigOptions;
 import org.apache.flink.configuration.GlobalConfiguration;
 
+import org.apache.flink.runtime.state.VoidNamespace;
+import org.apache.flink.runtime.state.VoidNamespaceSerializer;
+import org.apache.flink.streaming.api.operators.InternalTimer;
+import org.apache.flink.streaming.api.operators.InternalTimerService;
+import org.apache.flink.streaming.api.operators.Triggerable;
 import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
 import org.apache.flink.table.data.GenericRowData;
 import org.apache.flink.table.data.RowData;
@@ -39,8 +44,7 @@ import org.apache.flink.table.runtime.operators.join.stream.state.OuterJoinRecor
 import org.apache.flink.table.runtime.typeutils.InternalTypeInfo;
 import org.apache.flink.types.RowKind;
 
-/** Streaming unbounded Join operator which supports INNER/LEFT/RIGHT/FULL JOIN. */
-public class StreamingJoinOperator extends AbstractStreamingJoinOperator {
+public class StreamingJoinOperator extends AbstractStreamingJoinOperator implements Triggerable<Object, VoidNamespace> {
 
     // -------------------------------- FALCON Implementation --------------------------------
     boolean enableMerge = GlobalConfiguration.loadConfiguration().get(
@@ -64,7 +68,20 @@ public class StreamingJoinOperator extends AbstractStreamingJoinOperator {
     private Map<Object, List<RowData>> leftBuffer = new HashMap<>(500);
     private Map<Object, List<RowData>> rightBuffer = new HashMap<>(500);
     private int bufferSize = 0; // total number of records in falcon cache
-    private volatile long stateUpdateTimer = System.currentTimeMillis() + 1000; // miniBatchJoin triggering timer
+    private transient InternalTimerService<VoidNamespace> internalTimerService; // time service to trigger miniBatchJoin
+    private long nextTriggerTimer = -1L;  // when current time reaches nextTriggerTimer, reset internalTimerService
+
+    /** When currentTime reached nextTriggerTimer, internalTimerService will call these func to clear buffer records. */
+    @Override
+    public void onEventTime(InternalTimer<Object, VoidNamespace> timer) throws Exception {
+        triggerMiniBatchJoin();
+    }
+
+    @Override
+    public void onProcessingTime(InternalTimer<Object, VoidNamespace> timer) throws Exception {
+        triggerMiniBatchJoin();
+    }
+
 
     /**
      * Falcon miniBatch join function. If input record type is delete/update_before, trigger miniBatch join and then
@@ -84,8 +101,14 @@ public class StreamingJoinOperator extends AbstractStreamingJoinOperator {
             triggerMiniBatchJoin();
             retractElement(input, inputSideStateView, otherSideStateView, inputIsLeft);
         } else {
+            long currentTime = System.currentTimeMillis();
+            // if timer is not set, or it's time to trigger miniBatch, register a register timer.
+            if (nextTriggerTimer == -1 || currentTime >= nextTriggerTimer) {
+                nextTriggerTimer = currentTime + 1000;
+                internalTimerService.registerProcessingTimeTimer(VoidNamespace.INSTANCE, nextTriggerTimer);
+            }
             insertIntoBuffer(input, inputIsLeft);
-            if (bufferSize >= 3000 || System.currentTimeMillis() > stateUpdateTimer) {
+            if (bufferSize >= 3000) {
                 triggerMiniBatchJoin();
             }
         }
@@ -239,7 +262,8 @@ public class StreamingJoinOperator extends AbstractStreamingJoinOperator {
         bufferSize = 0;
         leftBuffer.clear();
         rightBuffer.clear();
-        stateUpdateTimer = System.currentTimeMillis() + 1000;
+        internalTimerService.deleteProcessingTimeTimer(VoidNamespace.INSTANCE, nextTriggerTimer);
+        nextTriggerTimer = -1;
     }
 
     /**
@@ -296,6 +320,9 @@ public class StreamingJoinOperator extends AbstractStreamingJoinOperator {
     @Override
     public void open() throws Exception {
         super.open();
+
+        this.internalTimerService = getInternalTimerService("falcon-miniBatch-join-timer",
+                VoidNamespaceSerializer.INSTANCE, this);
 
         this.outRow = new JoinedRowData();
         this.leftNullRow = new GenericRowData(leftType.toRowSize());
