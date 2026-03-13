@@ -129,9 +129,10 @@ public:
             std::vector<FileMetaDataRef> result;
             for (auto &group : groups) {
                 for (auto &fileMetaData : group->GetFiles()) {
-                    if (isPQ && fileMetaData->GetSmallest()->IsPqKey()) {
-                        result.push_back(fileMetaData);
-                    } else if (!isPQ && !fileMetaData->GetSmallest()->IsPqKey()) {
+                    if (fileMetaData == nullptr || fileMetaData->GetSmallest() == nullptr) {
+                        continue;
+                    }
+                    if (isPQ == fileMetaData->GetSmallest()->IsPqKey()) {
                         result.push_back(fileMetaData);
                     }
                 }
