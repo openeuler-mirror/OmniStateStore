@@ -5,7 +5,7 @@
 ## 1.1 最新消息
 <font size=3>
 
-- [2026.03.30] 发布OmniStateStore 1.2.0。基于对接Flink和RocksDB的插件完成Flink有状态用例性能加速。对Flink进行轻量级修改，基于状态缓存和状态过滤技术，降低Flink对RocksDB的访问频次，提升有状态用例的IO性能。 
+- [2026.03.30] 发布OmniStateStore 1.2.0。基于对接Flink和RocksDB的插件完成Flink有状态用例性能加速。对Flink进行轻量级修改，基于状态缓存和状态过滤技术，降低Flink对RocksDB的访问频次，提升有状态用例的IO性能。1.2.0版本进行了架构调整，与1.1.0以及1.0.0相互独立。 
 - [2025.12.30] 发布OmniStateStore 1.1.0。新增支持对接Flink Metric框架并实现部分常用的Metric指标；支持Priority Queue持久化存储；支持KV分离存储。 
 - [2025.06.30] 发布OmniStateStore 1.0.0。解决了大数据场景下，针对大状态下IO性能较差的问题，实现了一种新型的状态存储方式，提升了Flink的IO性能。
 </font>
@@ -34,7 +34,7 @@ OmniStateStore是对接Flink和RocksDB的中间层，包含动态Filter技术、
 **图1** OmniStateStore整体架构设计
 </font>
 
-<a href="./docs/zh/figures/falcon system structure.png"><img src="./docs/zh/figures/falcon system structure.png" alt="OmniStateStore整体架构设计" width="800" /></a>
+<a href="./docs/zh/figures/OmniStateStore整体架构设计.png"><img src="./docs/zh/figures/OmniStateStore整体架构设计.png" alt="OmniStateStore整体架构设计" width="800" /></a>
 
 ## 1.2.3 典型部署配置
 <font size="3">

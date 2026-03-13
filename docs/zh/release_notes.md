@@ -1,9 +1,9 @@
-# 1 版本说明书
-<font size=3> 本文档提供OmniStateStore的版本信息和特性更新情况。</font>
+# 版本说明书
+<font size=3> 提供OmniStateStore的版本信息和特性更新情况。</font>
 
 ---
 
-## 1.1 版本配套说明
+## 版本配套说明
 ### 产品版本信息
 <font size=3>
 <table>
@@ -89,11 +89,11 @@
     </tr>
     <tr>
       <td style="text-align: left;">Virus Lib Version</td>
-      <td style="text-align: left;">2025-12-10 08:00:00.0</td>
+      <td style="text-align: left;">2026-03-10 08:00:00.0</td>
     </tr>
     <tr>
       <td style="text-align: left;">Scan Time</td>
-      <td style="text-align: left;">2025-12-11 22:44:53</td>
+      <td style="text-align: left;">2026-03-11 22:44:53</td>
     </tr>
     <tr>
       <td style="text-align: left;">Scan Result</td>
@@ -117,7 +117,7 @@
     </tr>
     <tr>
       <td style="text-align: left;">Scan Time</td>
-      <td style="text-align: left;">2025-12-11 22:45:17</td>
+      <td style="text-align: left;">2026-03-11 22:45:17</td>
     </tr>
     <tr>
       <td style="text-align: left;">Scan Result</td>
@@ -137,11 +137,11 @@
     </tr>
     <tr>
       <td style="text-align: left;">Virus Lib Version</td>
-      <td style="text-align: left;">2025-12-11 10:04:00</td>
+      <td style="text-align: left;">2026-03 10:04:00</td>
     </tr>
     <tr>
       <td style="text-align: left;">Scan Time</td>
-      <td style="text-align: left;">2025-12-11 22:44:59</td>
+      <td style="text-align: left;">2026-03 22:44:59</td>
     </tr>
     <tr>
       <td style="text-align: left;">Scan Result</td>
@@ -153,10 +153,10 @@
 
 ---
 
-## 1.2 版本更新情况说明
+## 版本更新情况说明
 ## V1.2.0
 ### 更新说明
-<font size=3> 当前版本旨在解决大数据场景下，针对大状态下IO性能较差的问题，优化Flink对RocksDB的使用效率，提升Flink的IO性能。</font>
+<font size=3> 当前版本旨在解决大数据场景下，针对大状态下IO性能较差的问题，优化Flink对RocksDB的使用效率，提升Flink的IO性能。1.2.0版本进行了架构调整，与1.1.0以及1.0.0相互独立，主要新增特性如下： </font>
 
 ### 新增特性
 <font size=3>
@@ -245,22 +245,43 @@
   </thead>
   <tbody>
     <tr>
-      <td style="text-align: left;">《Kunpeng BoostKit 25.3.0 大数据OmniRuntime 1.9.0 版本说明书》</td>
-      <td style="text-align: left;">本文档提供OmniRuntime的版本发布信息</td>
+      <td style="text-align: left;">《OmniStateStore 1.2.0 版本说明书》</td>
+      <td style="text-align: left;">提供OmniRuntime的版本更新内容与发布说明</td>
       <td style="text-align: left;">开源仓</td>
     </tr>
     <tr>
-      <td style="text-align: left;">《Kunpeng BoostKit 25.3.0 大数据OmniRuntime 特性指南》</td>
-      <td style="text-align: left;">本文档提供OmniRuntime安装部署等指导</td>
+      <td style="text-align: left;">《OmniStateStore 快速入门》</td>
+      <td style="text-align: left;">提供OmniRuntime的快速上手教程，帮助用户快速了解和使用该组件。</td>
+      <td style="text-align: left;">开源仓</td>
+    </tr>
+    <tr>
+      <td style="text-align: left;">《OmniStateStore 安装指南》</td>
+      <td style="text-align: left;">提供OmniRuntime的安装部署指导。</td>
+      <td style="text-align: left;">开源仓</td>
+    </tr>
+    <tr>
+      <td style="text-align: left;">《OmniStateStore 使用指南》</td>
+      <td style="text-align: left;">提供OmniRuntime的使用操作指导。</td>
+      <td style="text-align: left;">开源仓</td>
+    </tr>
+    <tr>
+      <td style="text-align: left;">《OmniStateStore 常见问题》</td>
+      <td style="text-align: left;">记录安装、部署和使用过程中可能遇到的问题及其解决方法。</td>
+      <td style="text-align: left;">开源仓</td>
+    </tr>
+    <tr>
+      <td style="text-align: left;">《OmniStateStore 最佳实践》</td>
+      <td style="text-align: left;">提供OmniRuntime典型使用场景下的实践案例，帮助用户优化性能与使用体验。</td>
+      <td style="text-align: left;">开源仓</td>
+    </tr>
+    <tr>
+      <td style="text-align: left;">《OmniStateStore 设计指南》</td>
+      <td style="text-align: left;">提供OmniRuntime的系统架构与加速机制，帮助开发者深入了解其设计原理。</td>
       <td style="text-align: left;">开源仓</td>
     </tr>
   </tbody>
 </table>
 
-
-### 获取文档的方法
-
-<font size=3>您可以通过访问[鲲鹏社区](https://www.hikunpeng.com/document/detail/zh/kunpengbds/overview/kunpengbds.html)浏览和获取相关文档。</font>
 
 
 
