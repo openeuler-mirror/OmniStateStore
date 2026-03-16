@@ -76,7 +76,7 @@ OmniStateStore特性的使能过程中，存在以下约束：<br>
     </tr>
     <tr>
       <td style="text-align: left;">RocksDB</td>
-      <td style="text-align: left;">FRocksDB 6.20.3FRocksDB 6.20.3</td>
+      <td style="text-align: left;">FRocksDB 6.20.3</td>
     </tr>
     <tr>
       <td style="text-align: left;">Nexmark</td>
@@ -106,7 +106,7 @@ OmniStateStore特性的使能过程中，存在以下约束：<br>
 LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$JAVA_HOME/lib:$JAVA_HOME/jre/lib/aarch64:$JAVA_HOME/jre/lib/aarch64/server:/usr/local/lib
 ```
 
-**步骤5**&emsp;安装OmniStateStore。<br>解压BoostKit-omniruntime-omniStateStore-1.2.0.zip，将librocksd.so.6拷贝到“/usr/local/lib”目录下，将flink-alg-falcon.jar拷贝到“$FLINK_HOME/lib”目录下。<br>拷贝完成后即完成安装，无需额外配置。
+**步骤5**&emsp;安装OmniStateStore。<br>解压BoostKit-omniruntime-omniStateStore-1.2.0.zip，将librocksdb.so.6拷贝到“/usr/local/lib”目录下，将flink-alg-falcon.jar拷贝到“$FLINK_HOME/lib”目录下。<br>拷贝完成后即完成安装，无需额外配置。
 
 **步骤6**&emsp;配置OmniStateStore参数。<br>参考[flink-conf.yaml](../../conf/flink-conf.yaml)，在“$FLINK_HOME/conf/flink-conf.yaml”中配置omniStateStore参数以使能加速特性，并指定使用RocksDB状态后端。
 

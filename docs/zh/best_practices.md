@@ -54,7 +54,7 @@
     </tr>
     <tr>
       <td style="text-align: left;">Nexmark</td>
-      <td style="text-align: left;">0.3</td>
+      <td style="text-align: left;">0.2</td>
     </tr>
   </tbody>
 </table>
@@ -85,17 +85,17 @@ state.backend.incremental: true
 ## 测试用例
 <font size=3>
 
-本实施例基于nexmark0.3-Q4用例完成测试，其中Nexmark的获取方式请参阅[下载链接](https://github.com/nexmark/nexmark/releases/tag/v0.2.0)，使用方式请参阅[使用说明](#nexmark使用说明)。<br>
+本实施例基于nexmark0.2-Q4用例完成测试，其中Nexmark的获取方式请参阅[下载链接](https://github.com/nexmark/nexmark/releases/tag/v0.2.0)，使用方式请参阅[使用说明](#nexmark使用说明)。<br>
 该用例执行的操作是双流Join + AGG, 用例运行情况如下图所示：<br>
 
-**表1** nexmark q4 用例运行示意图
+**图1** nexmark q4 用例运行示意图
 
 <a href="./figures/Nexmark任务运行网页截图.png"><img src="./figures/Nexmark任务运行网页截图.png" alt="webUI" width="1000" /></a>
 
 
 双流Join操作主要使用RocksDBMapState，AGG操作主要使用RocksDBValueState。通过采集火焰图信息，可以观测到该用例RocksDB占比超过60%，是该用例的主要性能瓶颈。火焰图信息如下图所示：
 
-**表2** nexmark q4 用例CPU火焰图
+**图2** nexmark q4 用例CPU火焰图
 
 <a href="./figures/Nexmark任务火焰图.png"><img src="./figures/Nexmark任务火焰图.png" alt="flame graph" width="1000" /></a>
 
@@ -143,7 +143,7 @@ state.backend.incremental: true
 2026-03-03 16:00:54,838 INFO  org.apache.flink.contrib.streaming.state.RocksDBKeyedStateBackend [] - [FALCON] <accState, VALUE> enable falcon cache, and update falcon cache size of each state to 2500.
 2026-03-03 16:00:54,855 INFO  org.apache.flink.contrib.streaming.state.RocksDBKeyedStateBackend [] - [FALCON] <accState, VALUE> enable falcon cache, and update falcon cache size of each state to 2500.
 ```
-使用原生Flink运行nexmark0.3-Q4用例，任务的单核吞吐量为20.52；使能OmniStateStore状态存储加速后，该任务的单核吞吐量上升至37.26。**若以单核吞吐量作为性能评价指标，OmniStateStore性能提升81.58%。**
+使用原生Flink运行nexmark0.2-Q4用例，任务的单核吞吐量为20.52；使能OmniStateStore状态存储加速后，该任务的单核吞吐量上升至37.26。**若以单核吞吐量作为性能评价指标，OmniStateStore性能提升81.58%。**
 
 </font>
 
