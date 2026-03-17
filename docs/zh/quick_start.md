@@ -46,7 +46,7 @@ OmniStateStore软件包BoostKit-omnistatestore_1.x.x_aarch64_xxx.tar.gz。
 
 ## 环境部署<a name="ZH-CN_TOPIC_0000002520932058"></a>
 
-环境部署参考以下链接 [installation_guide.md](docs/zh/installation_guide.md)
+环境部署参考以下链接 [installation_guide.md](installation_guide.md)
 
 ## 测试验证<a name="ZH-CN_TOPIC_0000002520932058"></a>
 
