@@ -36,7 +36,7 @@
 编译成功则在目录dist/下存在：
 OmniStateStore软件包BoostKit-omnistatestore_1.x.x_aarch64_xxx.tar.gz。
 
-### 开发者测试
+### 3. 开发者测试
 1. 执行测试运行脚本。
 
     ```
