@@ -7,7 +7,7 @@
 <font size=3>
 
 **问题现象<br>**
-使用Flink1.16.1运行nexmark0.3-Q4用例，并尝试使能OmniStateStore特性，出现类构造器未查询到的问题。如下图所示：<br>
+使用Flink1.16.1运行nexmark0.2-Q4用例，并尝试使能OmniStateStore特性，出现类构造器未查询到的问题。如下图所示：<br>
 
 **图1** OmniStateStore运行报错截图
 

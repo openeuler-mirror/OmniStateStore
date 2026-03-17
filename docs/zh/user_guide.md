@@ -133,7 +133,7 @@ state.backend.rocksdb.falcon.use-merge: true
 
 启动Flink任务后，可以在Flink的运行日志中观察OmniStateStore的特性使能情况。各加速特性的适用场景和使能观测方式由下表所示：<br>
 
-**表1** OmniStateStore特性使能情况观测方式
+**表2** OmniStateStore特性使能情况观测方式
 <table>
   <thead>
     <tr>
