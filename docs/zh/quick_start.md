@@ -56,18 +56,12 @@ OmniStateStore软件包BoostKit-omnistatestore_1.x.x_aarch64_xxx.tar.gz。
     cd $FLINK_HOME/bin/ && ./start-cluster.sh
     ```
 
-2. 调用sql-client后，进行测试。
+3. 执行“${FLINK_HOME}/examples/streaming/WordCount.jar”示例程序。
 
     ```
-    ./sql-client.sh
+    $FLINK_HOME/bin/flink run $FLINK_HOME/examples/streaming/WordCount.jar
     ```
-
-3. 在命令行中输入。
-
-    ```
-    SELECT 'Hello, Flink!';
-    ```
-    可以正常输出结果即安装正常。
+    观察到Task Manager日志中打印“OmniStateStore service start success.”，说明OmniStateStore启动成功。
 
 
 
