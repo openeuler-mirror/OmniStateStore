@@ -56,7 +56,7 @@ OmniStateStore软件包BoostKit-omnistatestore_1.x.x_aarch64_xxx.tar.gz。
     cd $FLINK_HOME/bin/ && ./start-cluster.sh
     ```
 
-3. 执行“${FLINK_HOME}/examples/streaming/WordCount.jar”示例程序。
+2. 执行“${FLINK_HOME}/examples/streaming/WordCount.jar”示例程序。
 
     ```
     $FLINK_HOME/bin/flink run $FLINK_HOME/examples/streaming/WordCount.jar
