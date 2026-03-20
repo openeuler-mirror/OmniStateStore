@@ -51,7 +51,7 @@ public class RocksDBOptOptionsFactory implements ConfigurableRocksDBOptionsFacto
                                      Collection<AutoCloseable> handlesToClose) {
         Configuration config = GlobalConfiguration.loadConfiguration();
         if (config.get(USE_HASHMEMTABLE)) {
-            currentOptions.setAllowConcurrentMemtableWrite(false); // required for hash
+            // currentOptions.setAllowConcurrentMemtableWrite(false); // required for hash
         }
 
         return currentOptions;
@@ -89,7 +89,7 @@ public class RocksDBOptOptionsFactory implements ConfigurableRocksDBOptionsFacto
     public ReadOptions createReadOptions(
             ReadOptions currentOptions, Collection<AutoCloseable> handlesToClose) {
         Configuration config = GlobalConfiguration.loadConfiguration();
-        if (config.get(USE_RANGE_FILTER) || config.get(USE_HASHMEMTABLE)) {
+        if (config.get(USE_RANGE_FILTER)) {
             currentOptions.setTotalOrderSeek(true); // be careful if you use prefix filter for range query
         }
 
