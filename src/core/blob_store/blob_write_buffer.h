@@ -118,6 +118,9 @@ public:
     BResult InitDataBlockWriter(uint32_t realValueSize)
     {
         ByteBufferRef buffer = CreateWriteBuffer(realValueSize);
+        if (UNLIKELY(buffer == nullptr)) {
+            return BSS_ALLOC_FAIL;
+        }
         RETURN_INVALID_PARAM_AS_NULLPTR(buffer);
         WriteLocker<ReadWriteLock> lock(&mRwLock);
         mDataBlockWriter = std::make_shared<BlobDataBlockWriter>(buffer);
