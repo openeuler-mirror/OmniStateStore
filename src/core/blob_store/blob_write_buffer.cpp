@@ -36,7 +36,7 @@ BResult BlobWriteBuffer::Write(const uint8_t *value, uint32_t length, uint64_t e
     if (mDataBlockWriter == nullptr) {
         auto ret = InitDataBlockWriter(realValueSize);
         if (UNLIKELY(ret != BSS_OK)) {
-            LOG_ERROR("Failed to create block writer, ret:" << ret);
+            LOG_LIMIT_WARN("Failed to create block writer, ret:" << ret);
             return BSS_ALLOC_FAIL;
         }
     }
@@ -49,7 +49,7 @@ BResult BlobWriteBuffer::Write(const uint8_t *value, uint32_t length, uint64_t e
         AddFlushingDataBlock(dataBlock);
         auto ret = InitDataBlockWriter(realValueSize);
         if (UNLIKELY(ret != BSS_OK)) {
-            LOG_ERROR("Failed to create block writer, ret:" << ret);
+            LOG_LIMIT_WARN("Failed to create block writer, ret:" << ret);
             return BSS_ALLOC_FAIL;
         }
     }
@@ -99,9 +99,9 @@ ByteBufferRef BlobWriteBuffer::CreateBuffer(uint32_t size)
 {
     uintptr_t dataAddress;
     RETURN_NULLPTR_AS_NULLPTR(mMemManager);
-    auto retVal = mMemManager->GetMemory(MemoryType::SLICE_TABLE, size, dataAddress);
+    auto retVal = mMemManager->GetMemoryDirect(MemoryType::SLICE_TABLE, size, dataAddress);
     if (UNLIKELY(retVal != 0)) {
-        LOG_WARN("Alloc memory for write blob value failed, size:" << size);
+        LOG_LIMIT_WARN("Alloc memory for write blob value failed, size:" << size);
         return nullptr;
     }
     // reserve some byte buffer for flush.

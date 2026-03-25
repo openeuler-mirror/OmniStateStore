@@ -144,7 +144,7 @@ ByteBufferRef BlobFileWriter::CreateBuffer(uint32_t size)
 {
     uintptr_t dataAddress;
     RETURN_NULLPTR_AS_NULLPTR(mMemManager);
-    auto retVal = mMemManager->GetMemory(MemoryType::SLICE_TABLE, size, dataAddress);
+    auto retVal = mMemManager->GetMemory(MemoryType::FILE_STORE, size, dataAddress);
     if (UNLIKELY(retVal != 0)) {
         LOG_WARN("Alloc memory for write blob value failed, size:" << size);
         return nullptr;
