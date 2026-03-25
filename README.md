@@ -152,21 +152,22 @@
 
 如果您不希望您的模型或数据集等信息在OmniStateStore中被提及，或希望更新OmniStateStore中有关的描述，请在GitCode提交issue，我们将根据您的issue要求删除或更新您相关描述。衷心感谢您对OmniStateStore的理解和贡献。
 
-
-## License<a name="ZH-CN_TOPIC_0000002549907429"></a>
-
-OmniStateStore的使用许可证，具体请参见[LICENSE](zh-cn_topic_0000002547298197.md)文件。
-
-docs目录下的文档适用CC-BY 4.0许可证，具体请参见[LICENSE](zh-cn_topic_0000002547298197.md)文件。
-
-## 建议与交流<a name="ZH-CN_TOPIC_0000002518427588"></a>
-
-欢迎大家为社区做贡献。如果有任何疑问或建议，请提交[Issues](https://gitcode.com/opemEuler/omnistatestore)，我们会尽快回复。感谢您的支持。
-
-## 致谢<a name="ZH-CN_TOPIC_0000002518727184"></a>
+## 关于社区<a name="ZH-CN_TOPIC_0000002518727184"></a>
 
 OmniStateStore由华为公司的下列部门联合贡献：
 
 - 鲲鹏计算BoostKit开发部
 
 感谢来自社区的每一个PR，欢迎贡献OmniStateStore！
+
+## 贡献、建议与交流<a name="ZH-CN_TOPIC_0000002518427588"></a>
+
+欢迎大家为社区做贡献。如果有任何疑问或建议，请提交[Issues](https://gitcode.com/opemEuler/omnistatestore)，我们会尽快回复。感谢您的支持。
+
+
+
+## License<a name="ZH-CN_TOPIC_0000002549907429"></a>
+
+OmniStateStore的使用许可证，具体请参见[LICENSE](zh-cn_topic_0000002547298197.md)文件。
+
+docs目录下的文档适用CC-BY 4.0许可证，具体请参见[LICENSE](zh-cn_topic_0000002547298197.md)文件。
