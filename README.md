@@ -143,7 +143,7 @@ OmniStateStore/                       # 项目根目录
       <td style="text-align: left;">提供安装OmniStateStore的详细指导。</td>
     </tr>
     <tr>
-      <td style="text-align: left;">使用指南</td>
+      <td style="text-align: left;">用户指南</td>
       <td style="text-align: left;"><a href="./docs/zh/user_guide.md">user_guide.md</a></td>
       <td style="text-align: left;">提供使用OmniStateStore的详细指导。</td>
     </tr>

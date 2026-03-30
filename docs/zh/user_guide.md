@@ -1,4 +1,4 @@
-# 使用指南
+# 用户指南
 <font size=3>提供OmniStateStore的详细使用说明与操作指导，用户可以参阅该文档启动OmniStateStore加速功能。请确保已按照[安装指南](installation_guide.md)完成了OmniStateStore安装。</font>
 
 ---
