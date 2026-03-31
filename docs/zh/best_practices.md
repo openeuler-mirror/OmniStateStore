@@ -107,7 +107,7 @@ state.backend.incremental: true
 ## OmniStateStore实践
 <font size=3>
 
-本实施例按照[OmniStateStore安装指南](installation_guide.md)和[OmniStateStore使用指南](user_guide.md)完成OmniStateStore的安装和使能，在Flink日志中观察到以下日志信息，表示OmniStateStore使能成功。
+本实施例按照[OmniStateStore安装指南](installation_guide.md)和[OmniStateStore用户指南](user_guide.md)完成OmniStateStore的安装和使能，在Flink日志中观察到以下日志信息，表示OmniStateStore使能成功。
 
 ```
 2026-03-03 16:00:52,972 INFO  org.apache.flink.runtime.taskexecutor.TaskExecutor           [] - [FALCON] configuring falcon cache heap memory management system. current TM have 2 slots, so each slot can cache 10000 states.

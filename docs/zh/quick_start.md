@@ -8,7 +8,7 @@
 OmniStateStore的加速特性包含动态Filter技术、Flink语义状态缓存和Merge读写优化，具体地，可以拆分为以下子特性：<br>
 
 - 通过**Flink语义状态缓存算法**，同Key状态优先在内存中完成聚合，减少状态对RocksDB的访问频次；<br>
-- 通过**Flink智能多留感知算法**，对于仅需要点读、点写的状态，将memTable数据结构替换为HashLinkList, 提升状态点读和点写效率；<br>
+- 通过**Flink智能多流感知算法**，对于仅需要点读、点写的状态，将memTable数据结构替换为HashLinkList, 提升状态点读和点写效率；<br>
 - 通过**使用merge替换状态RMW**，减少Join算子的状态更新开销；<br>
 - 通过**双流Join数据缓存算法**，减少StreamJoinOperator的状态范围查询次数；<br>
 - 通过**动态Filter技术**，过滤冗余状态查询操作；<br>
