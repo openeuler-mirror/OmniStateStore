@@ -175,7 +175,7 @@ OmniStateStore软件安装前需要将前置依赖的软件安装成功，建议
 >当前步骤仅供需要卸载OmniStateStore时参考，不属于部署OmniStateStore的必要操作步骤。
 
 1. 在安装节点将配置的state.backend.ockdb.localdir路径删除。
-2. 将“$\{FLINK\_HOME\}/lib/“目录下的flink-boost-statebackend-1.1.0-SNAPSHOT-for-flink-$\{flink._x.x.x_\}.jar删除。
+2. 将“\$\{FLINK\_HOME\}/lib/“目录下的flink-boost-statebackend-1.1.0-SNAPSHOT-for-flink-$\{flink._x.x.x_\}.jar删除。
 
     ```
     rm -f flink-boost-statebackend-1.1.0-SNAPSHOT-for-flink-x.x.x.jar
