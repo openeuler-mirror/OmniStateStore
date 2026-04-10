@@ -1,5 +1,3 @@
-# OmniStateStore特性指南
-
 <font size=3>
 
 - [项目介绍](../../README.md)
