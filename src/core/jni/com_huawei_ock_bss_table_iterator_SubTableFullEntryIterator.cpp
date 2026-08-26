@@ -39,6 +39,10 @@ bool SubTableEntryInit(JNIEnv *env)
     }
     gEntryClass = (jclass)env->NewGlobalRef(stateListCountLocalClass);
     env->DeleteLocalRef(stateListCountLocalClass);
+    if (UNLIKELY(gEntryClass == nullptr)) {
+        LOG_ERROR("Failed to create global reference for EntryResult");
+        return false;
+    }
     // 预加载字段ID
     gKeyAddrField = env->GetFieldID(gEntryClass, "keyAddr", "J");
     gKeyLenField = env->GetFieldID(gEntryClass, "keyLen", "I");

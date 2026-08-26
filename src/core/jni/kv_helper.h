@@ -347,6 +347,12 @@ inline bool CheckPathValid(const std::string &inputPath, bool allowPathNotExist 
         path = path.substr(filterSize);
     }
 
+    if (UNLIKELY(path == ".." || path.rfind("../", 0) == 0 || path.find("/../") != std::string::npos ||
+                 (path.size() >= 3 && path.compare(path.size() - 3, 3, "/..") == 0))) {
+        LOG_ERROR("InputPath contains parent path traversal");
+        return false;
+    }
+
     // 检查真实路径
     auto realPath = realpath(path.c_str(), nullptr);
     if (UNLIKELY(realPath == nullptr)) {
@@ -627,6 +633,10 @@ inline jobject ConvertStateType(JNIEnv *env, StateType stateType)
         }
         stateTypeClass = (jclass)env->NewGlobalRef(localStateTypeClass);
         env->DeleteLocalRef(localStateTypeClass);
+        if (UNLIKELY(stateTypeClass == nullptr)) {
+            LOG_ERROR("Failed to NewGlobalRef for stateTypeClass");
+            return nullptr;
+        }
     }
 
     // 获取 BoostStateType.of(int) 方法的 ID
@@ -780,6 +790,10 @@ inline jobject ConvertKeyValueItem(JNIEnv *env, jobject object, const BinaryKeyV
         }
         binaryKVItemClass = (jclass)env->NewGlobalRef(localBinaryKVItemClass);
         env->DeleteLocalRef(localBinaryKVItemClass);
+        if (UNLIKELY(binaryKVItemClass == nullptr)) {
+            LOG_ERROR("Failed to NewGlobalRef BinaryKeyValueItem");
+            return nullptr;
+        }
     }
 
     jclass clazz = env->GetObjectClass(object);
