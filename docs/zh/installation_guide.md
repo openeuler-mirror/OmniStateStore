@@ -1094,154 +1094,139 @@ OmniStateStore支持对接Flink Metric框架，并提供一系列Metric指标，
 
 **表1 状态后端功能对比**<a id="状态后端功能对比"></a>
 
-<table style="undefined;table-layout: fixed; width: 808px"><colgroup>
-<col style="width: 184px">
-<col style="width: 215px">
-<col style="width: 192px">
-<col style="width: 217px">
+<table style="undefined;table-layout: fixed; width: 987px"><colgroup>
+<col style="width: 234px">
+<col style="width: 281px">
+<col style="width: 236px">
+<col style="width: 236px">
 </colgroup>
 <thead>
   <tr>
     <th>功能分类</th>
     <th>功能点</th>
-    <th>RocksDB StateBackend</th>
-    <th>OmniStateStore StateBackend</th>
+    <th>RocksDBStateBackend</th>
+    <th>OmniStateStore</th>
   </tr></thead>
 <tbody>
   <tr>
-    <td>基本状态读写API</td>
+    <td rowspan="9">基本状态读写API</td>
     <td>Operator State</td>
     <td>支持</td>
     <td>支持</td>
   </tr>
   <tr>
-    <td>基本状态读写API</td>
     <td>Broadcast State</td>
     <td>支持</td>
     <td>支持</td>
   </tr>
   <tr>
-    <td>基本状态读写API</td>
     <td>Value State</td>
     <td>支持</td>
     <td>支持</td>
   </tr>
   <tr>
-    <td>基本状态读写API</td>
     <td>List State</td>
     <td>支持</td>
     <td>支持</td>
   </tr>
   <tr>
-    <td>基本状态读写API</td>
     <td>Map State</td>
     <td>支持</td>
     <td>支持</td>
   </tr>
   <tr>
-    <td>基本状态读写API</td>
     <td>Reducing State</td>
     <td>支持</td>
     <td>支持</td>
   </tr>
   <tr>
-    <td>基本状态读写API</td>
     <td>Aggregating State</td>
     <td>支持</td>
     <td>支持</td>
   </tr>
   <tr>
-    <td>基本状态读写API</td>
     <td>状态有效期（TTL）</td>
     <td>支持</td>
     <td>支持</td>
   </tr>
   <tr>
-    <td>基本状态读写API</td>
     <td>计时器（Timer）</td>
     <td>支持</td>
     <td>支持</td>
   </tr>
   <tr>
-    <td>Checkpoint</td>
+    <td rowspan="7">Checkpoint</td>
     <td>全量快照</td>
     <td>支持</td>
     <td>支持</td>
   </tr>
   <tr>
-    <td>Checkpoint</td>
     <td>增量快照</td>
     <td>支持</td>
     <td>支持</td>
   </tr>
   <tr>
-    <td>Checkpoint</td>
     <td>对齐快照</td>
     <td>支持</td>
     <td>支持</td>
   </tr>
   <tr>
-    <td>Checkpoint</td>
     <td>非对齐快照</td>
     <td>支持</td>
     <td>支持</td>
   </tr>
   <tr>
-    <td>Checkpoint</td>
     <td>普通快照恢复</td>
     <td>支持</td>
     <td>支持</td>
   </tr>
   <tr>
-    <td>Checkpoint</td>
     <td>扩缩并行度场景下快照恢复</td>
     <td>支持</td>
     <td>支持</td>
   </tr>
   <tr>
-    <td>Savepoint</td>
+    <td>懒加载</td>
+    <td>不支持</td>
+    <td>支持</td>
+  </tr>
+  <tr>
+    <td rowspan="8">Savepoint</td>
     <td>不停作业执行Savepoint</td>
     <td>支持</td>
     <td>支持</td>
   </tr>
   <tr>
-    <td>Savepoint</td>
     <td>停作业执行Savepoint</td>
     <td>支持</td>
     <td>支持</td>
   </tr>
   <tr>
-    <td>Savepoint</td>
     <td>标准格式Savepoint</td>
     <td>支持</td>
     <td>支持</td>
   </tr>
   <tr>
-    <td>Savepoint</td>
     <td>原生格式Savepoint</td>
     <td>支持</td>
     <td>支持</td>
   </tr>
   <tr>
-    <td>Savepoint</td>
     <td>删除Savepoint</td>
     <td>支持</td>
     <td>支持</td>
   </tr>
   <tr>
-    <td>Savepoint</td>
     <td>普通Savepoint恢复</td>
     <td>支持</td>
     <td>支持</td>
   </tr>
   <tr>
-    <td>Savepoint</td>
     <td>扩缩并行度场景下Savepoint恢复</td>
     <td>支持</td>
     <td>支持</td>
   </tr>
   <tr>
-    <td>Savepoint</td>
     <td>Savepoint支持状态数据结构升级</td>
     <td>支持</td>
     <td>支持</td>

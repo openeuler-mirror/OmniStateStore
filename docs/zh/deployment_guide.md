@@ -2,12 +2,7 @@
 
 ## 环境要求
 
-### 前置条件
-
-前置环境要求是确保安装部署操作成功和后续应用程序正常执行的先决条件。
-
-- 请检查物理环境是否满足要求。
-- 请检查依赖软件是否已经安装成功，且安装的软件版本是否满足特性要求。
+安装OmniStateStore前，请提前准备软硬件安装环境，以确保后续安装操作顺利进行。
 
 ### 硬件要求
 
@@ -56,9 +51,9 @@ OmniStateStore软件安装前需要将前置依赖的软件安装成功，建议
 
 |软件名称|软件版本|
 |--|--|
-|OS|openEuler 20.03openEuler 22.03openEuler 24.03|
+|OS|openEuler 20.03<br>openEuler 22.03<br>openEuler 24.03|
 |Java|JDK 1.8.0_432|
-|Flink|1.16.11.16.31.17.1|
+|Flink|1.16.1<br>1.16.3<br>1.17.1|
 
 ## 安装指导
 
@@ -98,32 +93,66 @@ OmniStateStore软件安装前需要将前置依赖的软件安装成功，建议
 
     **表 1**  同步配置项说明
 
-    |配置项名称|简要描述|配置示例|注意事项|
-    |--|--|--|--|
-    |state.backend|Flink开源参数，用于配置state.backend状态后端。|com.huawei.ock.bss.OckDBStateBackendFactory|此配置用于切换状态后端的类型，需要保证字符完全正确并区分大小写。|
-    |state.backend.ockdb.localdir|OmniStateStore状态数据本地存储路径。|/usr/local/flink/ockdb|保证路径已存在且对Flink运行用户有读写权限。|
-    |state.backend.ockdb.jni.logfile|OmniStateStore日志路径。|/usr/local/flink/log/kv.log|建议配置为Flink的日志目录。|
+    <table style="undefined;table-layout: fixed; width: 973px"><colgroup>
+    <col style="width: 238px">
+    <col style="width: 250px">
+    <col style="width: 249px">
+    <col style="width: 236px">
+    </colgroup>
+    <thead>
+    <tr>
+        <th>配置项名称</th>
+        <th>简要描述</th>
+        <th>配置示例</th>
+        <th>注意事项</th>
+    </tr></thead>
+    <tbody>
+    <tr>
+        <td>state.backend</td>
+        <td>Flink开源参数，用于配置state.backend状态后端。</td>
+        <td>com.huawei.ock.bss.OckDBStateBackendFactory</td>
+        <td>此配置用于切换状态后端的类型，需要保证字符完全正确并区分大小写。</td>
+    </tr>
+    <tr>
+        <td>state.backend.ockdb.localdir</td>
+        <td>OmniStateStore状态数据本地存储路径。</td>
+        <td>/usr/local/flink/ockdb</td>
+        <td>保证路径已存在且对Flink运行用户有读写权限。</td>
+    </tr>
+    <tr>
+        <td>state.backend.ockdb.jni.logfile</td>
+        <td>OmniStateStore日志路径。</td>
+        <td>/usr/local/flink/log/kv.log</td>
+        <td>建议配置为Flink的日志目录。</td>
+    </tr>
+    </tbody>
+    </table>
 
-    配置项格式：_$\{配置项名称\} + $\{英文冒号\} + $\{空格\} + $\{配置项值\}_，如[图1](#fig188652364228)所示。
+    配置项格式：\$\{配置项名称\} + \$\{英文冒号\} + \$\{空格\} + $\{配置项值\}，如下所示。
 
-    **图 1**  配置项示例<a name="fig188652364228"></a>  
-    ![](figures/配置项示例.png "配置项示例")
+    ```cmd
+    state.backend: com.huawei.ock.bss.OckDBStateBackendFactory
+    state.backend.ockdb.localdir: /usr/local/flink/ockdb
+    state.backend.ockdb.jni.logfile: /usr/local/flink/log/kv.log
+    ```
 
 2. 启动Flink任务，查看日志中的配置项，检查配置是否成功。
-3. 执行“$\{FLINK\_HOME\}/examples/streaming/WordCount.jar”示例程序，观察到Task Manager日志中打印“OmniStateStore service start success.”，说明OmniStateStore启动成功。
+3. 执行“\$\{FLINK\_HOME\}/examples/streaming/WordCount.jar”示例程序，观察到Task Manager日志中打印“OmniStateStore service start success.”，说明OmniStateStore启动成功。
 
 ## 卸载软件
 
 1. 将配置的state.backend.ockdb.localdir路径删除。
-2. 将“$\{FLINK\_HOME\}/lib/”目录下的flink-boost-statebackend-1.x.x-SNAPSHOT-for-flink-$\{flink.version\}.jar删除。
+2. 将“\$\{FLINK\_HOME\}/lib/”目录下的flink-boost-statebackend-1.x.x-SNAPSHOT-for-flink-$\{flink.version\}.jar删除。
 3. 将flink-conf.yaml配置文件中的state.backend切换为其他状态后端。
 
 ## 相关参考
 
 - **[配置项说明](#配置项说明)**  
 OmniStateStore的Log模块、StateStore模块和Metric模块的配置参数规范，涵盖日志管理、状态存储、性能监控等维度，为OmniStateStore在Flink场景下的部署与调优提供参数配置参考。
+
 - **[Metric指标](#Metric指标)**  
 OmniStateStore支持对接Flink Metric框架，并提供一系列Metric指标，用于在任务运行过程中监测OmniStateStore的内存占用、缓存命中率等内部运行状态信息，为OmniStateStore在Flink场景下的性能调优与运行状态分析提供了Metric指标参考。
+
 - **[功能规格](#功能规格)**  
 对比OmniStateStore与RocksDB作为Flink状态后端在基本状态读写、Checkpoint、Savepoint等核心功能上的支持情况，两者在功能点上均保持一致支持，为用户评估OmniStateStore替代RocksDB的可行性提供参考依据。
 
@@ -135,16 +164,16 @@ Log模块、StateStore模块和Metric模块的具体配置项说明请参见[表
 
 **表 1**  Log模块配置项说明<a id="Log模块配置项说明"></a>
 
-|配置项名称|说明|默认值|合法值/区间|注意事项|
+|配置项名称|说明|默认值|取值范围|注意事项|
 |--|--|--|--|--|
 |state.backend.ockdb.jni.logfile|日志路径及日志文件名。|/usr/local/flink/log/kv.log|Flink运行用户具有读写权限的路径下面的文件（要求路径已存在）|保证路径已存在且对Flink运行用户有读写权限。|
-|state.backend.ockdb.jni.loglevel|日志级别。<br>1：DEBUG<br>2：INFO<br>3：WARN<br>4：ERROR|2|[1, 4]|无特别说明|
-|state.backend.ockdb.jni.lognum|最大日志文件个数。|20|[10, 50]|无特别说明|
-|state.backend.ockdb.jni.logsize|单个日志文件大小。单位MB。|20|[10, 50]|无特别说明|
+|state.backend.ockdb.jni.loglevel|日志级别。<br>1：DEBUG<br>2：INFO<br>3：WARN<br>4：ERROR|2|[1, 4]|无|
+|state.backend.ockdb.jni.lognum|最大日志文件个数。|20|[10, 50]|无|
+|state.backend.ockdb.jni.logsize|单个日志文件大小。单位MB。|20|[10, 50]|无|
 
 **表 2**  StateStore配置项说明<a id="StateStore配置项说明"></a>
 
-|配置项名称|说明|默认值|合法值/区间|注意事项|
+|配置项名称|说明|默认值|取值范围|注意事项|
 |--|--|--|--|--|
 |state.backend|Flink开源参数，用于配置state.backend状态后端。|无|com.huawei.ock.bss.OckDBStateBackendFactory|保证字符完全正确，区分大小写。|
 |state.backend.ockdb.localdir|OmniStateStore本地数据存储路径。|无|已存在且Flink运行用户具有读写权限的路径。|保证路径已存在且对Flink运行用户有读写权限。确保该路径与taskmanager.state.local.root-dirs配置路径在同一个文件系统下。|
@@ -154,8 +183,8 @@ Log模块、StateStore模块和Metric模块的具体配置项说明请参见[表
 |state.backend.ockdb.jni.lsmstore.compaction.switch|LSM文件存储层整理合并开关。LSM文件存储层的分层合并机制通过开关控制数据文件的整理与合并操作，以优化存储性能和空间利用率。|1|0：关闭<br>1：开启|建议开启。|
 |state.backend.ockdb.zero-copy.switch|大ListState覆盖写场景的SST文件免拷贝复用开关。开启后，在文件数触发的Level 0到Level 1 Compaction中，对满足条件的单记录大PUT文件尝试直接复用原SST；未命中时执行普通合并。|false|false：关闭<br>true：开启|默认关闭。适用于频繁使用ListState.update且单个序列化Value严格大于4 MiB的场景。开启前建议评估目标层文件数量和压缩策略影响。|
 |state.backend.ockdb.ttl.filter.switch|TTL过期数据后台压缩清理。|false|false：关闭<br>true：开启|当存在使用TTL State的业务场景时，建议开启。|
-|state.backend.ockdb.lsmstore.compression.policy|LsmStore中的各层级Level的压缩策略。state.backend.ockdb.lsmstore.compression.level.policy默认值配合使用。<br>level0：不开启压缩<br>level1：不开启压缩<br>level2：开启lz4压缩<br>其余level：全压缩|lz4|none：不压缩<br>lz4：使用lz4压缩|当Checkpoint文件上传过大时，建议开启。|
-|state.backend.ockdb.lsmstore.compression.level.policy|手动配置LSM文件不同level配置压缩策略，默认值为“none,none,lz4”，表示level0不开启压缩，level1不开启压缩，level2开启lz4压缩。|none,none,lz4|none：不压缩<br>lz4：使用lz4压缩|当Checkpoint成为瓶颈时，可适当将压缩策略往低层级提前，默认level层级范围[0, 5]。<br>level0为前台写压缩，建议使用None。<br>其余level为后台压缩。|
+|state.backend.ockdb.lsmstore.compression.policy|LsmStore中的各层级Level的压缩策略。state.backend.ockdb.lsmstore.compression.level.policy默认值配合使用。<br>level0：开启压缩<br>level1：不开启压缩<br>level2：开启lz4压缩<br>其余level：全压缩|lz4|none：不压缩<br>lz4：使用lz4压缩|当Checkpoint文件上传过大时，建议开启。|
+|state.backend.ockdb.lsmstore.compression.level.policy|手动配置LSM文件不同level配置压缩策略，默认值为“none,none,lz4”，表示level0开启压缩，level1不开启压缩，level2开启lz4压缩。|none,none,lz4|none：不压缩<br>lz4：使用lz4压缩|当Checkpoint成为瓶颈时，可适当将压缩策略往低层级提前，默认level层级范围[0, 5]。<br>level0为前台写压缩，建议使用None。<br>其余level为后台压缩。|
 |state.backend.ockdb.freshtable.snapshot.compression.policy|FreshTable的Checkpoint快照文件压缩策略。|none|none：不压缩<br>lz4：使用lz4压缩|当FreshTable快照文件上传成为Checkpoint瓶颈时，可配置为lz4以减少上传数据量。压缩会增加CPU开销。|
 |state.backend.ockdb.slicetable.snapshot.compression.policy|SliceTable的Checkpoint快照文件压缩策略。|none|none：不压缩<br>lz4：使用lz4压缩|当SliceTable快照文件上传成为Checkpoint瓶颈时，可配置为lz4以减少上传数据量。压缩会增加CPU开销。|
 |state.backend.ockdb.lazy.download.switch|从Checkpoint恢复时启动懒加载开关。|false|false：关闭<br>true：开启|当Checkpoint很大时开启，缩短任务恢复为running的所需时间。|
@@ -170,16 +199,16 @@ Log模块、StateStore模块和Metric模块的具体配置项说明请参见[表
 
 **表 3**  Metric配置项说明<a id="Metric配置项说明"></a>
 
-|配置项名称|说明|默认值|合法值/区间|注意事项|
+|配置项名称|说明|默认值|取值范围|注意事项|
 |--|--|--|--|--|
 |state.backend.ockdb.metric.enable|Metric功能总开关，开启后OmniStateStore才会采集Metric信息。|false|false：关闭<br>true：开启|此开关打开后，各模块的Metric开关才会生效。|
-|state.backend.ockdb.metric.memory|MemoryManager模块Metric信息采集开关。|false|false：关闭<br>true：开启|无特别说明|
-|state.backend.ockdb.metric.fresh.table|FreshTable模块Metric信息采集开关。|false|false：关闭<br>true：开启|无特别说明|
-|state.backend.ockdb.metric.slice.table|SliceTable模块Metric信息采集开关。|false|false：关闭<br>true：开启|无特别说明|
-|state.backend.ockdb.metric.lsm.store|LSM Store模块Metric信息采集开关。|false|false：关闭<br>true：开启|无特别说明|
-|state.backend.ockdb.metric.lsm.cache|LSM Cache模块Metric信息采集开关。|false|false：关闭<br>true：开启|无特别说明|
-|state.backend.ockdb.metric.snapshot|Snapshot模块Metric信息采集开关。|false|false：关闭<br>true：开启|无特别说明|
-|state.backend.ockdb.metric.restore|Restore模块Metric信息采集开关。|false|false：关闭<br>true：开启|无特别说明|
+|state.backend.ockdb.metric.memory|MemoryManager模块Metric信息采集开关。|false|false：关闭<br>true：开启|无|
+|state.backend.ockdb.metric.fresh.table|FreshTable模块Metric信息采集开关。|false|false：关闭<br>true：开启|无|
+|state.backend.ockdb.metric.slice.table|SliceTable模块Metric信息采集开关。|false|false：关闭<br>true：开启|无|
+|state.backend.ockdb.metric.lsm.store|LSM Store模块Metric信息采集开关。|false|false：关闭<br>true：开启|无|
+|state.backend.ockdb.metric.lsm.cache|LSM Cache模块Metric信息采集开关。|false|false：关闭<br>true：开启|无|
+|state.backend.ockdb.metric.snapshot|Snapshot模块Metric信息采集开关。|false|false：关闭<br>true：开启|无|
+|state.backend.ockdb.metric.restore|Restore模块Metric信息采集开关。|false|false：关闭<br>true：开启|无|
 
 ### Metric指标<a id="Metric指标"></a>
 
@@ -187,7 +216,7 @@ OmniStateStore支持对接Flink Metric框架，并提供一系列Metric指标，
 
 用户可以通过Flink WebUI上任务运行时的Metric界面添加并查看这些指标，便于实时了解和分析OmniStateStore的运行表现。
 
->[!NOTICE] 说明
+>![](public_sys-resources/icon-note.gif) **说明：**
 >
 >- 采集Metric数据会产生额外的性能开销，可能对任务的运行性能造成影响，建议仅在任务测试阶段或对性能要求不高的任务中开启Metric功能。
 >
@@ -347,28 +376,141 @@ OmniStateStore支持对接Flink Metric框架，并提供一系列Metric指标，
 
 **表 1**  状态后端功能对比<a id="状态后端功能对比"></a>
 
-|功能分类|功能点|RocksDB StateBackend|OmniStateStore StateBackend|
-|--|--|--|--|
-|基本状态读写API|Operator State|支持|支持|
-|Broadcast State|支持|支持|
-|Value State|支持|支持|
-|List State|支持|支持|
-|Map State|支持|支持|
-|Reducing State|支持|支持|
-|Aggregating State|支持|支持|
-|状态有效期（TTL）|支持|支持|
-|计时器（Timer）|支持|支持|
-|Checkpoint|全量快照|支持|支持|
-|增量快照|支持|支持|
-|对齐快照|支持|支持|
-|非对齐快照|支持|支持|
-|普通快照恢复|支持|支持|
-|扩缩并行度场景下快照恢复|支持|支持|
-|Savepoint|不停作业执行Savepoint|支持|支持|
-|停作业执行Savepoint|支持|支持|
-|标准格式Savepoint|支持|支持|
-|原生格式Savepoint|支持|支持|
-|删除Savepoint|支持|支持|
-|普通Savepoint恢复|支持|支持|
-|扩缩并行度场景下Savepoint恢复|支持|支持|
-|Savepoint支持状态数据结构升级|支持|支持|
+<table style="undefined;table-layout: fixed; width: 987px"><colgroup>
+<col style="width: 234px">
+<col style="width: 281px">
+<col style="width: 236px">
+<col style="width: 236px">
+</colgroup>
+<thead>
+  <tr>
+    <th>功能分类</th>
+    <th>功能点</th>
+    <th>RocksDBStateBackend</th>
+    <th>OmniStateStore</th>
+  </tr></thead>
+<tbody>
+  <tr>
+    <td rowspan="9">基本状态读写API</td>
+    <td>Operator State</td>
+    <td>支持</td>
+    <td>支持</td>
+  </tr>
+  <tr>
+    <td>Broadcast State</td>
+    <td>支持</td>
+    <td>支持</td>
+  </tr>
+  <tr>
+    <td>Value State</td>
+    <td>支持</td>
+    <td>支持</td>
+  </tr>
+  <tr>
+    <td>List State</td>
+    <td>支持</td>
+    <td>支持</td>
+  </tr>
+  <tr>
+    <td>Map State</td>
+    <td>支持</td>
+    <td>支持</td>
+  </tr>
+  <tr>
+    <td>Reducing State</td>
+    <td>支持</td>
+    <td>支持</td>
+  </tr>
+  <tr>
+    <td>Aggregating State</td>
+    <td>支持</td>
+    <td>支持</td>
+  </tr>
+  <tr>
+    <td>状态有效期（TTL）</td>
+    <td>支持</td>
+    <td>支持</td>
+  </tr>
+  <tr>
+    <td>计时器（Timer）</td>
+    <td>支持</td>
+    <td>支持</td>
+  </tr>
+  <tr>
+    <td rowspan="7">Checkpoint</td>
+    <td>全量快照</td>
+    <td>支持</td>
+    <td>支持</td>
+  </tr>
+  <tr>
+    <td>增量快照</td>
+    <td>支持</td>
+    <td>支持</td>
+  </tr>
+  <tr>
+    <td>对齐快照</td>
+    <td>支持</td>
+    <td>支持</td>
+  </tr>
+  <tr>
+    <td>非对齐快照</td>
+    <td>支持</td>
+    <td>支持</td>
+  </tr>
+  <tr>
+    <td>普通快照恢复</td>
+    <td>支持</td>
+    <td>支持</td>
+  </tr>
+  <tr>
+    <td>扩缩并行度场景下快照恢复</td>
+    <td>支持</td>
+    <td>支持</td>
+  </tr>
+  <tr>
+    <td>懒加载</td>
+    <td>不支持</td>
+    <td>支持</td>
+  </tr>
+  <tr>
+    <td rowspan="8">Savepoint</td>
+    <td>不停作业执行Savepoint</td>
+    <td>支持</td>
+    <td>支持</td>
+  </tr>
+  <tr>
+    <td>停作业执行Savepoint</td>
+    <td>支持</td>
+    <td>支持</td>
+  </tr>
+  <tr>
+    <td>标准格式Savepoint</td>
+    <td>支持</td>
+    <td>支持</td>
+  </tr>
+  <tr>
+    <td>原生格式Savepoint</td>
+    <td>支持</td>
+    <td>支持</td>
+  </tr>
+  <tr>
+    <td>删除Savepoint</td>
+    <td>支持</td>
+    <td>支持</td>
+  </tr>
+  <tr>
+    <td>普通Savepoint恢复</td>
+    <td>支持</td>
+    <td>支持</td>
+  </tr>
+  <tr>
+    <td>扩缩并行度场景下Savepoint恢复</td>
+    <td>支持</td>
+    <td>支持</td>
+  </tr>
+  <tr>
+    <td>Savepoint支持状态数据结构升级</td>
+    <td>支持</td>
+    <td>支持</td>
+  </tr>
+</tbody></table>

@@ -35,7 +35,7 @@
 
 |软件|软件版本|
 |--|--|
-|操作系统|openEuler 20.03openEuler 22.03openEuler 24.03|
+|操作系统|openEuler 20.03<br>openEuler 22.03<br>openEuler 24.03|
 |CMake|3.22.0|
 |GCC|10.3.1|
 |JDK|1.8.0_432|
@@ -56,7 +56,7 @@
 </tr>
 <tr id="row153569203719"><th class="firstcol" valign="top" width="50%" id="mcps1.2.3.3.1"><p>内存</p>
 </th>
-<td class="cellrowborder" valign="top" width="50%" headers="mcps1.2.3.3.1 "><p>>32GB及以上</p>
+<td class="cellrowborder" valign="top" width="50%" headers="mcps1.2.3.3.1 "><p>32GB及以上</p>
 </td>
 </tr>
 </tbody>
@@ -80,7 +80,7 @@
 
     |编译参数|编译选项|简要说明|
     |--|--|--|
-    |-t|debugrelease|编译debug包，开发阶段使用；编译release发布包，测试和发布阶段使用。|
+    |-t|debugrelease|编译debug包，开发阶段使用。<br>编译release发布包，测试和发布阶段使用。|
     |--ut|无|编译UT测试程序。|
     |--sve|无|使能鲲鹏高性能SVE指令集。|
     |-h|无|帮助。|
@@ -116,7 +116,8 @@
 
 OmniStateStore的整体架构逻辑图如[图1](#fig4959714185618)所示。
 
-**图 1**  OmniStateStore架构逻辑<a name="fig4959714185618"></a>  
+**图 1**  OmniStateStore架构逻辑<a name="fig4959714185618"></a> 
+
 ![](figures/OmniStateStore架构逻辑.png "OmniStateStore架构逻辑")
 
 - ShimLayer：OmniStateStore状态存储引擎适配接入层，该模块使用Java编程语言实现。
@@ -139,22 +140,26 @@ FreshTable是状态存储引擎的第一层，接收Shim Layout层分发的各�
 
 **KV-Table组织结构**
 
-**图 1**  KV-Table内存布局  
+**图 1**  KV-Table内存布局
+
 ![](figures/KV-Table内存布局.png "KV-Table内存布局")
 
 **KMAP-Table组织结构**
 
-**图 2**  KMAP-Table内存布局  
+**图 2**  KMAP-Table内存布局
+
 ![](figures/KMAP-Table内存布局.png "KMAP-Table内存布局")
 
 **KLIST-Table组织结构**
 
-**图 3**  KLIST-Table内存布局 
+**图 3**  KLIST-Table内存布局
+
 ![](figures/KLIST-Table内存布局.png "KLIST-Table内存布局")
 
 **Transform流程**
 
-**图 4**  Transform执行步骤  
+**图 4**  Transform执行步骤
+
 ![](figures/Transform执行步骤.png "Transform执行步骤")
 
 - 在初始化流程中，FreshTable对象会从空闲队列中取出一个MemorySegment作为当前可用的队列。
@@ -172,22 +177,24 @@ SliceTable是状态存储引擎的第二层，同样属于内存Cache，它主�
 
 **SliceBucket组织结构**
 
-**图 1**  SliceBucket内存布局 
+**图 1**  SliceBucket内存布局
+
 ![](figures/SliceBucket内存布局.png "SliceBucket内存布局")
 
 **Evict和Compaction流程**
 
 **图 2**  Evict和Compaction流程步骤
+
 ![](figures/Evict和Compaction流程步骤.png "Evict和Compaction流程步骤")
 
-Evict流程如下所示：
+Evict流程如下所示.
 
 1. 首先获取到当前的SliceBucketGroup作为待Evict SliceBucketGroup。
 2. 从Index=1开始遍历每个SliceBucket下的SliceChain，从前往后（时间序从旧往新）取出状态为Normal的SliceData并标记为evicting。
 3. 当SliceData个数和待淘汰数据量都满足设置条件或遍历结束则停止，同时生成Evict Task加入到Evict Executor中。
 4. Evict Task处理完成后将SliceData的标记由evicting更新为evicted。
 
-Compaction流程如下所示：
+Compaction流程如下所示.
 
 1. 当Transform IO将数据写入到某个SliceChain后生成Compaction Task，并加入到Compaction Executor中。
 2. 从后往前（时间序从新往旧）取出状态为Normal的SliceData并标记为compacting。
@@ -222,34 +229,144 @@ OmniStateStore的主要应用场景是平滑替换Flink原生的RocksDBStateStor
 
 **表 1**  OmniStateStore功能规格列表
 
-|功能分类|功能点|RocksDBStateBackend|OmniStateStore|
-|--|--|--|--|
-|基本状态读写API|Operator State|支持|支持|
-|Broadcast State|支持|支持|
-|Value State|支持|支持|
-|List State|支持|支持|
-|Map State|支持|支持|
-|Reducing State|支持|支持|
-|Aggregating State|支持|支持|
-|状态有效期（TTL）|支持|支持|
-|计时器（Timer）|支持|支持|
-|Checkpoint|全量快照|支持|支持|
-|增量快照|支持|支持|
-|对齐快照|支持|支持|
-|非对齐快照|支持|支持|
-|普通快照恢复|支持|支持|
-|扩缩并行度场景下快照恢复|支持|支持|
-|懒加载|**不支持**|支持|
-|Savepoint|不停作业执行Savepoint|支持|支持|
-|停作业执行Savepoint|支持|支持|
-|标准格式Savepoint|支持|支持|
-|原生格式Savepoint|支持|支持|
-|删除Savepoint|支持|支持|
-|普通Savepoint恢复|支持|支持|
-|扩缩并行度场景下Savepoint恢复|支持|支持|
-|Savepoint支持状态数据结构升级|支持|支持|
-|特殊接口|getKeysAndNamespaces|支持|**不支持**|
-|numKeyValueStateEntries|支持|**不支持**|
+<table style="undefined;table-layout: fixed; width: 987px"><colgroup>
+<col style="width: 234px">
+<col style="width: 281px">
+<col style="width: 236px">
+<col style="width: 236px">
+</colgroup>
+<thead>
+  <tr>
+    <th>功能分类</th>
+    <th>功能点</th>
+    <th>RocksDBStateBackend</th>
+    <th>OmniStateStore</th>
+  </tr></thead>
+<tbody>
+  <tr>
+    <td rowspan="9">基本状态读写API</td>
+    <td>Operator State</td>
+    <td>支持</td>
+    <td>支持</td>
+  </tr>
+  <tr>
+    <td>Broadcast State</td>
+    <td>支持</td>
+    <td>支持</td>
+  </tr>
+  <tr>
+    <td>Value State</td>
+    <td>支持</td>
+    <td>支持</td>
+  </tr>
+  <tr>
+    <td>List State</td>
+    <td>支持</td>
+    <td>支持</td>
+  </tr>
+  <tr>
+    <td>Map State</td>
+    <td>支持</td>
+    <td>支持</td>
+  </tr>
+  <tr>
+    <td>Reducing State</td>
+    <td>支持</td>
+    <td>支持</td>
+  </tr>
+  <tr>
+    <td>Aggregating State</td>
+    <td>支持</td>
+    <td>支持</td>
+  </tr>
+  <tr>
+    <td>状态有效期（TTL）</td>
+    <td>支持</td>
+    <td>支持</td>
+  </tr>
+  <tr>
+    <td>计时器（Timer）</td>
+    <td>支持</td>
+    <td>支持</td>
+  </tr>
+  <tr>
+    <td rowspan="7">Checkpoint</td>
+    <td>全量快照</td>
+    <td>支持</td>
+    <td>支持</td>
+  </tr>
+  <tr>
+    <td>增量快照</td>
+    <td>支持</td>
+    <td>支持</td>
+  </tr>
+  <tr>
+    <td>对齐快照</td>
+    <td>支持</td>
+    <td>支持</td>
+  </tr>
+  <tr>
+    <td>非对齐快照</td>
+    <td>支持</td>
+    <td>支持</td>
+  </tr>
+  <tr>
+    <td>普通快照恢复</td>
+    <td>支持</td>
+    <td>支持</td>
+  </tr>
+  <tr>
+    <td>扩缩并行度场景下快照恢复</td>
+    <td>支持</td>
+    <td>支持</td>
+  </tr>
+  <tr>
+    <td>懒加载</td>
+    <td>不支持</td>
+    <td>支持</td>
+  </tr>
+  <tr>
+    <td rowspan="8">Savepoint</td>
+    <td>不停作业执行Savepoint</td>
+    <td>支持</td>
+    <td>支持</td>
+  </tr>
+  <tr>
+    <td>停作业执行Savepoint</td>
+    <td>支持</td>
+    <td>支持</td>
+  </tr>
+  <tr>
+    <td>标准格式Savepoint</td>
+    <td>支持</td>
+    <td>支持</td>
+  </tr>
+  <tr>
+    <td>原生格式Savepoint</td>
+    <td>支持</td>
+    <td>支持</td>
+  </tr>
+  <tr>
+    <td>删除Savepoint</td>
+    <td>支持</td>
+    <td>支持</td>
+  </tr>
+  <tr>
+    <td>普通Savepoint恢复</td>
+    <td>支持</td>
+    <td>支持</td>
+  </tr>
+  <tr>
+    <td>扩缩并行度场景下Savepoint恢复</td>
+    <td>支持</td>
+    <td>支持</td>
+  </tr>
+  <tr>
+    <td>Savepoint支持状态数据结构升级</td>
+    <td>支持</td>
+    <td>支持</td>
+  </tr>
+</tbody></table>
 
 ## 开发样例
 
@@ -257,11 +374,11 @@ OmniStateStore的主要应用场景是平滑替换Flink原生的RocksDBStateStor
 
 OmniStateStore已经支持Flink 1.16.1、1.16.3和1.17.1三个版本，如果使用者或开发者希望支持更多Flink 1.x版本，可以按照如下方式进行适配。
 
-1. 确认共享源代码目录与版本独享目录，src\\plugin\\state\_store\_plugin为Java侧对接Flink框架的主要代码目录，以下分为共享源代码目录\(src、test\)与版本独享目录\(flink-1.16.3、flink-1.17.1<flink-1.16.1共用\>\)。
-2. 在src\\plugin\\state\_store\_plugin下创建新的版本独享目录，如flink-1.x.x。请根据具体Flink适配新版本进行更改。
-3. 修改src\\plugin\\state\_store\_plugin\\pom.xml，增加新的profile。
+1. 确认共享源代码目录与版本独享目录，src\plugin\state_store_plugin为Java侧对接Flink框架的主要代码目录，以下分为共享源代码目录(src、test)与版本独享目录(flink-1.16.3、flink-1.17.1)。
+2. 在src\plugin\state_store_plugin下创建新的版本独享目录，如flink-1.x.x。请根据具体Flink适配新版本进行更改。
+3. 修改src\plugin\state_store_plugin\pom.xml，增加新的profile。
 4. 将具有版本差异的Java文件放在flink-1.x.x目录下，保证flink-1.x.x目录与共享源代码目录下同名文件只有一份。
-5. maven compile编译通过后，修改src\\plugin\\CmakeLists.txt，增加flink-1.x.x编译目标。
+5. maven compile编译通过后，修改src\plugin\CmakeLists.txt，增加flink-1.x.x编译目标。
 
     ```cmd
     set(VERSION_1_x_x flink-1.x.x)
