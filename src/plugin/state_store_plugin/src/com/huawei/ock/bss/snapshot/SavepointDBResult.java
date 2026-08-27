@@ -59,14 +59,18 @@ public class SavepointDBResult {
         return new CloseableIterator<BinaryKeyValueItem>() {
             private int closeNum = 0;
 
+            private boolean closed = false;
+
             /**
              * close
              */
             @Override
-            public void close() {
-                if (closeNum > 0) {
+            public synchronized void close() {
+                if (closed) {
                     SavepointDBResult.LOG.error("Iterator already closed, closeNum: " + closeNum);
+                    return;
                 }
+                closed = true;
                 closeNum++;
                 SavepointDBResult.LOG.info("snapshotId: {}, Finish SavepointDBResult iterator time cost: {}",
                     snapshotId, (System.currentTimeMillis() - startTime));
@@ -79,7 +83,10 @@ public class SavepointDBResult {
              * @return boolean
              */
             @Override
-            public boolean hasNext() {
+            public synchronized boolean hasNext() {
+                if (closed) {
+                    return false;
+                }
                 return SavepointDBResult.this.hasNext(snapshotId);
             }
 
@@ -89,7 +96,10 @@ public class SavepointDBResult {
              * @return BinaryKeyValueItem
              */
             @Override
-            public BinaryKeyValueItem next() {
+            public synchronized BinaryKeyValueItem next() {
+                if (closed) {
+                    throw new BSSRuntimeException("Iterator already closed.");
+                }
                 return SavepointDBResult.this.next(snapshotId);
             }
         };

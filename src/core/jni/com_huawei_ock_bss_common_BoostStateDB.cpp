@@ -78,17 +78,38 @@ JNIEXPORT jboolean JNICALL Java_com_huawei_ock_bss_common_BoostStateDB_restore(J
         return JNI_FALSE;
     }
     jclass listClass = env->GetObjectClass(jRemotePaths);
+    if (UNLIKELY(listClass == nullptr || env->ExceptionCheck())) {
+        LOG_ERROR("Failed to get restore path list class.");
+        return JNI_FALSE;
+    }
     jmethodID sizeMid = env->GetMethodID(listClass, "size", "()I");
+    if (UNLIKELY(sizeMid == nullptr || env->ExceptionCheck())) {
+        LOG_ERROR("Failed to get restore path list size method.");
+        env->DeleteLocalRef(listClass);
+        return JNI_FALSE;
+    }
     jmethodID getMid = env->GetMethodID(listClass, "get", "(I)Ljava/lang/Object;");
+    if (UNLIKELY(getMid == nullptr || env->ExceptionCheck())) {
+        LOG_ERROR("Failed to get restore path list get method.");
+        env->DeleteLocalRef(listClass);
+        return JNI_FALSE;
+    }
     jint metaSize = env->CallIntMethod(jRestorePaths, sizeMid);
-    if (UNLIKELY(metaSize > static_cast<jint>(NO_1000000))) {
+    if (UNLIKELY(env->ExceptionCheck() || metaSize < 0 || metaSize > static_cast<jint>(NO_1000000))) {
         LOG_ERROR("MetaSize too big, metaSize: " << metaSize << ", maxSize: " << NO_1000000);
+        env->DeleteLocalRef(listClass);
         return JNI_FALSE;
     }
     std::vector<std::string> metaPaths;
     for (jint i = 0; i < metaSize; i++) {
         jstring restorePath = (jstring)env->CallObjectMethod(jRestorePaths, getMid, i);
+        if (UNLIKELY(restorePath == nullptr || env->ExceptionCheck())) {
+            LOG_ERROR("Failed to get restore path at index: " << i);
+            env->DeleteLocalRef(listClass);
+            return JNI_FALSE;
+        }
         std::string path = ConstructPath(env, restorePath);
+        env->DeleteLocalRef(restorePath);
         if (UNLIKELY(!CheckPathValid(path))) {
             LOG_ERROR("Invalid Restore Paths, path: " << PathTransform::ExtractFileName(path));
             env->DeleteLocalRef(listClass);
@@ -98,22 +119,41 @@ JNIEXPORT jboolean JNICALL Java_com_huawei_ock_bss_common_BoostStateDB_restore(J
     }
     // 获取列表大小
     jint size = env->CallIntMethod(jRemotePaths, sizeMid);
-    if (UNLIKELY(size > static_cast<jint>(NO_1000000))) {
+    if (UNLIKELY(env->ExceptionCheck())) {
+        LOG_ERROR("Failed to get remote restore path list size.");
+        env->DeleteLocalRef(listClass);
+        return JNI_FALSE;
+    }
+    jint localSize = env->CallIntMethod(jLocalPaths, sizeMid);
+    if (UNLIKELY(env->ExceptionCheck() || size < 0 || size > static_cast<jint>(NO_1000000) || localSize != size)) {
         LOG_ERROR("MetaSize too big, size: " << size << ", maxSize: " << NO_1000000);
+        env->DeleteLocalRef(listClass);
         return JNI_FALSE;
     }
     std::unordered_map<std::string, std::string> lazyPathMapping;
     for (jint i = 0; i < size; i++) {
         // 获取第 i 个元素，是一个 String 对象
         jstring remote = (jstring)env->CallObjectMethod(jRemotePaths, getMid, i);
+        if (UNLIKELY(remote == nullptr || env->ExceptionCheck())) {
+            LOG_ERROR("Failed to get remote restore path at index: " << i);
+            env->DeleteLocalRef(listClass);
+            return JNI_FALSE;
+        }
         std::string remotePath = ConstructPath(env, remote);
+        env->DeleteLocalRef(remote);
         if (UNLIKELY(!CheckPathValid(remotePath, true))) {
             env->DeleteLocalRef(listClass);
             LOG_ERROR("Invalid Remote Paths, remotePath: " << PathTransform::ExtractFileName(remotePath));
             return JNI_FALSE;
         }
         jstring local = (jstring)env->CallObjectMethod(jLocalPaths, getMid, i);
+        if (UNLIKELY(local == nullptr || env->ExceptionCheck())) {
+            LOG_ERROR("Failed to get local restore path at index: " << i);
+            env->DeleteLocalRef(listClass);
+            return JNI_FALSE;
+        }
         std::string localPath = ConstructPath(env, local);
+        env->DeleteLocalRef(local);
         if (UNLIKELY(!CheckPathValid(localPath, true))) {
             env->DeleteLocalRef(listClass);
             LOG_ERROR("Invalid Local Paths, localPath: " << PathTransform::ExtractFileName(localPath));

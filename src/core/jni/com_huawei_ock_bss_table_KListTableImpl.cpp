@@ -39,6 +39,10 @@ bool KListTableImplInit(JNIEnv *env)
     }
     gStateListCountClass = (jclass)env->NewGlobalRef(stateListCountLocalClass);
     env->DeleteLocalRef(stateListCountLocalClass);
+    if (UNLIKELY(gStateListCountClass == nullptr)) {
+        LOG_ERROR("Failed to create global reference for StateListResult");
+        return false;
+    }
 
     // 预加载字段ID
     gResIdField = env->GetFieldID(gStateListCountClass, "resId", "I");
@@ -138,6 +142,11 @@ JNIEXPORT void JNICALL Java_com_huawei_ock_bss_table_KListTableImpl_get(JNIEnv *
 
     ListResult listCount = abstractKListTable->Get(static_cast<uint32_t>(jKeyHash), key);
     if (listCount.size == 0 || listCount.addresses.empty() || listCount.lengths.empty()) {
+        return;
+    }
+    if (UNLIKELY(listCount.size > static_cast<uint32_t>(INT32_MAX) || listCount.addresses.size() < listCount.size ||
+                 listCount.lengths.size() < listCount.size)) {
+        LOG_ERROR("Invalid list result size: " << listCount.size);
         return;
     }
     env->SetIntField(object, gResIdField, listCount.resId);
@@ -302,6 +311,11 @@ JNIEXPORT jobject JNICALL Java_com_huawei_ock_bss_table_KListTableImpl_doNativeS
     }
 
     ListResult listCount = abstractKListTable->SectionRead(gReadSectionId);
+    if (UNLIKELY(listCount.size > static_cast<uint32_t>(INT32_MAX) || listCount.addresses.size() < listCount.size ||
+                 listCount.lengths.size() < listCount.size)) {
+        LOG_ERROR("Invalid section read result size: " << listCount.size);
+        return obj;
+    }
     env->SetIntField(obj, gResIdField, listCount.resId);
     env->SetIntField(obj, gSizeField, static_cast<jsize>(listCount.size));
     jlongArray newDatas = env->NewLongArray(static_cast<jsize>(listCount.size));
