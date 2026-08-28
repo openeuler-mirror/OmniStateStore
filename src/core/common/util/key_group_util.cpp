@@ -47,8 +47,12 @@ BResult KeyGroupUtil::Create(uint32_t maxParallelism, KeyGroupUtilRef &result)
     }
     uint64_t base = HASH_SPACE / maxParallelism;
     uint64_t extra = HASH_SPACE % maxParallelism;
-    result = new (std::nothrow) KeyGroupUtil(maxParallelism, base, extra);
-    return result.IsNull() ? BSS_ERR : BSS_OK;
+    auto *keyGroupUtil = new (std::nothrow) KeyGroupUtil(maxParallelism, base, extra);
+    if (UNLIKELY(keyGroupUtil == nullptr)) {
+        return BSS_ERR;
+    }
+    result = KeyGroupUtilRef(keyGroupUtil);
+    return BSS_OK;
 }
 
 }  // namespace bss

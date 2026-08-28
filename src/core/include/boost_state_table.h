@@ -13,10 +13,10 @@
 #define BOOST_STATE_TABLE_H
 
 #include <deque>
+#include <memory>
 #include <unordered_map>
 #include <vector>
 
-#include "common/util/key_group_util.h"
 #include "table.h"
 
 namespace ock {
@@ -43,6 +43,9 @@ using SectionsReadContextRef = std::shared_ptr<SectionsReadContext>;
 
 class SequenceIdFilter;
 using SequenceIdFilterRef = std::shared_ptr<SequenceIdFilter>;
+
+class KeyGroupUtil;
+using KeyGroupUtilRef = std::shared_ptr<KeyGroupUtil>;
 
 struct Value;
 class MapIterator;
