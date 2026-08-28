@@ -8,8 +8,7 @@
     tag = v1.10.0
 [submodule "3rdparty/secure/libboundscheck"]
 	path = 3rdparty/secure/libboundscheck
-	url = https://gitcode.com/openeuler/libboundscheck.git
-	tag = v1.1.16
+	url = https://gitcode.com/src-openeuler/libboundscheck.git
 [submodule "3rdparty/spdlog/spdlog"]
 	path = 3rdparty/spdlog/spdlog
 	url = https://gitcode.com/GitHub_Trending/sp/spdlog.git
