@@ -13,20 +13,20 @@
 #define BOOST_SS_KEY_GROUP_UTIL_H
 
 #include <cstdint>
+#include <memory>
 
 #include "include/bss_err.h"
-#include "include/ref.h"
 
 namespace ock {
 namespace bss {
 
 class KeyGroupUtil;
-using KeyGroupUtilRef = Ref<KeyGroupUtil>;
+using KeyGroupUtilRef = std::shared_ptr<KeyGroupUtil>;
 
-class KeyGroupUtil : public Referable {
+class KeyGroupUtil {
 public:
     static BResult Create(uint32_t maxParallelism, KeyGroupUtilRef &result);
-    ~KeyGroupUtil() override = default;
+    ~KeyGroupUtil() = default;
 
     inline uint32_t ComputeKeyGroupForKeyHash(uint32_t orderHash) const
     {
