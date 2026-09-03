@@ -64,16 +64,19 @@ Before installing the OmniStateStore software, check that you have installed all
 To prevent a software package from being maliciously tampered with during transfer or storage, download also the corresponding digital signature file for integrity verification while obtaining the software package.
 
 1. Obtain the software package based on  [Table 3](#en-us_topic_0000002466592290_en-us_topic_0000001664980070__table677mcpsimp).
-2. Obtain the  _OpenPGP Signature Verification Guide_.
-    - For carriers:  [https://support.huawei.com/carrier/digitalSignatureAction](http://support.huawei.com/carrier/digitalSignatureAction).
-    - For enterprises:  [https://support.huawei.com/enterprise/en/tool/pgp-verify-TL1000000054](https://support.huawei.com/enterprise/en/tool/pgp-verify-TL1000000054).
+2. Verify the integrity of the software package using SHA-256. For example, if the package name is **BoostKit-omniruntime-omnistatestore-1.1.0**, run the following command for your operating system:
 
-3. Verify the software package integrity by following instructions in  _OpenPGP Signature Verification Guide_.
+    - Linux:
 
-    > ![](public_sys-resources/icon-note.gif) **NOTE:**
-    >
-    > - If the verification fails, do not use the software package, and contact Huawei technical support.
-    > - Before using the software package for an installation or upgrade, verify the digital signature to ensure that the software has not been tampered with.
+        ```bash
+        sha256sum BoostKit-omniruntime-omnistatestore-1.1.0
+        ```
+
+    - Windows:
+
+        ```cmd
+        certutil -hashfile BoostKit-omniruntime-omnistatestore-1.1.0 SHA256
+        ```
 
 Before installing and using OmniStateStore, ensure that the hardware and software environments meet the requirements for installation, deployment, and normal operation.
 

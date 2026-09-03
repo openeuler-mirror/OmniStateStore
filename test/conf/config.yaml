@@ -16,7 +16,7 @@ pipeline:
       exec: "cd ../../build/test/llt/; ./bss_ut"
   report:
     - task: "lcov_report"
-      exec: "cd ../build; mkdir -p gcovr_report;pwd;lcov --d ../.. --c --output-file ../build/test.info --rc lcov_branch_coverage=1;lcov -r ../build/test.info \"*/home/huawei/*\" \"*/7.3.0/*\" \"*/build/*\" \"*/buildtools/*\" \"*/3rdparty/*\" \"*/test/llt/*\" \"*generated.h\" -output-file ../build/coverage.info --rc lcov_branch_coverage=1;genhtml -o ../build/gcovr_report ../build/coverage.info --show-details --legend --rc lcov_branch_coverage=1"
+      exec: "cd ../build; mkdir -p gcovr_report;pwd;lcov --d ../.. --c --output-file ../build/test.info --rc lcov_branch_coverage=1;lcov -r ../build/test.info \"*/7.3.0/*\" \"*/build/*\" \"*/buildtools/*\" \"*/3rdparty/*\" \"*/test/llt/*\" \"*generated.h\" -output-file ../build/coverage.info --rc lcov_branch_coverage=1;genhtml -o ../build/gcovr_report ../build/coverage.info --show-details --legend --rc lcov_branch_coverage=1"
       args: false
   clean:
     - task: "clean_target"
