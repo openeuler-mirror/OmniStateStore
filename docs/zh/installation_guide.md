@@ -114,16 +114,11 @@ OmniStateStore软件安装前需要将前置依赖的软件安装成功，建议
 为了防止软件包在传递过程或存储期间被恶意篡改，获取软件包时需下载对应的数字签名文件用于完整性验证。
 
 1. 参见[表3 OmniStateStore状态优化软件获取列表](#OmniStateStore状态优化软件获取列表)获取软件包。
-2. 获取《OpenPGP签名验证指南》。
-    - 运营商客户：请访问[http://support.huawei.com/carrier/digitalSignatureAction](http://support.huawei.com/carrier/digitalSignatureAction)
-    - 企业客户：请访问[https://support.huawei.com/enterprise/zh/tool/pgp-verify-TL1000000054](https://support.huawei.com/enterprise/zh/tool/pgp-verify-TL1000000054)
 
-3. 根据《OpenPGP签名验证指南》进行软件包完整性检查。
-
-    >![](public_sys-resources/icon-note.gif) **说明：** 
-    >
-    >- 如果校验失败，请不要使用该软件包，先联系华为技术支持工程师解决。
-    >- 使用软件包安装或升级之前，也需要按上述过程先验证软件包的数字签名，确保软件包未被篡改。
+2. 根据sha256进行软件包完整性检查。
+   例如包名为：BoostKit-omniruntime-omnistatestore-1.1.0：
+   linux执行命令：sha256sum BoostKit-omniruntime-omnistatestore-1.1.0
+   windows执行命令：certutil -hashfile BoostKit-omniruntime-omnistatestore-1.1.0 SHA256
 
 安装和使用OmniStateStore之前，请确保软硬件环境已经满足安装部署及应用程序正常运行的要求。
 

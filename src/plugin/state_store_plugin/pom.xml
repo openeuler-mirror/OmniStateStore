@@ -31,7 +31,7 @@
 
     <groupId>com.huawei.ock.bss</groupId>
     <artifactId>flink-boost-statestore-plugin</artifactId>
-    <description>Huawei BeiMing Open Computing Kits BSS framework</description>
+    <description>Open Computing Kits BSS framework</description>
     <packaging>jar</packaging>
 
     <dependencies>

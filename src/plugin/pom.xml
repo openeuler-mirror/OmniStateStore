@@ -10,7 +10,7 @@
 
     <groupId>com.huawei.ock</groupId>
     <artifactId>booststatebackend</artifactId>
-    <description>Huawei Open Computing BSS</description>
+    <description>Open Computing BSS</description>
     <packaging>pom</packaging>
     <version>${revision}</version>
 
