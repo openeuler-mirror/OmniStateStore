@@ -161,10 +161,6 @@
 
 ## 关于社区<a name="ZH-CN_TOPIC_0000002518727184"></a>
 
-OmniStateStore由华为公司的下列部门联合贡献：
-
-- 鲲鹏计算BoostKit开发部
-
 感谢来自社区的每一个PR，欢迎贡献OmniStateStore！
 
 ## 贡献、建议与交流<a name="ZH-CN_TOPIC_0000002518427588"></a>
