@@ -73,7 +73,11 @@ private:
     {
         while (mFreshTableIterator != mExistKeyValue.end()) {
             auto keyValue = mFreshTableIterator->second;
-            CONTINUE_LOOP_AS_NULLPTR(keyValue);
+            if (UNLIKELY(keyValue == nullptr)) {
+                LOG_ERROR("Error: In loop, got a nullptr keyValue");
+                ++mFreshTableIterator;
+                continue;
+            }
             mFreshTableIterator++;
             if (keyValue->value.ValueType() != DELETE) {
                 return keyValue;
@@ -142,7 +146,11 @@ private:
     {
         while (mFreshTableIterator != mExistKeyValue.end()) {
             auto keyValue = mFreshTableIterator->second;
-            CONTINUE_LOOP_AS_NULLPTR(keyValue);
+            if (UNLIKELY(keyValue == nullptr)) {
+                LOG_ERROR("Error: In loop, got a nullptr keyValue");
+                ++mFreshTableIterator;
+                continue;
+            }
             mFreshTableIterator++;
             if (keyValue->value.ValueType() != DELETE && !IsVisited(keyValue)) {
                 return keyValue;

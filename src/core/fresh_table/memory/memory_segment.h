@@ -96,7 +96,7 @@ public:
 
     BResult Copy(uint32_t from, uint32_t to, uint32_t length)
     {
-        if (from + length >= mCapacity || to + length >= mCapacity) {
+        if (length > mCapacity || from > mCapacity - length || to > mCapacity - length) {
             return BSS_ERR;
         }
         if (from == to || length == 0) {

@@ -199,7 +199,8 @@ public:
         if (UNLIKELY(source == nullptr)) {
             return BSS_INVALID_PARAM;
         }
-        if (UNLIKELY(!CheckParam(source->Data(), len, pos))) {
+        if (UNLIKELY(sourceOffset > source->Capacity() || len > source->Capacity() - sourceOffset ||
+                     !CheckParam(source->Data(), len, pos))) {
             return BSS_INVALID_PARAM;
         }
 

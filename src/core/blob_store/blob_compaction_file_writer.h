@@ -34,6 +34,10 @@ public:
     BResult WriteBlob(BlobValueWrapper blobValueWrapper)
     {
         auto value = blobValueWrapper.mBlobValue;
+        if (UNLIKELY(value.ValueLen() > UINT32_MAX - NO_28)) {
+            LOG_ERROR("Blob value is too large, value length:" << value.ValueLen());
+            return BSS_INVALID_PARAM;
+        }
         uint32_t size = value.ValueLen() + NO_28;
         if (mBlobDataBlockWriter == nullptr) {
             ByteBufferRef buffer = CreateBuffer(size);

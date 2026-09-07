@@ -20,6 +20,10 @@ std::atomic<uint64_t> FileManager::mPrefix = { 0 };
 FileInfoRef FileManager::AllocateFile(const FileDirectoryRef &fileDirectory,
                                       const std::function<std::string(std::string)> &fileNameGenerator)
 {
+    if (UNLIKELY(fileDirectory == nullptr)) {
+        LOG_ERROR("fileDirectory is nullptr.");
+        return nullptr;
+    }
     FileIdRef fileId = mFileIdGenerator->Generate();
     if (UNLIKELY(fileId == nullptr)) {
         return nullptr;

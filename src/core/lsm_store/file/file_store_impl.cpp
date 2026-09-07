@@ -566,7 +566,11 @@ bool LsmStore::FindKeyInOtherLevels(const Key &key, uint32_t level, std::vector<
     auto fileSize = static_cast<int32_t>(files.size());
     while (levelPointers[level] < fileSize) {
         const FileMetaDataRef &fileMetaData = files.at(levelPointers[level]);
-        CONTINUE_LOOP_AS_NULLPTR(fileMetaData);
+        if (UNLIKELY(fileMetaData == nullptr)) {
+            LOG_ERROR("Error: In loop, got a nullptr fileMetaData");
+            levelPointers[level] = levelPointers[level] + 1;
+            continue;
+        }
         auto cmpLargest = fileMetaData->GetLargest()->CompareKey(key);
         if (cmpLargest >= 0 && fileMetaData->GetSmallest()->CompareKey(key) <= 0) {
             return true;

@@ -202,7 +202,7 @@ BResult TombstoneFileManager::RestoreLevel(const FileInputViewRef &inputView,
     int32_t levelGap = restoreLevelSize - static_cast<int32_t>(mHighLevels.size());
     while (levelGap > 0) {
         TombstoneLevelRef lastLevel = mHighLevels.at(mHighLevels.size() - NO_1);
-        CONTINUE_LOOP_AS_NULLPTR(lastLevel);
+        RETURN_ERROR_AS_NULLPTR(lastLevel);
         TombstoneLevelRef newLevel = std::make_shared<TombstoneLevel>(mConfig, lastLevel->GetLevelId() + NO_1,
                                                                       shared_from_this(), false, mMemManager);
         lastLevel->SetNextLevel(newLevel);

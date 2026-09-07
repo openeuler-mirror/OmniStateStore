@@ -145,9 +145,17 @@ public:
         auto file = mFiles.begin();
         while (file != mFiles.end()) {
             BlobImmutableFileRef blobImmutableFile = *file;
-            CONTINUE_LOOP_AS_NULLPTR(blobImmutableFile);
+            if (UNLIKELY(blobImmutableFile == nullptr)) {
+                LOG_ERROR("Error: In loop, got a nullptr blobImmutableFile");
+                ++file;
+                continue;
+            }
             auto fileMeta = blobImmutableFile->GetBlobFileMeta();
-            CONTINUE_LOOP_AS_NULLPTR(fileMeta);
+            if (UNLIKELY(fileMeta == nullptr)) {
+                LOG_ERROR("Error: In loop, got a nullptr fileMeta");
+                ++file;
+                continue;
+            }
             auto minExpire = fileMeta->GetMinExpireTime();
             auto maxExpire = fileMeta->GetMaxExpireTime();
             auto now = TimeStampUtil::GetCurrentTime();

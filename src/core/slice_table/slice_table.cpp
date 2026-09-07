@@ -118,6 +118,10 @@ int32_t SliceTable::AddSlice(const SliceIndexContextRef &curSliceIndexContext,
     dataSliceImpl->Init(slice);
     //  将DataSlice转换为SliceAddress并加入对应的chain中
     SliceAddressRef sliceAddress = currentLogicalSliceChain->CreateSlice(dataSliceImpl, mAccessRecorder->AccessCount());
+    if (UNLIKELY(sliceAddress == nullptr)) {
+        LOG_ERROR("Create slice address failed.");
+        return -1;
+    }
     sliceAddress->AddRequestCount(GetSnapshotVersion() & 0xFFFFL);
     auto sliceSize = dataSliceImpl->GetSize();
     if (UNLIKELY(sliceSize > INT32_MAX)) {

@@ -120,12 +120,23 @@ public:
         return true;
     }
 
-    void Dequeue(RunnablePtr &value)
+    bool Dequeue(RunnablePtr &value)
     {
         std::unique_lock<std::mutex> lk(mMutex);
-        mCondVar.wait(lk, [this] { return !mQueue.empty(); });
+        mCondVar.wait(lk, [this] { return mStopped || !mQueue.empty(); });
+        if (mQueue.empty()) {
+            return false;
+        }
         value = mQueue.front();
         mQueue.pop_front();
+        return true;
+    }
+
+    void Shutdown()
+    {
+        std::lock_guard<std::mutex> lk(mMutex);
+        mStopped = true;
+        mCondVar.notify_all();
     }
 
     uint32_t QueueSize()
@@ -139,6 +150,7 @@ private:
     std::list<RunnablePtr> mQueue;
     std::mutex mMutex;
     std::condition_variable mCondVar;
+    bool mStopped = false;
 };
 
 class ExecutorService;

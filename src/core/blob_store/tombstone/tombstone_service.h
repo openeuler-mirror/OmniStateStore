@@ -172,8 +172,13 @@ public:
         auto file = mWrittenFiles.begin();
         while (file != mWrittenFiles.end()) {
             TombstoneFileRef tombstoneFile = *file;
-            CONTINUE_LOOP_AS_NULLPTR(tombstoneFile);
+            if (UNLIKELY(tombstoneFile == nullptr)) {
+                LOG_ERROR("Error: In loop, got a nullptr tombstoneFile");
+                ++file;
+                continue;
+            }
             if (tombstoneFile->GetVersion() > version) {
+                ++file;
                 continue;
             }
             ret.emplace_back(*file);

@@ -30,11 +30,12 @@ ExecutorServicePtr ExecutorService::Create(uint16_t threadNum, uint32_t queueCap
 ExecutorService::ExecutorService(uint16_t threadNum, uint32_t queueCapacity)
     : mRunnableQueue(queueCapacity),
       mThreadNum(threadNum),
-      mThreads(threadNum),
+      mThreads(),
       mStarted(false),
       mStopped(false),
       mStartedThreadNum(0)
 {
+    mThreads.reserve(threadNum);
 }
 
 void ExecutorService::FreeThread()
@@ -64,6 +65,7 @@ bool ExecutorService::Start()
     for (uint16_t i = 0; i < mThreadNum; i++) {
         auto *thr = new (std::nothrow) std::thread(&ExecutorService::RunInThread, this);
         if (UNLIKELY(thr == nullptr)) {
+            Stop();
             FreeThread();
             LOG_ERROR("Create executor service thread index:" << i << " thread total num:" << mThreadNum << "failed");
             return false;
@@ -86,17 +88,13 @@ void ExecutorService::Stop()
         return;
     }
 
+    mStopped = true;
+    mRunnableQueue.Shutdown();
     for (auto &thr : mThreads) {
-        if (!mRunnableQueue.EnqueueStop()) {
-            continue;
-        }
-
-        if (thr != nullptr) {
+        if (thr != nullptr && thr->joinable()) {
             thr->join();
         }
     }
-
-    mStopped = true;
 }
 
 void ExecutorService::RunInThread()
@@ -117,13 +115,15 @@ void ExecutorService::RunInThread()
     }
     RunnablePtr task = nullptr;
     while (mRunnableQueue.QueueSize() != 0) {
-        mRunnableQueue.Dequeue(task);
+        if (!mRunnableQueue.Dequeue(task)) {
+            break;
+        }
     }
 }
 
 bool ExecutorService::Execute(const RunnablePtr &runnable, bool flag)
 {
-    if (UNLIKELY(!mStarted)) {
+    if (UNLIKELY(!mStarted || mStopped)) {
         return false;
     }
     RETURN_FALSE_AS_NULLPTR(runnable);
@@ -136,7 +136,10 @@ BResult ExecutorService::DoRunnable(bool &flag)
     HTRY
     {
         RunnablePtr task = nullptr;
-        mRunnableQueue.Dequeue(task);
+        if (!mRunnableQueue.Dequeue(task)) {
+            flag = false;
+            return BSS_OK;
+        }
         if (task != nullptr) {
             if (task->Type() == RunnableType::NORMAL) {
                 task->Run();

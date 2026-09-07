@@ -169,7 +169,11 @@ public:
             if (UNLIKELY(mData != nullptr)) {
                 // 释放旧的内存.
                 auto tmp = reinterpret_cast<uintptr_t>(mData);
-                RETURN_NOT_OK(mMemManager->ReleaseMemory(tmp));
+                auto ret = mMemManager->ReleaseMemory(tmp);
+                if (UNLIKELY(ret != BSS_OK)) {
+                    mMemManager->ReleaseMemory(addr);
+                    return ret;
+                }
             }
             // 替换新的内存.
             mData = reinterpret_cast<uint8_t *>(addr);
