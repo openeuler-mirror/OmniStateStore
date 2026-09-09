@@ -111,7 +111,11 @@ public:
         auto group = mFileGroup.begin();
         while (group != mFileGroup.end()) {
             TombstoneFileGroupRef tombstoneFileGroup = *group;
-            CONTINUE_LOOP_AS_NULLPTR(tombstoneFileGroup);
+            if (UNLIKELY(tombstoneFileGroup == nullptr)) {
+                LOG_ERROR("Error: In loop, got a nullptr tombstoneFileGroup");
+                group = mFileGroup.erase(group);
+                continue;
+            }
             tombstoneFileGroup->CleanExpireTombstoneFile(minBlobId, pendingDeleteFiles);
             if (tombstoneFileGroup->Empty()) {
                 group = mFileGroup.erase(group);
@@ -214,6 +218,8 @@ public:
             auto fileVec = (*group)->GetFiles();
             if (fileVec.empty()) {
                 group = mFileGroup.erase(group);
+            } else {
+                ++group;
             }
         }
     }

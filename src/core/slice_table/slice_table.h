@@ -387,7 +387,10 @@ public:
         }
         mBucketGroupManager->MarkLogicalSliceChainFlushed(newLogicalSliceChain,
                                                           mBucketGroupManager->GetBucketGroupVector()[0]);
-        newLogicalSliceChain->SetBaseSliceIndex(logicalSliceChain->GetBaseSliceIndex() - curIndex);
+        uint32_t baseSliceIndex = logicalSliceChain->GetBaseSliceIndex();
+        uint32_t removedSliceCount = static_cast<uint32_t>(curIndex);
+        newLogicalSliceChain->SetBaseSliceIndex(
+            baseSliceIndex > removedSliceCount ? baseSliceIndex - removedSliceCount : 0);
         auto invalidSliceAddress = std::vector<SliceAddressRef>();
         mSliceBucketIndex->UpdateLogicalSliceChain(bucketIndex, logicalSliceChain, newLogicalSliceChain);
         mSliceBucketIndex->Unlock(bucketIndex);

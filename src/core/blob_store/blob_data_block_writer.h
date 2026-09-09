@@ -53,13 +53,14 @@ public:
     inline bool CheckBlobSize(uint32_t size)
     {
         ReadLocker<ReadWriteLock> lk(&mRwLock);
-        if (UNLIKELY(UINT32_MAX - mPosition - size < mIndexEntryList.size() * BLOB_INDEX_ENTRY_STRUCT_SIZE)) {
+        uint64_t curSize = static_cast<uint64_t>(mPosition) + size +
+                           static_cast<uint64_t>(mIndexEntryList.size()) * BLOB_INDEX_ENTRY_STRUCT_SIZE;
+        if (UNLIKELY(curSize > UINT32_MAX)) {
             LOG_ERROR("The value crosses the boundary and exceeds the UINT32_MAX maximum, mPosition: "
                       << mPosition << ", size: " << size << ", index vec size: " << mIndexEntryList.size()
                       << ", blob block header size: " << BLOB_DATA_BLOCK_HEADER_SIZE);
             return false;
         }
-        auto curSize = mPosition + size + mIndexEntryList.size() * BLOB_INDEX_ENTRY_STRUCT_SIZE;
         return curSize <= mCapacity;
     }
 

@@ -93,7 +93,8 @@ public:
 
     static uint32_t RotateRight(uint32_t i, uint32_t distance)
     {
-        return (i >> distance) | (i << -distance);
+        distance %= NO_32;
+        return distance == 0 ? i : (i >> distance) | (i << (NO_32 - distance));
     }
 
     template <typename T> inline static int32_t IntegerCompare(T x, T y)

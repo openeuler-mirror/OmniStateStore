@@ -125,7 +125,6 @@ public:
                                                                                      mSeqId.fetch_add(1));
         ret = list->Initialize();
         if (UNLIKELY(ret != BSS_OK)) {
-            mMemManager->ReleaseMemory(dataAddress);
             return nullptr;
         }
         return list;

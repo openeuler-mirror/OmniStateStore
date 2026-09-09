@@ -39,13 +39,29 @@ void GetTypeSerializer(JNIEnv *env, jobject jTypeSerializer, TypeSerializer &typ
     static const std::string BIG_INT_TYPE{ "org.apache.flink.table.types.logical.BigIntType" };
     static const std::string TIMESTAMP_TYPE{ "org.apache.flink.table.types.logical.TimestampType" };
 
+    if (UNLIKELY(env == nullptr || jTypeSerializer == nullptr)) {
+        LOG_ERROR("Type serializer is nullptr.");
+        return;
+    }
     auto typeSerializerClass = env->GetObjectClass(jTypeSerializer);
+    if (UNLIKELY(typeSerializerClass == nullptr)) {
+        LOG_ERROR("Get type serializer class failed.");
+        return;
+    }
     auto className = GetClassName(env, jTypeSerializer, typeSerializerClass);
     if (ROW_DATA_SERIALIZER == className) {
         typeSerializer.mSerType = SerializerType::BINARY_ROW_DATA_SERIALIZER;
         auto typesFieldId = env->GetFieldID(typeSerializerClass, "types",
                                             "[Lorg/apache/flink/table/types/logical/LogicalType;");
+        if (UNLIKELY(typesFieldId == nullptr)) {
+            LOG_ERROR("Get serializer types field failed.");
+            return;
+        }
         auto jTypes = reinterpret_cast<jobjectArray>(env->GetObjectField(jTypeSerializer, typesFieldId));
+        if (UNLIKELY(jTypes == nullptr)) {
+            LOG_ERROR("Get serializer types failed.");
+            return;
+        }
         for (int i = 0; i < env->GetArrayLength(jTypes); i++) {
             auto jElemType = env->GetObjectArrayElement(jTypes, i);
             if (!jElemType) {

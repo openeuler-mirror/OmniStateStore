@@ -108,7 +108,11 @@ public:
         auto cur = mWaitingDeleteFiles.begin();
         while (cur != mWaitingDeleteFiles.end()) {
             BlobImmutableFileRef blobImmutableFile = *cur;
-            CONTINUE_LOOP_AS_NULLPTR(blobImmutableFile);
+            if (UNLIKELY(blobImmutableFile == nullptr)) {
+                LOG_ERROR("Error: In loop, got a nullptr blobImmutableFile");
+                cur = mWaitingDeleteFiles.erase(cur);
+                continue;
+            }
             blobImmutableFile->DiscardFile();
             cur = mWaitingDeleteFiles.erase(cur);
         }
@@ -120,7 +124,11 @@ public:
         auto group = groups.begin();
         while (group != groups.end()) {
             BlobFileGroupRef blobFileGroup = *group;
-            CONTINUE_LOOP_AS_NULLPTR(blobFileGroup);
+            if (UNLIKELY(blobFileGroup == nullptr)) {
+                LOG_ERROR("Error: In loop, got a nullptr blobFileGroup");
+                ++group;
+                continue;
+            }
             auto files = blobFileGroup->CleanExpireFiles(mConfig->GetBlobFileRetainTimeInMill());
             if (!files.empty()) {
                 DeleteBlobFiles(files);

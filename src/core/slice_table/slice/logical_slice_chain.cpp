@@ -334,6 +334,7 @@ BResult LogicalSliceChainImpl::CopySliceAddresses(const LogicalSliceChainRef &lo
         }
     } else {
         auto sliceAddresses = logicalSliceChain->GetSliceAddresses();  // 浅拷贝, 仅拷贝sliceAddress的智能指针.
+        mSliceAddresses.resize(snapshotChainLen);
         auto endIterator = std::copy(sliceAddresses.begin() + startIndex,
                                      sliceAddresses.begin() + startIndex + snapshotChainLen, mSliceAddresses.begin());
         if (endIterator != mSliceAddresses.end()) {

@@ -11,6 +11,7 @@
 
 #include "slice_table_snapshot_operator.h"
 
+#include "common/scope_guard.h"
 #include "snapshot_compression_utils.h"
 
 namespace ock {
@@ -254,6 +255,12 @@ BResult SliceTableSnapshotOperator::AsyncSnapshotWithoutLocalRecovery(uint64_t s
     if (mIsReleased.load()) {
         return BSS_OK;
     }
+    SCOPE_EXIT({
+        if (mFileOutputView != nullptr) {
+            mFileOutputView->Close();
+            mFileOutputView = nullptr;
+        }
+    });
 
     uint64_t dataTotalSize = 0;
     std::unordered_set<std::string> fileSet;

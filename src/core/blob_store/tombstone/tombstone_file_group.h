@@ -120,7 +120,8 @@ public:
         }
 
         WriteLocker<ReadWriteLock> lock(&mRwLock);
-        if (fileSubVec->GetEndIndex() > mFiles.size()) {
+        if (fileSubVec->GetStartIndex() >= mFiles.size() || fileSubVec->GetEndIndex() >= mFiles.size() ||
+            fileSubVec->GetStartIndex() > fileSubVec->GetEndIndex()) {
             LOG_ERROR("File index is invalid, endIndex:" << fileSubVec->GetEndIndex()
                                                          << ", files size:" << mFiles.size());
             return;
@@ -154,9 +155,17 @@ public:
         auto file = mFiles.begin();
         while (file != mFiles.end()) {
             TombstoneFileRef tombstoneFile = *file;
-            CONTINUE_LOOP_AS_NULLPTR(tombstoneFile);
+            if (UNLIKELY(tombstoneFile == nullptr)) {
+                LOG_ERROR("Error: In loop, got a nullptr tombstoneFile");
+                ++file;
+                continue;
+            }
             TombstoneFileMetaRef tombstoneFileMeta = tombstoneFile->GetFileMeta();
-            CONTINUE_LOOP_AS_NULLPTR(tombstoneFileMeta);
+            if (UNLIKELY(tombstoneFileMeta == nullptr)) {
+                LOG_ERROR("Error: In loop, got a nullptr tombstoneFileMeta");
+                ++file;
+                continue;
+            }
             if (tombstoneFileMeta->GetMaxBlobId() < minBlobId) {
                 pendingDeleteFiles.emplace_back(tombstoneFile);
                 file = mFiles.erase(file);
@@ -188,7 +197,11 @@ public:
         auto file = mFiles.begin();
         while (file != mFiles.end()) {
             auto fileMeta = (*file)->GetFileMeta();
-            CONTINUE_LOOP_AS_NULLPTR(fileMeta);
+            if (UNLIKELY(fileMeta == nullptr)) {
+                LOG_ERROR("Error: In loop, got a nullptr fileMeta");
+                ++file;
+                continue;
+            }
             if (fileMeta->GetMinBlobId() > largestFileMeta->GetMaxBlobId() ||
                 fileMeta->GetMaxBlobId() < largestFileMeta->GetMinBlobId()) {
                 ++file;

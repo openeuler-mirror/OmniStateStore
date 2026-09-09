@@ -16,6 +16,7 @@
 #include "common/fs/file_system.h"
 #include "common/jvm_instance.h"
 #include "common/path.h"
+#include "common/scope_guard.h"
 
 namespace ock {
 namespace bss {
@@ -28,17 +29,7 @@ public:
 
     ~HadoopFileSystem() override
     {
-        if (UNLIKELY(mEnv == nullptr)) {
-            return;
-        }
-        if (mClassHdfs != nullptr) {
-            mEnv->DeleteGlobalRef(mClassHdfs);
-            mClassHdfs = nullptr;
-        }
-        if (mObjectHdfs != nullptr) {
-            mEnv->DeleteGlobalRef(mObjectHdfs);
-            mObjectHdfs = nullptr;
-        }
+        Close();
     }
 
     BResult Open(int flags) override
@@ -52,27 +43,55 @@ public:
             LOG_ERROR("Get JNI env fail:" << ret);
             return BSS_ERR;
         }
+        Close();
         jclass clazz = mEnv->FindClass("com/huawei/ock/bss/common/fs/HadoopFileSystem");
+        if (UNLIKELY(clazz == nullptr)) {
+            return BSS_ALLOC_FAIL;
+        }
         mClassHdfs = (jclass)mEnv->NewGlobalRef(clazz);
         mEnv->DeleteLocalRef(clazz);
-        RETURN_ALLOC_FAIL_AS_NULLPTR(mClassHdfs);
+        if (UNLIKELY(mClassHdfs == nullptr)) {
+            Close();
+            return BSS_ALLOC_FAIL;
+        }
         jmethodID constructor = mEnv->GetMethodID(mClassHdfs, "<init>", "(Ljava/lang/String;)V");
-        RETURN_ALLOC_FAIL_AS_NULLPTR(constructor);
+        if (UNLIKELY(constructor == nullptr)) {
+            Close();
+            return BSS_ALLOC_FAIL;
+        }
         std::string path = mFilePath->Name();
         jstring jFilePath = mEnv->NewStringUTF(path.c_str());
-        RETURN_ALLOC_FAIL_AS_NULLPTR(jFilePath);
+        if (UNLIKELY(jFilePath == nullptr)) {
+            Close();
+            return BSS_ALLOC_FAIL;
+        }
         jobject object = mEnv->NewObject(mClassHdfs, constructor, jFilePath);
-        mObjectHdfs = mEnv->NewGlobalRef(object);
-        mEnv->DeleteLocalRef(object);
-        RETURN_ALLOC_FAIL_AS_NULLPTR(mObjectHdfs);
+        mEnv->DeleteLocalRef(jFilePath);
         if (mEnv->ExceptionCheck()) {
             LOG_ERROR("Create jHdfs fail:" << mFilePath->ExtractFileName());
             mEnv->ExceptionDescribe();
             mEnv->ExceptionClear();
+            if (object != nullptr) {
+                mEnv->DeleteLocalRef(object);
+            }
             Close();
             return BSS_ERR;
         }
-        return InitJMethod();
+        if (UNLIKELY(object == nullptr)) {
+            Close();
+            return BSS_ALLOC_FAIL;
+        }
+        mObjectHdfs = mEnv->NewGlobalRef(object);
+        mEnv->DeleteLocalRef(object);
+        if (UNLIKELY(mObjectHdfs == nullptr)) {
+            Close();
+            return BSS_ALLOC_FAIL;
+        }
+        ret = InitJMethod();
+        if (UNLIKELY(ret != BSS_OK)) {
+            Close();
+        }
+        return ret;
     }
 
     BResult Read(uint8_t *buffer, uint64_t count, int64_t offset) override
@@ -87,7 +106,14 @@ public:
         auto byteArray = (jbyteArray)mEnv->CallObjectMethod(mObjectHdfs, mRead, jOffset, jCount);
         RETURN_ALLOC_FAIL_AS_NULLPTR(byteArray);
         jbyte *byte = mEnv->GetByteArrayElements(byteArray, nullptr);
-        RETURN_ALLOC_FAIL_AS_NULLPTR(byte);
+        if (UNLIKELY(byte == nullptr)) {
+            mEnv->DeleteLocalRef(byteArray);
+            return BSS_ALLOC_FAIL;
+        }
+        SCOPE_EXIT({
+            mEnv->ReleaseByteArrayElements(byteArray, byte, JNI_ABORT);
+            mEnv->DeleteLocalRef(byteArray);
+        });
         uint32_t len = mEnv->GetArrayLength(byteArray);
         if (len == 0) {
             LOG_ERROR("Read remote file fail,expect size :" << count << " actual size:" << len
@@ -103,8 +129,6 @@ public:
             buffer[i] = static_cast<uint8_t>(byte[i] & 0xFF);  // 确保无符号
         }
         mOffset += len;
-        mEnv->ReleaseByteArrayElements(byteArray, byte, JNI_ABORT);
-        mEnv->DeleteLocalRef(byteArray);
         return BSS_OK;
     }
 
@@ -135,6 +159,29 @@ public:
 
     void Close() override
     {
+        if (UNLIKELY(mEnv == nullptr)) {
+            return;
+        }
+        if (mObjectHdfs != nullptr && mClose != nullptr) {
+            mEnv->CallVoidMethod(mObjectHdfs, mClose);
+            if (mEnv->ExceptionCheck()) {
+                LOG_ERROR("Close java file system failed.");
+                mEnv->ExceptionDescribe();
+                mEnv->ExceptionClear();
+            }
+        }
+        if (mObjectHdfs != nullptr) {
+            mEnv->DeleteGlobalRef(mObjectHdfs);
+            mObjectHdfs = nullptr;
+        }
+        if (mClassHdfs != nullptr) {
+            mEnv->DeleteGlobalRef(mClassHdfs);
+            mClassHdfs = nullptr;
+        }
+        mRead = nullptr;
+        mClose = nullptr;
+        mDownload = nullptr;
+        mRemove = nullptr;
     }
 
     void Seek(int64_t offset) override

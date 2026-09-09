@@ -28,13 +28,21 @@ JNIEXPORT jlong JNICALL Java_com_huawei_ock_bss_table_iterator_PQKeyIterator_ope
         LOG_ERROR("PQTable is nullptr.");
         return 0;
     }
+    if (UNLIKELY(groupId == nullptr)) {
+        LOG_ERROR("groupId is nullptr.");
+        return 0;
+    }
     jbyte *byte = env->GetByteArrayElements(groupId, nullptr);
     RETURN_FALSE_AS_NULLPTR(byte);
     uint32_t len = static_cast<uint32_t>(env->GetArrayLength(groupId));
     uint8_t *cpdata = static_cast<uint8_t *>(malloc(len));
-    RETURN_FALSE_AS_NULLPTR(cpdata);
+    if (UNLIKELY(cpdata == nullptr)) {
+        env->ReleaseByteArrayElements(groupId, byte, JNI_ABORT);
+        return 0;
+    }
     if (UNLIKELY(memcpy_s(cpdata, len, byte, len) != EOK)) {
         free(cpdata);
+        env->ReleaseByteArrayElements(groupId, byte, JNI_ABORT);
         LOG_ERROR("memcpy groupId failed.");
         return 0;
     }
