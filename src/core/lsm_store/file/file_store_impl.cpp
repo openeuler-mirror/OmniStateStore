@@ -1077,16 +1077,15 @@ BResult LsmStore::RestoreVersionInfo(const std::vector<std::pair<FileInputViewRe
 
 void LsmStore::ReleaseSnapshot(uint64_t snapshotId)
 {
-    if (mSnapshotVersions.find(snapshotId) == mSnapshotVersions.end()) {
+    auto it = mSnapshotVersions.find(snapshotId);
+    if (it == mSnapshotVersions.end()) {
         LOG_INFO("Version not found, snapshotId:" << snapshotId);
         return;
     }
-    auto version = mSnapshotVersions.at(snapshotId);
-    auto delCnt = this->mSnapshotVersions.erase(snapshotId);
-    if (delCnt > 0) {
-        LOG_DEBUG("File store release snapshot success.");
-        ReleaseVersionFinally(version);
-    }
+    auto version = it->second;
+    mSnapshotVersions.erase(it);
+    LOG_DEBUG("File store release snapshot success.");
+    ReleaseVersionFinally(version);
 }
 
 KeyValueIteratorRef LsmStore::PrefixIterator(const Key &prefixKey, bool reverseOrder)
