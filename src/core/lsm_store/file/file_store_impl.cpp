@@ -288,7 +288,12 @@ Compaction::Result LsmStore::BackgroundCompaction()
             // 2. 根据选择的compaction的groupRange判断是否为简单移动.
             if ((isTrivialMove =
                      compaction->IsTrivialMove())) {  // 移动流程则只将文件移动到下一层，不需要做具体的压缩操作.
-                FileMetaDataRef fileMetaData = compaction->GetLevelInputs().at(0);
+                auto levelInputs = compaction->GetLevelInputs();
+                if (levelInputs.empty()) {
+                    LOG_WARN("Trivial move requested but level inputs empty, skip.");
+                    return Compaction::Result::NON_COMPACTION;
+                }
+                FileMetaDataRef fileMetaData = levelInputs.at(0);
                 VersionEditRef versionEdit = compaction->GetEditBuilder()
                                                  ->DeleteFile(mGroupRange, compaction->GetInputLevelId(),
                                                               fileMetaData->GetIdentifier())
