@@ -313,7 +313,7 @@ uint64_t FullSortEvictor::TriggerFlush(std::vector<SliceScore> &entryList, Bucke
     }
     bool ret = iter->second->SubmitJob(entryList, shared_from_this(), isSync);
     if (UNLIKELY(!ret)) {
-        LOG_ERROR("Submit flush job failed, isSync:" << isSync);
+        LOG_WARN("Submit flush job failed, isSync:" << isSync);
         for (SliceScore &entry : entryList) {
             if (!entry.mSliceAddress->SetStatus(SliceEvent::FLUSH_BACK)) {
                 LOG_ERROR("Rollback flush status to normal failed, slice address status:"

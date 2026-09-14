@@ -148,7 +148,7 @@ public:
                                                 [this](const PQSkipList &item) { PollFlushingSegment(item); });
         auto ret = mService->Execute(std::static_pointer_cast<Runnable>(processor));
         if (UNLIKELY(!ret)) {
-            LOG_ERROR("Submit task failed" << mService->QueueSize());
+            LOG_WARN("Submit task failed" << mService->QueueSize());
             return BSS_ERR;
         }
         // Checkpoint流程首先确保处于待淘汰队列的跳表Flush完成.
