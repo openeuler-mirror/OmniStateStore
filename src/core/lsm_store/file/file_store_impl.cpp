@@ -245,7 +245,7 @@ void LsmStore::ScheduleLsmStoreCompaction(const RunnablePtr &task) const
 
     // 后台执行compaction.
     if (!mCompactionExecutor->Execute(task)) {
-        LOG_ERROR("Execute compaction task failed, waiting for the next trigger.");
+        LOG_WARN("Execute compaction task failed, waiting for the next trigger.");
     }
 }
 

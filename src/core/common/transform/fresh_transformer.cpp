@@ -184,7 +184,7 @@ void FreshHandler::CompactCallback(LogicalSliceChainRef &logicalSliceChain, uint
                                                                       invalidSliceAddressList);
     if (!mTransExecutor->Execute(processor, true)) {
         logicalSliceChain->SetCompactionToNormal();
-        LOG_ERROR("Execute replace logic slice task failed.");
+        LOG_WARN("Execute replace logic slice task failed.");
     }
 }
 
@@ -196,7 +196,7 @@ void FreshTransformer::TriggerTransform()
     RunnablePtr processor = std::make_shared<TransformerProcessor>(mFreshTable, mSliceTable, mHandle);
     bool isOk = mTransformExecutor->Execute(processor, false);
     if (UNLIKELY(!isOk)) {
-        LOG_ERROR("Execute transform failed.");
+        LOG_WARN("Execute transform failed.");
     }
 }
 

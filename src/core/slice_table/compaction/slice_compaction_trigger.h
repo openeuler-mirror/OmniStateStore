@@ -75,7 +75,7 @@ public:
                                                                      compactCompletedNotify, mBoostNativeMetric);
         bool ret = mCompactionEventExecutor->Execute(task);
         if (UNLIKELY(!ret)) {
-            LOG_ERROR("Execute async slice compaction task failed.");
+            LOG_WARN("Execute async slice compaction task failed.");
             return BSS_ERR;
         }
         return BSS_OK;

@@ -135,7 +135,7 @@ void BlobWriteBuffer::TriggerFlush()
     RETURN_AS_NULLPTR(mBlobFlushExecutor);
     bool isOk = mBlobFlushExecutor->Execute(processor, false);
     if (UNLIKELY(!isOk)) {
-        LOG_ERROR("Execute blob flush failed.");
+        LOG_WARN("Execute blob flush failed.");
     }
 }
 
