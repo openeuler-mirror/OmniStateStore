@@ -126,6 +126,16 @@
 - 如果显示no，说明禁止了root用户SSH登录。
 - 如果显示yes，说明需要修改PermitRootLogin为no。
 
+### 公网地址声明<a name="ZH-CN_TOPIC_PUBLIC_NETWORK_ADDRESS"></a>
+
+本声明统计本仓库自有源代码、构建配置和文档中出现的公网地址，不包含`3rdparty`目录以及其他带第三方许可证声明的第三方组件源码中的地址。OmniStateStore运行时不会主动访问以下公网地址；除初始化Git子模块和构建依赖外，其余地址仅作为许可证标识或XML命名空间使用。
+
+|类型|公网地址|所在文件|用途说明|
+|--|--|--|--|
+|许可证|[http://license.coscl.org.cn/MulanPSL2](http://license.coscl.org.cn/MulanPSL2)|`LICENSE`、`src`和`test`目录下的源码文件|木兰宽松许可证第2版的许可证标识，不会触发网络访问。|
+|第三方依赖获取|<ul><li><a href="https://gitcode.com/GitHub_Trending/go/googletest.git">GoogleTest</a>：C++单元测试框架，用于构建和运行测试。</li><li><a href="https://gitcode.com/GitHub_Trending/lz/lz4.git">LZ4</a>：无损压缩库，用于数据压缩与解压。</li><li><a href="https://gitcode.com/src-openeuler/libboundscheck.git">libboundscheck</a>：安全函数库，用于提供带边界检查的内存与字符串操作。</li><li><a href="https://gitcode.com/GitHub_Trending/sp/spdlog.git">spdlog</a>：C++日志库，用于Native模块日志记录。</li></ul>|`.gitmodules`|初始化或更新Git子模块时获取构建依赖；产品运行时不会访问。|
+|构建元数据|<ul><li><a href="http://maven.apache.org/xsd/maven-4.0.0.xsd">http://maven.apache.org/xsd/maven-4.0.0.xsd</a></li><li><a href="https://maven.apache.org/xsd/assembly-2.2.0.xsd">https://maven.apache.org/xsd/assembly-2.2.0.xsd</a></li><li><a href="http://www.w3.org/2001/XMLSchema-instance">http://www.w3.org/2001/XMLSchema-instance</a></li></ul>|`src/plugin/pom.xml`、`src/plugin/state_store_api/pom.xml`、`src/plugin/state_store_plugin/pom.xml`、`src/plugin/assembly.xml`|Maven POM、Assembly文件的XML命名空间和Schema标识，不是运行时访问地址。|
+
 ## 贡献声明<a name="ZH-CN_TOPIC_0000002518267678"></a>
 
 - 提交错误报告：如果您在OmniStateStore中发现了一个不存在安全问题的漏洞，请在OmniStateStore仓库中的Issues中搜索，以防该漏洞被重复提交，如果找不到漏洞可以创建一个新的Issues。如果发现了一个安全问题请不要将其公开，请参阅安全问题处理方式。提交错误报告时应该包含完整信息。
