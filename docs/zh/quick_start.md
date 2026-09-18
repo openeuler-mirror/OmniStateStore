@@ -17,6 +17,8 @@
 |GCC|10.3.1|
 |JDK|1.8.0_432|
 
+还需安装Maven，并设置JAVA_HOME指向包含JNI头文件的JDK目录。Native单元测试依赖libaio-devel和libasan。可直接使用[容器环境部署](installation_guide.md#容器环境部署)提供的环境镜像，具体内容见[镜像说明](../../docker/README.md)。
+
 ### 源码编译
 
 1. 下载源代码.

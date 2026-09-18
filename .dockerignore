@@ -1,0 +1,11 @@
+.git
+**/.git
+.codex*
+build
+dist
+output
+cmake-build-*
+**/target
+**/*.log
+.idea
+.vscode
