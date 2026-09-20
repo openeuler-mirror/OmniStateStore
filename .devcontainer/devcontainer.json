@@ -1,0 +1,7 @@
+{
+  "name": "OmniStateStore build and test",
+  "image": "swr.cn-north-4.myhuaweicloud.com/ubscore/omnistatestore:latest",
+  "workspaceFolder": "/workspace",
+  "workspaceMount": "source=${localWorkspaceFolder},target=/workspace,type=bind",
+  "remoteUser": "root"
+}

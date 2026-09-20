@@ -63,7 +63,7 @@
 
 ## 环境部署<a name="ZH-CN_TOPIC_0000002550027431"></a>
 
-介绍OmniStateStore的环境依赖及安装方式，具体请参见\[installation\_guide.md\]\(./docs/zh/installation\_guide.md\)。
+介绍OmniStateStore的环境依赖及安装方式，具体请参见[安装指南](./docs/zh/installation_guide.md)。预构建镜像、Dockerfile及源码编译/UT流程见[容器环境部署](./docs/zh/installation_guide.md#容器环境部署)。
 
 ## 快速入门<a name="ZH-CN_TOPIC_0000002518427582"></a>
 

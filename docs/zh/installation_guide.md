@@ -122,6 +122,84 @@ OmniStateStore软件安装前需要将前置依赖的软件安装成功，建议
 
 安装和使用OmniStateStore之前，请确保软硬件环境已经满足安装部署及应用程序正常运行的要求。
 
+## 容器环境部署
+
+仓库提供用于源码编译和单元测试的环境镜像，预装GCC、CMake、OpenJDK 8、Maven、libaio-devel和libasan，并尝试预热四个Flink版本的Maven依赖。镜像不包含项目源码、编译产物或Flink；启动后挂载源码，再执行仓库构建脚本。缓存不保证完整，构建仍需访问Git和Maven仓库。
+
+### 获取镜像
+
+以下命令在已启动Docker的Linux主机执行。预构建镜像为 **ARM64/aarch64**，基于openEuler 24.03 LTS-SP3；与本文openEuler 22.03 LTS SP3部署基线有差异，实际部署前需验证兼容性。x86_64主机请使用Dockerfile自行构建对应架构镜像。
+
+```bash
+docker pull swr.cn-north-4.myhuaweicloud.com/ubscore/omnistatestore:latest
+```
+
+私有仓库需先登录。latest 标签指向的镜像会随发布更新。如果希望以后始终使用同一份镜像，请保存首次拉取时输出的 Digest 值，它是这份镜像内容的唯一标识。再次拉取或启动容器时，将镜像名称末尾的 :latest 替换为 @，再接上完整的 Digest 值（包括 sha256: 前缀和后面的字符），即可指定同一份镜像。
+
+也可在仓库根目录基于[docker/Dockerfile](../../docker/Dockerfile)构建：
+
+```bash
+docker build -f docker/Dockerfile \
+    -t omnistatestore-verify:24.03-lts-sp3-$(uname -m) .
+```
+
+镜像内容、构建参数、发布和开发容器配置见[docker/README.md](../../docker/README.md)。自行构建后，将下方运行命令的镜像地址替换为本地标签。
+
+### 准备源码并创建容器
+
+在Linux主机上克隆源码，保证Shell脚本使用LF换行；Windows检出的CRLF脚本不可直接挂载执行。以下命令在仓库根目录运行，`$(pwd)`为源码的绝对路径：
+
+```bash
+git clone --recurse-submodules https://atomgit.com/openeuler/OmniStateStore.git
+cd OmniStateStore
+git submodule update --init --recursive
+docker run -d --name omn-ttfhw \
+    --mount type=bind,source="$(pwd)",target=/workspace \
+    swr.cn-north-4.myhuaweicloud.com/ubscore/omnistatestore:latest
+```
+
+镜像默认执行`sleep infinity`。容器以root运行，挂载目录内的构建文件可能归root所有。请使用独立验证工作副本：构建脚本会清空该副本的`build/`和`dist/`。普通构建不需要`--privileged`；镜像未安装hdt或覆盖率报告工具。
+
+### 编译与安装
+
+在宿主机执行以下命令，在已启动的容器中编译Release安装包。构建产物会保存在挂载的源码目录中，随后可选择与Flink版本对应的JAR进行安装。
+
+```bash
+docker exec omn-ttfhw bash -lc 'cd /workspace && bash scripts/build.sh -t release'
+```
+
+构建成功后，宿主机源码目录包含以下产物：
+
+```text
+dist/BoostKit-omnistatestore_1.1.0_aarch64_release.tar.gz
+dist/BoostKit-omnistatestore_1.1.0/java/jars/flink-boost-statebackend-1.1.0-SNAPSHOT-for-flink-<version>.jar
+```
+
+x86_64构建的压缩包架构后缀为`x86_64`。JAR内置JNI库，不能跨架构混用。将与Flink版本对应的JAR复制到JobManager和所有TaskManager的`${FLINK_HOME}/lib/`，再按本文“启动OmniStateStore”配置并验证。自行编译的产物无需执行发布包的ZIP解压步骤。
+
+### 可选：单元测试
+
+先将所需Release产物复制到源码目录之外保存，再执行以下命令；Debug构建会清理`dist/`：
+
+```bash
+docker exec omn-ttfhw bash -lc \
+    'cd /workspace && bash scripts/build.sh -t debug --ut && cd build/test/llt && ./bss_ut'
+```
+
+该方式直接运行Native测试，不依赖`test/run_dt.sh`使用的hdt，也不包含hdt覆盖率报告流程。环境镜像的依赖自检不代表项目UT或Flink集成验证通过。
+
+### 清理
+
+完成构建与验证、确认不再使用该容器后，在宿主机依次执行以下命令，停止并删除容器，再删除本地镜像以释放磁盘空间。
+
+```bash
+docker stop omn-ttfhw
+docker rm omn-ttfhw
+docker rmi swr.cn-north-4.myhuaweicloud.com/ubscore/omnistatestore:latest
+```
+
+清理不会删除绑定挂载的宿主机源码及产物。
+
 ## 安装OmniStateStore<a id="安装OmniStateStore"></a>
 
 1. 请参见[表3 OmniStateStore状态优化软件获取列表](#OmniStateStore状态优化软件获取列表)获取软件包BoostKit-omniruntime-omnistatestore-1.1.0.zip。
