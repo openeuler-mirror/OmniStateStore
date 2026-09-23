@@ -10,9 +10,15 @@
  */
 #include <dirent.h>
 #include <ftw.h>
+#include <unistd.h>
 
 #include <array>
+#include <cstdlib>
 #include <cstring>
+#include <functional>
+#include <memory>
+#include <string>
+#include <vector>
 
 #include "common/bss_log.h"
 #include "gtest/gtest.h"
@@ -1589,10 +1595,24 @@ TEST_F(TestDB, SameTaskSlotDifferentMaxParallelismKeepsDbACodec)
     expectValue();
     ASSERT_EQ(pqTableA->TriggerSegmentFlush(true), BSS_OK);
 
-    std::string checkpointRoot = GetCurrentWorkingDirectory() + "/codec-root-checkpoint";
+    std::string checkpointTemplate = configA->GetLocalPath() + "/codec-root-checkpoint-XXXXXX";
+    std::vector<char> checkpointTemplateBuffer(checkpointTemplate.begin(), checkpointTemplate.end());
+    checkpointTemplateBuffer.push_back('\0');
+    char *createdCheckpointRoot = mkdtemp(checkpointTemplateBuffer.data());
+    ASSERT_NE(createdCheckpointRoot, nullptr);
+    std::string checkpointRoot(createdCheckpointRoot);
     std::string checkpointPath = checkpointRoot + "/1";
-    mkdir(checkpointRoot.c_str(), mode_t(NO_777));
-    mkdir(checkpointPath.c_str(), mode_t(NO_777));
+    struct CheckpointDirectoryGuard {
+        TestDB *test;
+        const std::string &path;
+        ~CheckpointDirectoryGuard()
+        {
+            EXPECT_TRUE(test->RemoveDirectoryRecursive(path));
+        }
+    } checkpointCleanup{ this, checkpointRoot };
+    ASSERT_EQ(access(checkpointRoot.c_str(), F_OK), 0);
+    ASSERT_EQ(mkdir(checkpointPath.c_str(), mode_t(NO_777)), 0);
+    ASSERT_EQ(access(checkpointPath.c_str(), F_OK), 0);
     ASSERT_NE(mDB->CreateSyncCheckpoint(checkpointPath, 1), nullptr);
     ASSERT_EQ(mDB->CreateAsyncCheckpoint(1, false), BSS_OK);
 

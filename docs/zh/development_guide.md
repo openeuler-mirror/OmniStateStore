@@ -80,7 +80,9 @@
 
     |编译参数|编译选项|简要说明|
     |--|--|--|
-    |-t|debugrelease|编译debug包，开发阶段使用。<br>编译release发布包，测试和发布阶段使用。|
+    |-t|debug/release/blend|编译debug、release或blend包。|
+    |--fv|1.16.1/1.16.3/1.17.1/1.20.0|仅编译指定Flink版本。|
+    |-j/--jobs|正整数|设置并行编译任务数，默认读取`BSS_BUILD_JOBS`，未设置时为8。|
     |--ut|无|编译UT测试程序。|
     |--sve|无|使能鲲鹏高性能SVE指令集。|
     |-h|无|帮助。|
@@ -91,13 +93,26 @@
 
 ### 测试指导
 
-1. 执行测试运行脚本。
+1. 编译UT测试程序。
 
     ```cmd
-    sh test/run_dt.sh
+    bash scripts/build.sh -t debug --ut -j 8
     ```
 
-2. 执行测试运行脚本后会自动编译和测试用例执行，查看测试用例执行结果。
+2. 直接执行LLT二进制并生成GoogleTest XML报告。
+
+    ```cmd
+    (cd build/test/llt && ./bss_ut --gtest_output=xml:report.xml)
+    ```
+
+3. `sh test/run_dt.sh`依赖hdt工具链，可作为已有hdt环境的兼容入口。该入口属于历史辅助流程；在新的系统、编译器或hdt版本上使用前，需要单独验证兼容性。日常开发和CI建议以直接构建、直接执行`bss_ut`的结果为准。
+
+4. 需要保留可复核的重复测试证据时，使用证据运行脚本。focused模式默认执行并核对本次整改的4个回归用例，也可通过`--filter`扩展过滤器；full模式执行全部用例。`--timeout`默认30分钟。脚本会记录源码提交与文件指纹、测试二进制SHA-256，以及每轮命令、日志、XML和退出码；任一轮超时、退出失败、XML缺失、必需用例缺失或XML包含失败时立即停止。
+
+    ```cmd
+    bash scripts/run_ut_evidence.sh --mode focused --repeat 3 --timeout 10m
+    bash scripts/run_ut_evidence.sh --mode full --repeat 1 --timeout 30m
+    ```
 
 ## 技术细节
 

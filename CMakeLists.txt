@@ -137,13 +137,15 @@ add_subdirectory(3rdparty)
 add_subdirectory(src)
 add_subdirectory(test)
 
+set(BSS_BUILD_JOBS 8 CACHE STRING "Maximum number of parallel build jobs")
+
 add_custom_target(build_cpp
-        COMMAND make -j8
+        COMMAND ${CMAKE_MAKE_PROGRAM} -j${BSS_BUILD_JOBS}
         WORKING_DIRECTORY ${PROJECT_TOP_BUILD_DIR}
 )
 
 add_custom_target(build_version
-        COMMAND make -j8
+        COMMAND ${CMAKE_MAKE_PROGRAM} -j${BSS_BUILD_JOBS}
         COMMAND make build_bss_java_version_${FLINK_VERSION}
         COMMAND make build_bss_install_java_version_${FLINK_VERSION}
 
@@ -151,7 +153,7 @@ add_custom_target(build_version
 )
 
 add_custom_target(build_all
-        COMMAND make -j8
+        COMMAND ${CMAKE_MAKE_PROGRAM} -j${BSS_BUILD_JOBS}
         COMMAND make build_bss_java_version_1.16.3
         COMMAND make build_bss_install_java_version_1.16.3
         COMMAND make build_bss_java_version_1.17.1

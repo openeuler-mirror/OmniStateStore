@@ -33,7 +33,9 @@
 
     | 编译参数  | 编译选项  | 简要说明  |
     | ------------ | ------------ | ------------ |
-    | -t  | debug/release  | 编译debug/release包  |
+    | -t  | debug/release/blend  | 编译debug、release或blend包  |
+    | --fv  | 1.16.1/1.16.3/1.17.1/1.20.0  | 仅编译指定Flink版本  |
+    | -j/--jobs  | 正整数  | 设置并行编译任务数，默认读取`BSS_BUILD_JOBS`，未设置时为8  |
     | --ut  | 无  | 编译UT测试程序  |
     | --sve  | 无  | 使能鲲鹏高性能SVE指令  |
     | -h  | 无  | 帮助  |
@@ -44,13 +46,19 @@ OmniStateStore软件包BoostKit-omnistatestore_1.x.x_aarch64_xxx.tar.gz。
 
 ### 开发者测试
 
-1. 执行测试运行脚本。
+1. 编译UT测试程序。以下命令使用8个并行编译任务，可通过`-j`、`--jobs`或环境变量`BSS_BUILD_JOBS`调整。
 
-    ```cmd
-    sh test/run_dt.sh
+    ```bash
+    bash scripts/build.sh -t debug --ut -j 8
     ```
 
-2. 执行测试运行脚本后会自动编译和测试用例执行，最后观测测试用例执行结果即可。
+2. 直接执行生成的LLT二进制，并输出GoogleTest XML报告。
+
+    ```bash
+    (cd build/test/llt && ./bss_ut --gtest_output=xml:report.xml)
+    ```
+
+3. `sh test/run_dt.sh`依赖hdt工具链，可作为已有hdt环境的兼容入口。该入口属于历史辅助流程；在新的系统、编译器或hdt版本上使用前，需要单独验证兼容性。日常开发和CI建议以上述直接构建、直接执行`bss_ut`的结果为准。
 
 ## 环境部署<a name="ZH-CN_TOPIC_0000002520932058"></a>
 

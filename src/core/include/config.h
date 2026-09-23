@@ -573,7 +573,7 @@ public:
     std::string mRemotePath;
     std::string mBackendUID;
     std::string mBackupPath;
-    bool mEnableLocalRecovery;
+    bool mEnableLocalRecovery = false;
     bool mIsNewJob = true;
 
     int32_t mLsmStoreCompactionSwitch = 1;
