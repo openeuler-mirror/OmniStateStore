@@ -10,14 +10,18 @@ set -o errexit
 unset module
 
 usage() {
-    echo "Usage: $0 [ -h | -help ] [ -t | -type <build_type> ] [--ut=UT] "
-    echo "build_type: [debug, release]"
+    local exit_code=${1:-1}
+    echo "Usage: $0 [-h | --help] [-t | --type <build_type>] [--fv <flink_version>]"
+    echo "          [-j | --jobs <jobs>] [--ut] [--sve]"
+    echo "build_type: [debug, release, blend]"
+    echo "flink_version: [1.16.1, 1.16.3, 1.17.1, 1.20.0]"
+    echo "jobs: positive integer (default: BSS_BUILD_JOBS or 8)"
     echo "Examples:"
     echo " 1 ./build.sh -t release "
     echo " 2 ./build.sh -t debug [--ut] // 限制仅DT构建脚本使用"
-    echo " 3 ./build.sh -t release [--closeJNI] // 限制仅不编译Jni文件使用"
+    echo " 3 ./build.sh -t release --fv 1.20.0 --jobs 8"
     echo
-    exit 1;
+    exit "${exit_code}"
 }
 
 CMAKE_FLAGS=""
@@ -28,18 +32,16 @@ OUTPUT_DIR=${PROJ_DIR}/dist
 BUILD_DIR=${PROJ_DIR}/build
 LOG_FILE=${PROJ_DIR}/scripts/build.log
 
-if [ ! -d "${BUILD_DIR}" ]; then
-    mkdir -p ${BUILD_DIR}
-fi
-
 arch=$(uname -m)
 BUILD_TYPE=release
 BUILD_UT=OFF
 FLINK_VERSION=all
+BUILD_JOBS=${BSS_BUILD_JOBS:-8}
 
-while true; do
+while [[ $# -gt 0 ]]; do
     case "$1" in
         -t | --type )
+            [[ $# -lt 2 ]] && echo "Missing value for $1" && usage
             type=$2
             type=${type,,}
             [[ "$type" != "debug" && "$type" != "release" && "$type" != "blend" ]] && echo "Invalid build type $2" && usage
@@ -56,11 +58,18 @@ while true; do
             shift 2
             ;;
         --fv )
+            [[ $# -lt 2 ]] && echo "Missing value for $1" && usage
             version=$2
             version="${version// /}"
-            [[ "version" != "1.16.1" && "version" != "1.16.3" && "version" != "1.17.1" ]] && echo "Invalid flink version $2" && usage
+            [[ "${version}" != "1.16.1" && "${version}" != "1.16.3" && "${version}" != "1.17.1" && \
+                "${version}" != "1.20.0" ]] && echo "Invalid flink version $2" && usage
             FLINK_VERSION=${version}
             CMAKE_FLAGS+="-DFLINK_VERSION=${version} "
+            shift 2
+            ;;
+        -j | --jobs )
+            [[ $# -lt 2 ]] && echo "Missing value for $1" && usage
+            BUILD_JOBS=$2
             shift 2
             ;;
         --ut )
@@ -70,14 +79,22 @@ while true; do
         --sve )
             CMAKE_FLAGS+='-DBUILD_SVE=ON '
             shift ;;
-        -h | -help )
-            usage
-            exit 0
+        -h | --help | -help )
+            usage 0
             ;;
         * )
-            break;;
+            echo "Unknown argument: $1"
+            usage
+            ;;
     esac
 done
+
+if ! [[ "${BUILD_JOBS}" =~ ^[1-9][0-9]*$ ]]; then
+    echo "Invalid jobs value: ${BUILD_JOBS}"
+    usage
+fi
+
+CMAKE_FLAGS+="-DBSS_BUILD_JOBS=${BUILD_JOBS} "
 
 CMAKE_CMD="cmake .. $CMAKE_FLAGS-DCMAKE_INSTALL_PREFIX=../dist"
 
@@ -122,11 +139,11 @@ function build_cmake()
   # configure
   $CMAKE_CMD
   if [[ "${BUILD_UT}" == "ON" ]]; then
-    make build_cpp
+    make -j"${BUILD_JOBS}" build_cpp
   elif [[ "${FLINK_VERSION}" != "all" ]]; then
-    make build_version
+    make -j"${BUILD_JOBS}" build_version
   else
-    make build_all
+    make -j"${BUILD_JOBS}" build_all
   fi
 
   local ret=$?
@@ -195,6 +212,10 @@ echo $(date +"[%Y-%m-%d %H:%M]"): $0 $@
 
 # check glibc version >=2.10
 check_glibc
+
+if [ ! -d "${BUILD_DIR}" ]; then
+    mkdir -p "${BUILD_DIR}"
+fi
 
 # CI_BUILD是一个环境变量
 if [ -z "${CI_BUILD}" ];then
