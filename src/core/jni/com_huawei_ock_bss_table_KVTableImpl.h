@@ -27,6 +27,8 @@ extern "C" {
  */
 JNIEXPORT void JNICALL Java_com_huawei_ock_bss_table_KVTableImpl_put(JNIEnv *, jclass, jlong, jint, jlong, jint, jlong,
                                                                      jint);
+JNIEXPORT jint JNICALL Java_com_huawei_ock_bss_table_KVTableImpl_restorePut(JNIEnv *, jclass, jlong, jint, jlong, jint,
+                                                                            jlong, jint);
 
 /*
  * Class:     com_huawei_ock_bss_table_KVTableImpl

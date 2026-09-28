@@ -1,6 +1,7 @@
 package com.huawei.ock.bss.iterator;
 
 import com.huawei.ock.bss.common.BinaryKeyValueItem;
+import com.huawei.ock.bss.common.BoostStateType;
 import com.huawei.ock.bss.common.exception.BSSRuntimeException;
 import com.huawei.ock.bss.iterator.serializer.KeyValueBuilder;
 import com.huawei.ock.bss.snapshot.SavepointDBResult;
@@ -13,6 +14,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 
 import javax.annotation.Nullable;
 
@@ -29,11 +33,20 @@ public final class BoostSortedKeyValueIterator<K> implements SingleStateIterator
 
     private KeyGroupRange keyGroupRange;
 
+    private Record pending;
+
+    private static final byte LIST_DELIMITER = ',';
+
     public BoostSortedKeyValueIterator(SavepointDBResult savepointDBResult, KeyValueBuilder<K> keyValueBuilder,
         KeyGroupRange keyGroupRange) throws IOException {
+        this(savepointDBResult.iterator(), keyValueBuilder, keyGroupRange);
+    }
+
+    BoostSortedKeyValueIterator(CloseableIterator<BinaryKeyValueItem> iterator,
+        KeyValueBuilder<K> keyValueBuilder, KeyGroupRange keyGroupRange) throws IOException {
         this.keyValueBuilder = keyValueBuilder;
         this.isValid = false;
-        this.iterator = savepointDBResult.iterator();
+        this.iterator = iterator;
 
         this.keyGroupRange = keyGroupRange;
         next();
@@ -41,17 +54,92 @@ public final class BoostSortedKeyValueIterator<K> implements SingleStateIterator
 
     @Override
     public void next() {
-        currentItem = null;
-        BinaryKeyValueItem binaryKeyValueItem = null;
         try {
-            while (currentItem == null && iterator.hasNext()) {
-                binaryKeyValueItem = iterator.next();
-                currentItem = keyValueBuilder.buildKeyValueItem(binaryKeyValueItem);
+            Record first = pending == null ? readNext() : pending;
+            pending = null;
+            if (first == null) {
+                currentItem = null;
+                isValid = false;
+                return;
+            }
+            currentItem = first.item;
+            if (first.type == BoostStateType.LIST || first.type == BoostStateType.SUB_LIST) {
+                List<byte[]> fragments = new ArrayList<>();
+                fragments.add(first.item.getValue());
+                Record following;
+                while ((following = readNext()) != null) {
+                    if (following.type != first.type || following.item.getStateId() != first.item.getStateId()
+                        || following.item.getKeyGroup() != first.item.getKeyGroup()
+                        || !Arrays.equals(following.item.getKey(), first.item.getKey())) {
+                        pending = following;
+                        break;
+                    }
+                    fragments.add(following.item.getValue());
+                }
+                if (fragments.size() > 1) {
+                    currentItem = new KeyValueItem(first.item.getKeyGroup(), first.item.getStateId(),
+                        first.item.getKey(), combineListFragments(fragments));
+                }
             }
         } catch (IOException e) {
             throw new BSSRuntimeException("Failed to get next kv item.", e);
         }
         isValid = currentItem != null;
+    }
+
+    private Record readNext() throws IOException {
+        while (iterator.hasNext()) {
+            BinaryKeyValueItem binaryItem = iterator.next();
+            KeyValueItem item = keyValueBuilder.buildKeyValueItem(binaryItem);
+            if (item != null) {
+                return new Record(binaryItem.getStateType(), item);
+            }
+        }
+        return null;
+    }
+
+    // Native savepoint sections arrive newest first. Flink's ListDelimitedSerializer
+    // requires one value per key/state, with a comma between serialized elements.
+    static byte[] combineListFragments(List<byte[]> newestFirst) {
+        long length = 0;
+        int nonEmpty = 0;
+        for (byte[] fragment : newestFirst) {
+            if (fragment.length > 0) {
+                length += fragment.length;
+                nonEmpty++;
+            }
+        }
+        if (nonEmpty == 0) {
+            return new byte[0];
+        }
+        length += nonEmpty - 1;
+        if (length > Integer.MAX_VALUE) {
+            throw new BSSRuntimeException("Serialized ListState exceeds Java array limit: " + length);
+        }
+        byte[] combined = new byte[(int) length];
+        int position = 0;
+        for (int index = newestFirst.size() - 1; index >= 0; index--) {
+            byte[] fragment = newestFirst.get(index);
+            if (fragment.length == 0) {
+                continue;
+            }
+            if (position > 0) {
+                combined[position++] = LIST_DELIMITER;
+            }
+            System.arraycopy(fragment, 0, combined, position, fragment.length);
+            position += fragment.length;
+        }
+        return combined;
+    }
+
+    private static final class Record {
+        private final BoostStateType type;
+        private final KeyValueItem item;
+
+        private Record(BoostStateType type, KeyValueItem item) {
+            this.type = type;
+            this.item = item;
+        }
     }
 
     private boolean checkKeyGroup(int keyGroup) {

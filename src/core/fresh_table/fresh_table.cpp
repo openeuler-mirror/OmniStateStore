@@ -167,11 +167,12 @@ BResult FreshTable::Put(const Key &key, const Value &value)
 bool FreshTable::GetList(const Key &key, std::deque<Value> &result)
 {
     // 1. 查找active memory segment.
-    bool shouldContinue = VisitBinarySegmentMap(mActive, result, key);
+    bool shouldContinue = VisitBinarySegmentMap(GetActiveSegment(), result, key);
     if (shouldContinue) {
         // 2. 查找flushing queue.
         ReadLocker<ReadWriteLock> lock(&mRwLock);
-        for (auto it = mSnapshotQueue.rbegin(); it != mSnapshotQueue.rend() && shouldContinue; ++it) {
+        auto snapshots = mSnapshotQueue.GetDeque();
+        for (auto it = snapshots.rbegin(); it != snapshots.rend() && shouldContinue; ++it) {
             shouldContinue = VisitBinarySegmentMap(*it, result, key);
         }
     }
@@ -181,13 +182,15 @@ bool FreshTable::GetList(const Key &key, std::deque<Value> &result)
 KeyValueIteratorRef FreshTable::EntryIterator(const PriKeyFilter &priKeyFilter, const SecKeyFilter &secKeyFilter)
 {
     std::vector<KeyValueIteratorRef> iterators;
-    auto iterator = mActive->GetBinaryData()->EntryIterator(priKeyFilter, secKeyFilter);
+    auto active = GetActiveSegment();
+    auto iterator = active->GetBinaryData()->EntryIterator(priKeyFilter, secKeyFilter);
     if (iterator != nullptr) {
         iterators.emplace_back(iterator);
     }
 
     ReadLocker<ReadWriteLock> lock(&mRwLock);
-    for (auto it = mSnapshotQueue.rbegin(); it != mSnapshotQueue.rend(); ++it) {
+    auto snapshots = mSnapshotQueue.GetDeque();
+    for (auto it = snapshots.rbegin(); it != snapshots.rend(); ++it) {
         iterator = (*it)->GetBinaryData()->EntryIterator(priKeyFilter, secKeyFilter);
         if (iterator != nullptr) {
             iterators.emplace_back(iterator);
@@ -200,13 +203,15 @@ KeyValueIteratorRef FreshTable::EntryIterator(const PriKeyFilter &priKeyFilter, 
 KeyValueIteratorRef FreshTable::GetMapIterator(const Key &key)
 {
     std::vector<KeyValueIteratorRef> iterators;
-    auto iterator = mActive->GetBinaryData()->MapEntryIterator(key);
+    auto active = GetActiveSegment();
+    auto iterator = active->GetBinaryData()->MapEntryIterator(key);
     if (iterator != nullptr) {
         iterators.emplace_back(iterator);
     }
 
     ReadLocker<ReadWriteLock> lock(&mRwLock);
-    for (auto it = mSnapshotQueue.rbegin(); it != mSnapshotQueue.rend(); ++it) {
+    auto snapshots = mSnapshotQueue.GetDeque();
+    for (auto it = snapshots.rbegin(); it != snapshots.rend(); ++it) {
         iterator = (*it)->GetBinaryData()->MapEntryIterator(key);
         if (iterator != nullptr) {
             iterators.emplace_back(iterator);
@@ -250,13 +255,15 @@ BResult FreshTable::Append(const Key &key, const Value &value)
 
 bool FreshTable::GetKMap(const Key &key, Value &value)
 {
-    bool found = mActive->GetBinaryData()->GetKMap(key, value);
+    auto active = GetActiveSegment();
+    bool found = active->GetBinaryData()->GetKMap(key, value);
     if (found) {
         return true;
     }
 
     ReadLocker<ReadWriteLock> lock(&mRwLock);
-    for (auto it = mSnapshotQueue.rbegin(); it != mSnapshotQueue.rend(); ++it) {
+    auto snapshots = mSnapshotQueue.GetDeque();
+    for (auto it = snapshots.rbegin(); it != snapshots.rend(); ++it) {
         found = (*it)->GetBinaryData()->GetKMap(key, value);
         if (found) {
             return true;
@@ -267,13 +274,15 @@ bool FreshTable::GetKMap(const Key &key, Value &value)
 
 bool FreshTable::Get(const Key &key, Value &value)
 {
-    bool found = mActive->GetBinaryData()->Get(key, value);
+    auto active = GetActiveSegment();
+    bool found = active->GetBinaryData()->Get(key, value);
     if (found) {
         return true;
     }
 
     ReadLocker<ReadWriteLock> lock(&mRwLock);
-    for (auto it = mSnapshotQueue.rbegin(); it != mSnapshotQueue.rend(); ++it) {
+    auto snapshots = mSnapshotQueue.GetDeque();
+    for (auto it = snapshots.rbegin(); it != snapshots.rend(); ++it) {
         found = (*it)->GetBinaryData()->Get(key, value);
         if (found) {
             return true;

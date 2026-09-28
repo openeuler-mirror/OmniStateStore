@@ -263,10 +263,9 @@ BResult Slice::CreateAndInitBuffer(const SliceCreateMeta &meta, RawDataSlice &ra
 
     // sort by rotate right HashCode.
     uint32_t rightShiftBits = NO_31 - BssMath::NumberOfLeadingZeros(indexCount);
-    std::vector<uint32_t> rotatedHashes;
-    rotatedHashes.reserve(indexVec.size());
+    std::vector<uint32_t> rotatedHashes(mixHashCodeVec.size());
     for (uint32_t index : indexVec) {
-        rotatedHashes.emplace_back(BssMath::RotateRight(mixHashCodeVec[index], rightShiftBits));
+        rotatedHashes[index] = BssMath::RotateRight(mixHashCodeVec[index], rightShiftBits);
     }
     std::sort(indexVec.begin(), indexVec.end(),
               [&](uint32_t a, uint32_t b) { return rotatedHashes[a] < rotatedHashes[b]; });

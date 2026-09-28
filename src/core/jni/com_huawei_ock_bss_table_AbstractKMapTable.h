@@ -42,6 +42,8 @@ JNIEXPORT jlong JNICALL Java_com_huawei_ock_bss_table_AbstractKMapTable_get(JNIE
  */
 JNIEXPORT void JNICALL Java_com_huawei_ock_bss_table_AbstractKMapTable_add(JNIEnv *, jclass, jlong, jint, jlong, jint,
                                                                            jlong, jint, jlong, jint);
+JNIEXPORT jint JNICALL Java_com_huawei_ock_bss_table_AbstractKMapTable_restoreAdd(JNIEnv *, jclass, jlong, jint, jlong,
+                                                                                  jint, jlong, jint, jlong, jint);
 
 /*
  * Class:     com_huawei_ock_bss_table_AbstractKMapTable

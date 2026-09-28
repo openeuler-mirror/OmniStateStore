@@ -26,6 +26,8 @@ extern "C" {
  */
 JNIEXPORT void JNICALL Java_com_huawei_ock_bss_table_KListTableImpl_put(JNIEnv *, jclass, jlong, jint, jlong, jint,
                                                                         jlong, jint);
+JNIEXPORT jint JNICALL Java_com_huawei_ock_bss_table_KListTableImpl_restorePut(JNIEnv *, jclass, jlong, jint, jlong,
+                                                                               jint, jlong, jint);
 
 /*
  * Class:     com_huawei_ock_bss_table_KListTableImpl
@@ -65,6 +67,8 @@ JNIEXPORT void JNICALL Java_com_huawei_ock_bss_table_KListTableImpl_add(JNIEnv *
  */
 JNIEXPORT void JNICALL Java_com_huawei_ock_bss_table_KListTableImpl_addAll(JNIEnv *, jclass, jlong, jint, jlong, jint,
                                                                            jlong, jint);
+JNIEXPORT jint JNICALL Java_com_huawei_ock_bss_table_KListTableImpl_restoreAdd(JNIEnv *, jclass, jlong, jint, jlong,
+                                                                               jint, jlong, jint);
 /*
  * Class:     com_huawei_ock_bss_table_KListTableImpl
  * Method:    releaseAllBuffer

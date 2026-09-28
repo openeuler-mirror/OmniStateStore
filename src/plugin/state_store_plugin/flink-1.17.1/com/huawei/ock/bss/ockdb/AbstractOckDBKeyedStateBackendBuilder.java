@@ -266,8 +266,12 @@ public abstract class AbstractOckDBKeyedStateBackendBuilder<K> extends AbstractK
     }
 
     protected BoostRestoreResult restore(BoostStateDB db, BoostRestoreOperation<K> restoreOperation) throws Exception {
-        if (!(restoreOperation instanceof BoostNoneRestoreOperation)) {
+        if (restoreOperation instanceof BoostIncrementalRestoreOperation) {
+            LOG.info("Disable Java bloom filter for incremental restore because native files do not replay keys.");
             db.getConfig().setEnableBloomFilter(false);
+        } else if (restoreOperation instanceof BoostSavepointRestoreOperation
+            && db.getConfig().isEnableBloomFilter()) {
+            LOG.info("Java bloom filter is enabled and will be populated during savepoint restore.");
         }
         long restoreStartTime = System.currentTimeMillis();
         BoostRestoreResult restoreResult = restoreOperation.restore();

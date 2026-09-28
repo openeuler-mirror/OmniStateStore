@@ -556,6 +556,8 @@ private:
 
     void RegisterTombstoneService();
 
+    SliceAddressRef AppendSliceToCurrentChain(const SliceIndexContextRef &context, const DataSliceRef &dataSlice);
+
 private:
     std::atomic<bool> mIsRunning{ true };
     mutable std::mutex mMutex;

@@ -20,7 +20,9 @@ import com.huawei.ock.bss.common.memory.DirectBuffer;
 import com.huawei.ock.bss.common.memory.DirectDataInputDeserializer;
 import com.huawei.ock.bss.common.memory.DirectDataOutputSerializer;
 import com.huawei.ock.bss.common.serialize.KVSerializerUtil;
+import com.huawei.ock.bss.common.serialize.ThreadLocalOutputViewPool;
 import com.huawei.ock.bss.table.api.KListTable;
+import com.huawei.ock.bss.table.api.SerializedListRestoreTable;
 import com.huawei.ock.bss.table.api.Table;
 import com.huawei.ock.bss.table.api.TableDescription;
 import com.huawei.ock.bss.table.description.KListTableDescription;
@@ -48,7 +50,8 @@ import java.util.concurrent.ConcurrentHashMap;
  * @param <E> element
  * @since BeiMing 25.0.T1
  */
-public class KListTableImpl<K, E> extends AbstractTable<K, List<E>> implements KListTable<K, E> {
+public class KListTableImpl<K, E> extends AbstractTable<K, List<E>>
+    implements KListTable<K, E>, SerializedListRestoreTable<K> {
     private static final Logger LOG = LoggerFactory.getLogger(KListTableImpl.class);
 
     /**
@@ -103,6 +106,42 @@ public class KListTableImpl<K, E> extends AbstractTable<K, List<E>> implements K
         } catch (IOException ioException) {
             LOG.error("Fail to put {} with list.", key, ioException);
             throw new BSSRuntimeException("Fail to put " + key + " with list.", ioException);
+        }
+    }
+
+    @Override
+    public void restoreSerialized(byte[] serializedKey, int mixedKeyHash, int bloomKeyHash,
+        SerializedListRestoreTable.ChunkProducer producer) throws IOException {
+        Preconditions.checkNotNull(serializedKey);
+        Preconditions.checkNotNull(producer);
+        checkNativeHandleValid();
+        DirectDataOutputSerializer keyBytes = ThreadLocalOutputViewPool.current(true).getOutputView();
+        DirectDataOutputSerializer valueBytes = ThreadLocalOutputViewPool.current(false).getOutputView();
+        keyBytes.write(serializedKey);
+        final boolean[] first = {true};
+        producer.writeTo(chunk -> {
+            Preconditions.checkNotNull(chunk);
+            valueBytes.setPosition(0);
+            valueBytes.write(chunk);
+            if (first[0]) {
+                int result = restorePut(nativeHandle, mixedKeyHash, keyBytes.data(), keyBytes.length(),
+                    valueBytes.data(), valueBytes.length());
+                checkRestoreResult(result);
+                first[0] = false;
+            } else {
+                int result = restoreAdd(nativeHandle, mixedKeyHash, keyBytes.data(), keyBytes.length(),
+                    valueBytes.data(), valueBytes.length());
+                checkRestoreResult(result);
+            }
+        });
+        if (!first[0]) {
+            addKeyHash(bloomKeyHash);
+        }
+    }
+
+    private static void checkRestoreResult(int result) {
+        if (result != 0) {
+            throw new BSSRuntimeException("Serialized list restore failed with native result " + result + ".");
         }
     }
 
@@ -457,6 +496,9 @@ public class KListTableImpl<K, E> extends AbstractTable<K, List<E>> implements K
      */
     public static native void put(long nativeHandle, int keyHashCode, long kBytes, int kSize, long vBytes, int vSize);
 
+    private static native int restorePut(long nativeHandle, int keyHashCode, long kBytes, int kSize, long vBytes,
+        int vSize);
+
     /**
      * native get
      *
@@ -501,6 +543,9 @@ public class KListTableImpl<K, E> extends AbstractTable<K, List<E>> implements K
      * @param vSize        vSize
      */
     public static native void add(long nativeHandle, int keyHashCode, long kBytes, int kSize, long vBytes, int vSize);
+
+    private static native int restoreAdd(long nativeHandle, int keyHashCode, long kBytes, int kSize, long vBytes,
+        int vSize);
 
     /**
      * native addAll
