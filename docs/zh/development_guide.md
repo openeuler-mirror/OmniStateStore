@@ -114,6 +114,19 @@
     bash scripts/run_ut_evidence.sh --mode full --repeat 1 --timeout 30m
     ```
 
+#### 加速UT链接
+
+Debug加覆盖率模式下，`bss_ut`二进制较大。默认GNU ld为单线程链接器，即使提高`-j`并行编译数，最后的链接阶段也无法并行。使用mold或lld可缩短这一阶段的耗时；实际收益随机器和构建配置变化。
+
+按当前Dockerfile重新构建的[编译与测试环境镜像](../../docker/README.md)会安装mold，并设置`LDFLAGS=-fuse-ld=mold`。在镜像内首次配置CMake时会使用该链接器。手动搭建环境时，可安装mold并在执行构建脚本时指定：
+
+```bash
+dnf install -y mold
+LDFLAGS=-fuse-ld=mold bash scripts/build.sh -t debug --ut -j 8
+```
+
+`-fuse-ld=mold`需要GCC 12.1及以上。较旧的GCC若提供lld，可安装lld并改用`LDFLAGS=-fuse-ld=lld`。`LDFLAGS`只在首次配置CMake时写入链接参数；已有构建目录需重新配置或清理后再构建。`scripts/build.sh`每次会清理构建目录。可在`build/test/llt/CMakeFiles/bss_ut.dir/link.txt`检查最终链接命令是否带有`-fuse-ld=mold`（或`lld`）。
+
 ## 技术细节
 
 ### 总体架构
