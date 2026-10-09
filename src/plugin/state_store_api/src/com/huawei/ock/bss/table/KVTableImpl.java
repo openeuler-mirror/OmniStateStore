@@ -20,6 +20,8 @@ import com.huawei.ock.bss.common.memory.DirectBuffer;
 import com.huawei.ock.bss.common.memory.DirectDataInputDeserializer;
 import com.huawei.ock.bss.common.memory.DirectDataOutputSerializer;
 import com.huawei.ock.bss.common.serialize.KVSerializerUtil;
+import com.huawei.ock.bss.common.serialize.ThreadLocalOutputViewPool;
+import com.huawei.ock.bss.table.api.SerializedKVRestoreTable;
 import com.huawei.ock.bss.table.api.TableDescription;
 import com.huawei.ock.bss.table.description.KVTableDescription;
 
@@ -39,7 +41,7 @@ import javax.annotation.Nullable;
  *
  * @since BeiMing 25.0.T1
  */
-public class KVTableImpl<K, V> extends AbstractTable<K, V> {
+public class KVTableImpl<K, V> extends AbstractTable<K, V> implements SerializedKVRestoreTable<K> {
     private static final Logger LOG = LoggerFactory.getLogger(KVTableImpl.class);
 
     /**
@@ -88,6 +90,23 @@ public class KVTableImpl<K, V> extends AbstractTable<K, V> {
             LOG.error("Fail to put <{}, {}>.", key, value, ioException);
             throw new BSSRuntimeException("Fail to put " + key + ", " + value, ioException);
         }
+    }
+
+    @Override
+    public void restoreSerialized(byte[] serializedKey, int mixedKeyHash, int bloomKeyHash, byte[] serializedValue) {
+        Preconditions.checkNotNull(serializedKey);
+        Preconditions.checkNotNull(serializedValue);
+        checkNativeHandleValid();
+        DirectDataOutputSerializer keyBytes = ThreadLocalOutputViewPool.current(true).getOutputView();
+        DirectDataOutputSerializer valueBytes = ThreadLocalOutputViewPool.current(false).getOutputView();
+        keyBytes.write(serializedKey);
+        valueBytes.write(serializedValue);
+        int result = restorePut(nativeHandle, mixedKeyHash, keyBytes.data(), keyBytes.length(), valueBytes.data(),
+            valueBytes.length());
+        if (result != 0) {
+            throw new BSSRuntimeException("Serialized value restore failed with native result " + result + ".");
+        }
+        addKeyHash(bloomKeyHash);
     }
 
     /**
@@ -298,6 +317,9 @@ public class KVTableImpl<K, V> extends AbstractTable<K, V> {
      * @param vSize        vSize
      */
     public static native void put(long nativeHandle, int keyHashCode, long kBytes, int kSize, long vBytes,
+        int vSize);
+
+    private static native int restorePut(long nativeHandle, int keyHashCode, long kBytes, int kSize, long vBytes,
         int vSize);
 
     /**

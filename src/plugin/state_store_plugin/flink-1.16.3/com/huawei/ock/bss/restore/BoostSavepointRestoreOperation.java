@@ -12,7 +12,9 @@
 package com.huawei.ock.bss.restore;
 
 import com.huawei.ock.bss.common.BoostStateDB;
+import com.huawei.ock.bss.common.conf.BoostConfig;
 import com.huawei.ock.bss.common.exception.BSSRuntimeException;
+import com.huawei.ock.bss.common.memory.DirectDataOutputSerializer;
 import com.huawei.ock.bss.state.internal.KeyedListState;
 import com.huawei.ock.bss.state.internal.KeyedListStateImpl;
 import com.huawei.ock.bss.state.internal.KeyedMapState;
@@ -43,7 +45,11 @@ import com.huawei.ock.bss.table.api.Table;
 import com.huawei.ock.bss.table.api.NsKListTable;
 import com.huawei.ock.bss.table.api.NsKMapTable;
 import com.huawei.ock.bss.table.api.NsKVTable;
+import com.huawei.ock.bss.table.api.SerializedKVRestoreTable;
+import com.huawei.ock.bss.table.api.SerializedListRestoreTable;
+import com.huawei.ock.bss.table.api.SerializedMapRestoreTable;
 import com.huawei.ock.bss.table.api.TableDescription;
+import com.huawei.ock.bss.table.KeyPair;
 import com.huawei.ock.bss.util.DescriptionUtils;
 
 import org.apache.flink.api.common.state.StateDescriptor;
@@ -51,6 +57,7 @@ import org.apache.flink.api.common.typeutils.TypeSerializer;
 import org.apache.flink.api.common.typeutils.base.ListSerializer;
 import org.apache.flink.api.common.typeutils.base.MapSerializer;
 import org.apache.flink.core.memory.DataInputDeserializer;
+import org.apache.flink.core.memory.DataOutputSerializer;
 import org.apache.flink.runtime.state.CompositeKeySerializationUtils;
 import org.apache.flink.runtime.state.KeyExtractorFunction;
 import org.apache.flink.runtime.state.KeyGroupRange;
@@ -75,12 +82,17 @@ import org.apache.flink.runtime.state.restore.KeyGroupEntry;
 import org.apache.flink.runtime.state.restore.SavepointRestoreResult;
 import org.apache.flink.runtime.state.restore.ThrowingIterator;
 import org.apache.flink.util.Preconditions;
+import org.apache.flink.util.MathUtils;
 import org.apache.flink.util.StateMigrationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
@@ -98,6 +110,10 @@ import javax.annotation.Nonnull;
 public class BoostSavepointRestoreOperation<K> extends AbstractBoostRestoreOperation<K> {
     private static final Logger LOG = LoggerFactory.getLogger(BoostSavepointRestoreOperation.class);
 
+    private static final int LIST_RESTORE_MAX_ELEMENTS = 100;
+
+    private static final int LIST_RESTORE_MAX_BYTES = 64 * 1024;
+
     private final int keyGroupPrefixBytes;
 
     private final BoostStateDB db;
@@ -113,6 +129,8 @@ public class BoostSavepointRestoreOperation<K> extends AbstractBoostRestoreOpera
     private final DataInputDeserializer valueDeserializer;
 
     private final ListDelimitedSerializer listDelimitedSerializer;
+
+    private DirectDataOutputSerializer normalizationOutput;
 
     private final PriorityQueueSetFactory priorityQueueSetFactory;
 
@@ -473,24 +491,44 @@ public class BoostSavepointRestoreOperation<K> extends AbstractBoostRestoreOpera
         this.valueDeserializer.setBuffer(groupEntry.getValue());
         // 此处不读取会导致偏移量无法正确增加，后续key和namespace无法正确读取
         CompositeKeySerializationUtils.readKeyGroup(this.keyGroupPrefixBytes, this.keyDeserializer);
-        K key = CompositeKeySerializationUtils.readKey(keySerializer, this.keyDeserializer, ambiguousKeyPossible);
-        N namespace = CompositeKeySerializationUtils.readNamespace(namespaceSerializer, this.keyDeserializer,
-            ambiguousKeyPossible);
+        int keyStart = this.keyDeserializer.getPosition();
+        K key = keySerializer.deserialize(this.keyDeserializer);
+        int keyEnd = this.keyDeserializer.getPosition();
+        if (ambiguousKeyPossible) {
+            CompositeKeySerializationUtils.readVariableIntBytes(this.keyDeserializer, keyEnd - keyStart);
+        }
+        int namespaceStart = this.keyDeserializer.getPosition();
+        N namespace = namespaceSerializer.deserialize(this.keyDeserializer);
+        int namespaceEnd = this.keyDeserializer.getPosition();
+        if (ambiguousKeyPossible) {
+            CompositeKeySerializationUtils.readVariableIntBytes(this.keyDeserializer,
+                namespaceEnd - namespaceStart);
+        }
         Preconditions.checkNotNull(key, "key should not be null when readKvStateData.");
         Preconditions.checkNotNull(namespace, "namespace should not be null when readKvStateData.");
+        byte[] canonicalKey = groupEntry.getKey();
+        byte[] keyBytes = fieldBytes(keySerializer, key, canonicalKey, keyStart, keyEnd);
+        byte[] namespaceBytes = fieldBytes(namespaceSerializer, namespace, canonicalKey, namespaceStart, namespaceEnd);
+        int keyJavaHash = key.hashCode();
+        int namespaceJavaHash = namespace.hashCode();
+        int mixedKeyHash = MathUtils.murmurHash(keyJavaHash);
 
         StateDescriptor.Type stateType = backendMetaInfo.getStateType();
         switch (stateType) {
             case LIST:
-                restoreListState(stateName, key, namespace, groupEntry.getValue(), (ListSerializer<?>) stateSerializer);
+                restoreListState(stateName, key, namespace, keyBytes, namespaceBytes, keyJavaHash,
+                    namespaceJavaHash, mixedKeyHash, groupEntry.getValue(), (ListSerializer<?>) stateSerializer);
                 return;
             case MAP:
-                restoreMapState(stateName, key, namespace, (MapSerializer<?, ?>) stateSerializer);
+                restoreMapState(stateName, key, namespace, keyBytes, namespaceBytes, keyJavaHash,
+                    namespaceJavaHash, mixedKeyHash, canonicalKey, groupEntry.getValue(),
+                    (MapSerializer<?, ?>) stateSerializer);
                 return;
             case VALUE:
             case REDUCING:
             case AGGREGATING:
-                restoreKeyedAndNSKeyedState(stateName, key, namespace, stateSerializer);
+                restoreKeyedAndNSKeyedState(stateName, key, namespace, keyBytes, namespaceBytes, keyJavaHash,
+                    namespaceJavaHash, mixedKeyHash, stateSerializer, groupEntry.getValue());
                 return;
             default:
                 throw new UnsupportedEncodingException("Invalid state type " + stateType);
@@ -498,61 +536,229 @@ public class BoostSavepointRestoreOperation<K> extends AbstractBoostRestoreOpera
     }
 
     @SuppressWarnings("unchecked")
-    private <N, V> void restoreKeyedAndNSKeyedState(String stateName, K key, N namespace,
-        TypeSerializer<V> valueSerializer) throws IOException {
-        V value = valueSerializer.deserialize(this.valueDeserializer);
-        if (namespace instanceof VoidNamespace) {
-            KeyedValueState<K, V> keyedValueState = (KeyedValueState<K, V>) getKeyedStateWithCheck(stateName);
-            keyedValueState.put(key, value);
+    private <N, V> void restoreKeyedAndNSKeyedState(String stateName, K key, N namespace, byte[] keyBytes,
+        byte[] namespaceBytes, int keyJavaHash, int namespaceJavaHash, int mixedKeyHash,
+        TypeSerializer<V> valueSerializer, byte[] originalValueBytes) throws IOException {
+        if (BoostConfig.DEBUG_MODE) {
+            V value = valueSerializer.deserialize(this.valueDeserializer);
+            restoreValueLegacy(stateName, key, namespace, value);
             return;
         }
+        byte[] valueBytes = normalizedValueBytes(valueSerializer, originalValueBytes);
+        if (namespace instanceof VoidNamespace) {
+            ((SerializedKVRestoreTable<K>) getTableWithCheck(stateName)).restoreSerialized(keyBytes, mixedKeyHash,
+                keyJavaHash, valueBytes);
+            return;
+        }
+        ((SerializedMapRestoreTable<K, N>) getTableWithCheck(stateName)).restoreSerialized(keyBytes, mixedKeyHash,
+            keyJavaHash, namespaceBytes, namespaceJavaHash, valueBytes);
+    }
 
-        NSKeyedValueState<K, N, V> nsKeyedValueState =
-            (NSKeyedValueState<K, N, V>) getNSKeyedStateWithCheck(stateName);
-        nsKeyedValueState.put(key, namespace, value);
+    private <N, V> void restoreValueLegacy(String stateName, K key, N namespace, V value) {
+        if (namespace instanceof VoidNamespace) {
+            ((KeyedValueState<K, V>) getKeyedStateWithCheck(stateName)).put(key, value);
+        } else {
+            ((NSKeyedValueState<K, N, V>) getNSKeyedStateWithCheck(stateName)).put(key, namespace, value);
+        }
     }
 
     @SuppressWarnings("unchecked")
-    private <N, E> void restoreListState(String stateName, K key, N namespace, byte[] valueBytes,
-        TypeSerializer<List<E>> stateSerializer) {
+    private <N, E> void restoreListState(String stateName, K key, N namespace, byte[] keyBytes,
+        byte[] namespaceBytes, int keyJavaHash, int namespaceJavaHash, int mixedKeyHash, byte[] valueBytes,
+        TypeSerializer<List<E>> stateSerializer) throws IOException {
         if (valueBytes == null) {
             LOG.warn("input valueBytes is null.");
             return;
         }
 
-        LOG.info("restore list state:{} value size:{}", stateName, valueBytes.length);
-        List<E> values = this.listDelimitedSerializer.deserializeList(valueBytes,
-            ((ListSerializer<E>) stateSerializer).getElementSerializer());
-
-        if (namespace instanceof VoidNamespace) {
-            KeyedListState<K, E> keyedListState = (KeyedListState<K, E>) getKeyedStateWithCheck(stateName);
-            values.forEach(e -> keyedListState.add(key, e));
+        TypeSerializer<E> elementSerializer = ((ListSerializer<E>) stateSerializer).getElementSerializer();
+        if (BoostConfig.DEBUG_MODE) {
+            List<E> values = this.listDelimitedSerializer.deserializeList(valueBytes, elementSerializer);
+            if (namespace instanceof VoidNamespace) {
+                KeyedListState<K, E> state = (KeyedListState<K, E>) getKeyedStateWithCheck(stateName);
+                values.forEach(e -> state.add(key, e));
+            } else {
+                NSKeyedListState<K, N, E> state = (NSKeyedListState<K, N, E>) getNSKeyedStateWithCheck(stateName);
+                values.forEach(e -> state.add(key, namespace, e));
+            }
             return;
         }
-
-        NSKeyedListState<K, N, E> nsKeyedListState =
-            (NSKeyedListState<K, N, E>) getNSKeyedStateWithCheck(stateName);
-        values.forEach(e -> nsKeyedListState.add(key, namespace, e));
+        if (namespace instanceof VoidNamespace) {
+            ((SerializedListRestoreTable<K>) getTableWithCheck(stateName)).restoreSerialized(keyBytes, mixedKeyHash,
+                keyJavaHash, consumer -> transcodeList(valueBytes, elementSerializer, consumer));
+        } else {
+            ((SerializedListRestoreTable<KeyPair<K, N>>) getTableWithCheck(stateName)).restoreSerialized(
+                keyPairBytes(keyBytes, namespaceBytes, namespaceJavaHash), mixedKeyHash,
+                keyJavaHash ^ namespaceJavaHash,
+                consumer -> transcodeList(valueBytes, elementSerializer, consumer));
+        }
     }
 
     @SuppressWarnings("unchecked")
-    private <N, UK, UV> void restoreMapState(String stateName, K key, N namespace,
-        MapSerializer<UK, UV> stateSerializer) throws IOException {
+    private <N, UK, UV> void restoreMapState(String stateName, K key, N namespace, byte[] keyBytes,
+        byte[] namespaceBytes, int keyJavaHash, int namespaceJavaHash, int mixedKeyHash, byte[] canonicalKey,
+        byte[] canonicalValue, MapSerializer<UK, UV> stateSerializer) throws IOException {
+        int userKeyStart = this.keyDeserializer.getPosition();
         UK mapEntryKey = stateSerializer.getKeySerializer().deserialize(this.keyDeserializer);
+        int userKeyEnd = this.keyDeserializer.getPosition();
+        int userKeyHash = mapEntryKey.hashCode();
+        byte[] serializedUserKey = fieldBytes(stateSerializer.getKeySerializer(), mapEntryKey,
+            canonicalKey, userKeyStart, userKeyEnd);
+        boolean isNull = this.valueDeserializer.readBoolean();
         UV mapEntryValue = null;
-        if (!this.valueDeserializer.readBoolean()) {
-            mapEntryValue = stateSerializer.getValueSerializer().deserialize(this.valueDeserializer);
-        }
-
-        if (namespace instanceof VoidNamespace) {
-            KeyedMapState<K, UK, UV> keyedMapState = (KeyedMapState<K, UK, UV>) getKeyedStateWithCheck(stateName);
-            keyedMapState.add(key, mapEntryKey, mapEntryValue);
+        if (isNull) {
+            restoreMapLegacy(stateName, key, namespace, mapEntryKey, null);
             return;
         }
+        if (BoostConfig.DEBUG_MODE) {
+            mapEntryValue = stateSerializer.getValueSerializer().deserialize(this.valueDeserializer);
+            restoreMapLegacy(stateName, key, namespace, mapEntryKey, mapEntryValue);
+            return;
+        }
+        byte[] serializedValue;
+        if (isCanonicalSerializer(stateSerializer.getValueSerializer())) {
+            serializedValue = Arrays.copyOfRange(canonicalValue, 1, canonicalValue.length);
+            validateSerialized(stateSerializer.getValueSerializer(), serializedValue);
+        } else {
+            mapEntryValue = stateSerializer.getValueSerializer().deserialize(this.valueDeserializer);
+            if (this.valueDeserializer.available() != 0) {
+                throw new IOException("Map value serializer did not consume the complete savepoint value.");
+            }
+            serializedValue = serializeNormalized(stateSerializer.getValueSerializer(), mapEntryValue);
+        }
+        if (namespace instanceof VoidNamespace) {
+            ((SerializedMapRestoreTable<K, UK>) getTableWithCheck(stateName)).restoreSerialized(keyBytes,
+                mixedKeyHash, keyJavaHash, serializedUserKey, userKeyHash, serializedValue);
+        } else {
+            ((SerializedMapRestoreTable<KeyPair<K, N>, UK>) getTableWithCheck(stateName)).restoreSerialized(
+                keyPairBytes(keyBytes, namespaceBytes, namespaceJavaHash), mixedKeyHash,
+                keyJavaHash ^ namespaceJavaHash, serializedUserKey, userKeyHash, serializedValue);
+        }
+    }
 
-        NSKeyedMapState<K, N, UK, UV> nsKeyedMapState =
-            (NSKeyedMapState<K, N, UK, UV>) getNSKeyedStateWithCheck(stateName);
-        nsKeyedMapState.add(key, namespace, mapEntryKey, mapEntryValue);
+    private <N, UK, UV> void restoreMapLegacy(String stateName, K key, N namespace, UK userKey, UV value) {
+        if (namespace instanceof VoidNamespace) {
+            ((KeyedMapState<K, UK, UV>) getKeyedStateWithCheck(stateName)).add(key, userKey, value);
+        } else {
+            ((NSKeyedMapState<K, N, UK, UV>) getNSKeyedStateWithCheck(stateName)).add(key, namespace, userKey, value);
+        }
+    }
+
+    private Table getTableWithCheck(String stateName) {
+        Table table = this.tables.get(stateName);
+        if (table == null) {
+            throw new BSSRuntimeException("Failed to get Table, stateName: " + stateName);
+        }
+        return table;
+    }
+
+    private <T> byte[] fieldBytes(TypeSerializer<T> serializer, T value, byte[] source, int start, int end)
+        throws IOException {
+        if (isCanonicalSerializer(serializer)) {
+            return Arrays.copyOfRange(source, start, end);
+        }
+        return serializeNormalized(serializer, value);
+    }
+
+    private <T> byte[] normalizedValueBytes(TypeSerializer<T> serializer, byte[] bytes) throws IOException {
+        if (isCanonicalSerializer(serializer)) {
+            validateSerialized(serializer, bytes);
+            return bytes;
+        }
+        DataInputDeserializer input = new DataInputDeserializer(bytes);
+        T value = serializer.deserialize(input);
+        if (input.available() != 0) {
+            throw new IOException("State serializer did not consume the complete savepoint value.");
+        }
+        return serializeNormalized(serializer, value);
+    }
+
+    private <T> byte[] serializeNormalized(TypeSerializer<T> serializer, T value) throws IOException {
+        if (normalizationOutput == null) {
+            normalizationOutput = new DirectDataOutputSerializer(128);
+        } else {
+            normalizationOutput.setPosition(0);
+        }
+        serializer.serialize(value, normalizationOutput);
+        return normalizationOutput.getCopyOfBuffer();
+    }
+
+    private static void validateSerialized(TypeSerializer<?> serializer, byte[] bytes) throws IOException {
+        DataInputDeserializer input = new DataInputDeserializer(bytes);
+        serializer.copy(input, DiscardingDataOutputView.INSTANCE);
+        if (input.available() != 0) {
+            throw new IOException("Serializer did not consume the complete savepoint value.");
+        }
+    }
+
+    private static boolean isCanonicalSerializer(TypeSerializer<?> serializer) {
+        String name = serializer.getClass().getName();
+        return name.equals("org.apache.flink.api.common.typeutils.base.BooleanSerializer")
+            || name.equals("org.apache.flink.api.common.typeutils.base.ByteSerializer")
+            || name.equals("org.apache.flink.api.common.typeutils.base.CharSerializer")
+            || name.equals("org.apache.flink.api.common.typeutils.base.IntSerializer")
+            || name.equals("org.apache.flink.api.common.typeutils.base.LongSerializer")
+            || name.equals("org.apache.flink.api.common.typeutils.base.ShortSerializer")
+            || name.equals("org.apache.flink.api.common.typeutils.base.StringSerializer")
+            || name.equals("org.apache.flink.api.common.typeutils.base.array.BytePrimitiveArraySerializer")
+            || serializer instanceof VoidNamespaceSerializer;
+    }
+
+    private static byte[] keyPairBytes(byte[] keyBytes, byte[] namespaceBytes, int namespaceHash) {
+        ByteBuffer buffer = ByteBuffer.allocate(8 + keyBytes.length + namespaceBytes.length)
+            .order(ByteOrder.LITTLE_ENDIAN);
+        buffer.putInt(namespaceHash);
+        buffer.put(keyBytes);
+        buffer.put(namespaceBytes);
+        buffer.putInt(keyBytes.length);
+        return buffer.array();
+    }
+
+    private <E> void transcodeList(byte[] canonicalBytes, TypeSerializer<E> serializer,
+        SerializedListRestoreTable.ChunkConsumer consumer) throws IOException {
+        DataInputDeserializer input = new DataInputDeserializer(canonicalBytes);
+        DataOutputSerializer payload = new DataOutputSerializer(Math.min(Math.max(canonicalBytes.length, 1),
+            LIST_RESTORE_MAX_BYTES));
+        GrowableDataOutputView element = new GrowableDataOutputView(128);
+        List<Integer> lengths = new ArrayList<>(LIST_RESTORE_MAX_ELEMENTS);
+        boolean rawCopy = isCanonicalSerializer(serializer);
+        while (input.available() > 0) {
+            element.clear();
+            byte[] bytes;
+            if (rawCopy) {
+                serializer.copy(input, element);
+                bytes = element.getCopyOfBuffer();
+            } else {
+                E value = serializer.deserialize(input);
+                bytes = serializeNormalized(serializer, value);
+            }
+            if (!lengths.isEmpty() && (lengths.size() >= LIST_RESTORE_MAX_ELEMENTS
+                || payload.length() + bytes.length > LIST_RESTORE_MAX_BYTES)) {
+                consumer.accept(buildListChunk(payload, lengths));
+                payload.clear();
+                lengths.clear();
+            }
+            payload.write(bytes);
+            lengths.add(bytes.length);
+            if (input.available() > 0) {
+                if (input.readByte() != ',' || input.available() == 0) {
+                    throw new IOException("Invalid list delimiter in savepoint value.");
+                }
+            }
+        }
+        if (!lengths.isEmpty()) {
+            consumer.accept(buildListChunk(payload, lengths));
+        }
+    }
+
+    private static byte[] buildListChunk(DataOutputSerializer payload, List<Integer> lengths) throws IOException {
+        DataOutputSerializer chunk = new DataOutputSerializer(4 + payload.length() + lengths.size() * 4);
+        chunk.writeInt(lengths.size());
+        chunk.write(payload.getSharedBuffer(), 0, payload.length());
+        for (int length : lengths) {
+            chunk.writeInt(length);
+        }
+        return chunk.getCopyOfBuffer();
     }
 
     private KeyedState getKeyedStateWithCheck(String stateName) {

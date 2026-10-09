@@ -196,6 +196,11 @@ public:
         mLocks[bucketIndex % LOCKS_NUM].LockWrite();
     }
 
+    inline void LockRead(uint32_t bucketIndex)
+    {
+        mLocks[bucketIndex % LOCKS_NUM].LockRead();
+    }
+
     inline void Unlock(uint32_t bucketIndex)
     {
         mLocks[bucketIndex % LOCKS_NUM].Unlock();

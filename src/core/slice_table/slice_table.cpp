@@ -97,13 +97,9 @@ BResult SliceTable::TryCompact(const SliceIndexContextRef &sliceIndexContext,
 int32_t SliceTable::AddSlice(const SliceIndexContextRef &curSliceIndexContext,
                              std::vector<std::pair<SliceKey, Value>> &dataList, uint64_t version)
 {
-    LogicalSliceChainRef currentLogicalSliceChain = curSliceIndexContext->GetLogicalSliceChain();
-    if (currentLogicalSliceChain == nullptr || currentLogicalSliceChain->IsNone()) {
-        LOG_ERROR("BUG! add slice receive NO_SLICE request");
-        return -1;
-    }
     if (dataList.empty()) {
-        return 0;
+        auto chain = curSliceIndexContext == nullptr ? nullptr : curSliceIndexContext->GetLogicalSliceChain();
+        return chain != nullptr && !chain->IsNone() ? 0 : -1;
     }
 
     SliceRef slice = std::make_shared<Slice>();
@@ -117,7 +113,7 @@ int32_t SliceTable::AddSlice(const SliceIndexContextRef &curSliceIndexContext,
     auto dataSliceImpl = std::make_shared<DataSlice>();
     dataSliceImpl->Init(slice);
     //  将DataSlice转换为SliceAddress并加入对应的chain中
-    SliceAddressRef sliceAddress = currentLogicalSliceChain->CreateSlice(dataSliceImpl, mAccessRecorder->AccessCount());
+    SliceAddressRef sliceAddress = AppendSliceToCurrentChain(curSliceIndexContext, dataSliceImpl);
     if (UNLIKELY(sliceAddress == nullptr)) {
         LOG_ERROR("Create slice address failed.");
         return -1;
@@ -149,12 +145,31 @@ BResult SliceTable::AddSlice(const SliceIndexContextRef &curSliceIndexContext, R
     DataSliceRef dataSlice = std::make_shared<DataSlice>();
     dataSlice->Init(slice);
     // 将DataSlice转换为SliceAddress并加入对应的chain中
-    auto currentLogicalSliceChain = curSliceIndexContext->GetLogicalSliceChain();
-    auto sliceAddress = currentLogicalSliceChain->CreateSlice(dataSlice, mAccessRecorder->AccessCount());
+    auto sliceAddress = AppendSliceToCurrentChain(curSliceIndexContext, dataSlice);
     RETURN_ERROR_AS_NULLPTR(sliceAddress);
     sliceAddress->AddRequestCount(GetSnapshotVersion() & 0xFFFFL);
     addSize = dataSlice->GetSize();
     return BSS_OK;
+}
+
+SliceAddressRef SliceTable::AppendSliceToCurrentChain(const SliceIndexContextRef &context,
+                                                      const DataSliceRef &dataSlice)
+{
+    if (UNLIKELY(context == nullptr || dataSlice == nullptr)) {
+        return nullptr;
+    }
+    uint32_t bucketIndex = context->GetSliceIndexSlot();
+    mSliceBucketIndex->LockRead(bucketIndex);
+    // The context may name a chain that compaction has already replaced.
+    auto chain = mSliceBucketIndex->GetLogicChainedSlice(bucketIndex);
+    SliceAddressRef result = nullptr;
+    if (LIKELY(chain != nullptr && !chain->IsNone())) {
+        result = chain->CreateSlice(dataSlice, mAccessRecorder->AccessCount());
+    } else {
+        LOG_ERROR("Add slice received an empty logical slice chain, bucketIndex:" << bucketIndex);
+    }
+    mSliceBucketIndex->Unlock(bucketIndex);
+    return result;
 }
 
 BResult SliceTable::WriteValueToBlobStore(FreshValueNodePtr &curVal, uint32_t keyHash, uint16_t stateId,

@@ -126,3 +126,19 @@ JNIEXPORT void JNICALL Java_com_huawei_ock_bss_table_KVTableImpl_remove(JNIEnv *
     BinaryData priKey(reinterpret_cast<uint8_t *>(jKey), static_cast<uint32_t>(jKeyLen));
     kVTable->Remove(keyHashCode, priKey);
 }
+
+JNIEXPORT jint JNICALL Java_com_huawei_ock_bss_table_KVTableImpl_restorePut(JNIEnv *, jclass, jlong jTableHandle,
+                                                                            jint jKeyHash, jlong jKey, jint jKeyLen,
+                                                                            jlong jVal, jint jValLen)
+{
+    if (UNLIKELY(jKey == 0 || jVal == 0 || jKeyHash < 0 || jKeyLen < 0 || jValLen < 0)) {
+        return BSS_INVALID_PARAM;
+    }
+    auto *table = reinterpret_cast<KVTable *>(jTableHandle);
+    if (UNLIKELY(table == nullptr)) {
+        return BSS_INVALID_PARAM;
+    }
+    BinaryData key(reinterpret_cast<uint8_t *>(jKey), static_cast<uint32_t>(jKeyLen));
+    BinaryData value(reinterpret_cast<uint8_t *>(jVal), static_cast<uint32_t>(jValLen));
+    return table->Put(static_cast<uint32_t>(jKeyHash), key, value);
+}

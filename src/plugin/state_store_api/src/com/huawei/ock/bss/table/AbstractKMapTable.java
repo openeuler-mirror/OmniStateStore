@@ -21,7 +21,9 @@ import com.huawei.ock.bss.common.memory.DirectDataInputDeserializer;
 import com.huawei.ock.bss.common.memory.DirectDataOutputSerializer;
 import com.huawei.ock.bss.common.serialize.KVSerializerUtil;
 import com.huawei.ock.bss.common.serialize.SubTableSerializer;
+import com.huawei.ock.bss.common.serialize.ThreadLocalOutputViewPool;
 import com.huawei.ock.bss.table.api.KMapTable;
+import com.huawei.ock.bss.table.api.SerializedMapRestoreTable;
 import com.huawei.ock.bss.table.api.Table;
 import com.huawei.ock.bss.table.description.KMapTableDescription;
 import com.huawei.ock.bss.table.iterator.SubTableEntryIterator;
@@ -52,7 +54,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * @since BeiMing 25.0.T1
  */
 public abstract class AbstractKMapTable<K, UK, UV, M extends Map<UK, UV>> extends AbstractTable<K, M>
-    implements KMapTable<K, UK, UV, M> {
+    implements KMapTable<K, UK, UV, M>, SerializedMapRestoreTable<K, UK> {
     private static final Logger LOG = LoggerFactory.getLogger(AbstractKMapTable.class);
 
     /**
@@ -213,6 +215,28 @@ public abstract class AbstractKMapTable<K, UK, UV, M extends Map<UK, UV>> extend
             throw new BSSRuntimeException("Fail to add key " + key + " map key " + userKey + " with list.",
                 ioException);
         }
+    }
+
+    @Override
+    public void restoreSerialized(byte[] serializedKey, int mixedKeyHash, int bloomKeyHash,
+        byte[] serializedUserKey, int userKeyHash, byte[] serializedValue) {
+        Preconditions.checkNotNull(serializedKey);
+        Preconditions.checkNotNull(serializedUserKey);
+        Preconditions.checkNotNull(serializedValue);
+        checkNativeHandleValid();
+        DirectDataOutputSerializer firstKey = ThreadLocalOutputViewPool.current(true).getOutputView();
+        DirectDataOutputSerializer secondKey = ThreadLocalOutputViewPool.current(false).getOutputView();
+        DirectDataOutputSerializer value = ThreadLocalOutputViewPool.current(false).getOutputView();
+        firstKey.write(serializedKey);
+        secondKey.write(serializedUserKey);
+        value.write(serializedValue);
+        int result = restoreAdd(nativeHandle, mixedKeyHash, firstKey.data(), firstKey.length(), secondKey.data(),
+            secondKey.length(), value.data(), value.length());
+        if (result != 0) {
+            throw new BSSRuntimeException("Serialized map restore failed with native result " + result + ".");
+        }
+        addKeyHash(bloomKeyHash);
+        addKeyHash(bloomKeyHash, userKeyHash);
     }
 
     /**
@@ -544,6 +568,9 @@ public abstract class AbstractKMapTable<K, UK, UV, M extends Map<UK, UV>> extend
      * @param userVSize    userVSize
      */
     public static native void add(long nativeHandle, int keyHashCode, long kBytes, int kSize, long userKBytes,
+        int userKSize, long userVBytes, int userVSize);
+
+    private static native int restoreAdd(long nativeHandle, int keyHashCode, long kBytes, int kSize, long userKBytes,
         int userKSize, long userVBytes, int userVSize);
 
     /**

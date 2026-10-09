@@ -135,8 +135,9 @@ public:
      * Get active segment.
      * @return active segment.
      */
-    const BoostSegmentRef &GetActiveSegment()
+    BoostSegmentRef GetActiveSegment()
     {
+        ReadLocker<ReadWriteLock> lock(&mRwLockActive);
         return mActive;
     }
 
@@ -238,7 +239,8 @@ public:
         mBoostNativeMetric->SetFreshFlushingRecordCount([this]() -> uint64_t {
             ReadLocker<ReadWriteLock> lock(&mRwLock);
             uint64_t records = 0;
-            for (auto it = mSnapshotQueue.rbegin(); it != mSnapshotQueue.rend(); it++) {
+            auto snapshots = mSnapshotQueue.GetDeque();
+            for (auto it = snapshots.rbegin(); it != snapshots.rend(); it++) {
                 records += (*it)->Size();
             }
             return records;
@@ -336,6 +338,7 @@ public:
      */
     inline void SetActiveEmpty()
     {
+        WriteLocker<ReadWriteLock> lock(&mRwLockActive);
         mActive = nullptr;
     }
 
@@ -378,9 +381,10 @@ private:
 
     inline void AddFlushingSegment()
     {
-        IncrementFreshWastedSize(mActive);
+        auto active = GetActiveSegment();
+        IncrementFreshWastedSize(active);
         DecrementFreshKeyValueSize();
-        mSnapshotQueue.PushBack(mActive);
+        mSnapshotQueue.PushBack(active);
     }
 
     inline bool PollFlushingSegment(std::shared_ptr<BoostSegment> &item)
