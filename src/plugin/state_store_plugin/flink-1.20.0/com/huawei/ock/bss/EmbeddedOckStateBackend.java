@@ -463,27 +463,37 @@ public class EmbeddedOckStateBackend extends AbstractManagedMemoryStateBackend i
 
         // TaskSlot与MemoryManager一一对应，使用MemoryManager实例作为当前Slot的标识，然后通过MemoryManager获取当前Slot可用内存
         int slotFlag = env.getMemoryManager().hashCode();
-        long slotMemoryLimit = getTaskSlotMemoryLimit(env.getMemoryManager(), managedMemoryFraction);
-
         // 启动heap内存监控线程
         double borrowHeapRatio = 0.7;
         HeapMonitor.INSTANCE.start(borrowHeapRatio);
 
         BoostNativeMetricOptions options = BoostNativeMetricOptions.fromConfig(this.config);
-
-        return new OckDBKeyedStateBackendBuilder<>(numberOfKeyGroups,
-            keyGroupRange, userCodeClassLoader, instanceBasePath, localRecoveryConfig, kvStateRegistry, identifier,
-            executionConfig, keySerializer, ttlTimeProvider, latencyTrackingStateConfig, cancelStreamRegistry,
-            keyGroupCompressionDecorator, stateHandles, checkedpriorityQueueStateType.asyncSnapshot,
-            ResourceContainer.INSTANCE, checkedpriorityQueueStateType, this.config)
-            .setEnableIncrementalCheckpointing(isIncrementalCheckpointsEnabled())
-            .setNumberOfTransferringThreads(getNumberOfTransferThreads())
-            .setTaskSlotFlag(slotFlag)
-            .setTaskSlotMemoryLimit(slotMemoryLimit)
-            .setSlotManagedMemoryFraction(managedMemoryFraction)
-            .setJobID(jobId.toString())
-            .setNativeMetricOptions(options)
-            .build();
+        OpaqueMemoryResource<SizeAllocator> managedMemoryResource =
+            getTaskSlotMemoryResource(env.getMemoryManager(), managedMemoryFraction);
+        try {
+            OckDBKeyedStateBackend<K> backend = new OckDBKeyedStateBackendBuilder<>(numberOfKeyGroups,
+                keyGroupRange, userCodeClassLoader, instanceBasePath, localRecoveryConfig, kvStateRegistry, identifier,
+                executionConfig, keySerializer, ttlTimeProvider, latencyTrackingStateConfig, cancelStreamRegistry,
+                keyGroupCompressionDecorator, stateHandles, checkedpriorityQueueStateType.asyncSnapshot,
+                ResourceContainer.INSTANCE, checkedpriorityQueueStateType, this.config)
+                .setEnableIncrementalCheckpointing(isIncrementalCheckpointsEnabled())
+                .setNumberOfTransferringThreads(getNumberOfTransferThreads())
+                .setTaskSlotFlag(slotFlag)
+                .setTaskSlotMemoryLimit(managedMemoryResource.getResourceHandle().getMemorySize())
+                .setSlotManagedMemoryFraction(managedMemoryFraction)
+                .setJobID(jobId.toString())
+                .setNativeMetricOptions(options)
+                .setManagedMemoryResource(managedMemoryResource)
+                .build();
+            return backend;
+        } catch (IOException | RuntimeException | Error failure) {
+            try {
+                managedMemoryResource.close();
+            } catch (Exception closeFailure) {
+                failure.addSuppressed(closeFailure);
+            }
+            throw failure;
+        }
     }
 
     /**
@@ -491,23 +501,22 @@ public class EmbeddedOckStateBackend extends AbstractManagedMemoryStateBackend i
      *
      * @param memoryManager memoryManager
      * @param fraction      fraction
-     * @return long
+     * @return managed memory resource lease
      */
-    private long getTaskSlotMemoryLimit(MemoryManager memoryManager, double fraction)
+    private OpaqueMemoryResource<SizeAllocator> getTaskSlotMemoryResource(MemoryManager memoryManager, double fraction)
         throws IOException {
         LongFunctionWithException<SizeAllocator, Exception> allocatorFunc = size -> new SizeAllocator(
             MANAGED_MEMORY_RESOURCE_ID, size);
-        long memoryLimit;
         try {
             OpaqueMemoryResource<SizeAllocator> memoryResource = memoryManager.getSharedMemoryResourceForManagedMemory(
                 MANAGED_MEMORY_RESOURCE_ID, allocatorFunc, fraction);
-            memoryLimit = memoryResource.getResourceHandle().getMemorySize();
+            long memoryLimit = memoryResource.getResourceHandle().getMemorySize();
             LOG.info("Get slot:{} managed memory by fraction:{}, result size:{}", memoryManager.hashCode(),
                 fraction, memoryLimit);
+            return memoryResource;
         } catch (Exception e) {
             throw new IOException("Failed to get managed memory size.", e);
         }
-        return memoryLimit;
     }
 
     /**

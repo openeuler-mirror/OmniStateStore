@@ -26,6 +26,7 @@ using KeyVectorValueMap = std::unordered_map<SliceKey, std::vector<Value>, Slice
 class TestLsmStore : public ::testing::Test {
 public:
     GeneratorRef mGenerator;
+    StateFilterManagerRef mTestStateFilterManager;
     void SetUp() override
     {
         mGenerator = MakeRef<Generator>(44);
@@ -100,6 +101,7 @@ public:
         auto stateFilterManager =
             std::make_shared<StateFilterManager>(std::make_shared<StateIdProvider>(0, NO_65535, mMemManager), config, 0,
                                                  NO_65535, codec);
+        mTestStateFilterManager = stateFilterManager;
         mLsmStore = std::make_shared<LsmStore>(fileStoreId, config, tableFactory, fileCache, stateFilterManager,
                                                mMemManager);
         mLsmStore->Initialize();

@@ -100,10 +100,20 @@ public:
             compactionCount += dataSlice->GetCompactionCount();
         }
 
+        const auto listFilters = stateFilterManager->SnapshotListCompactionFilters();
         finalResult.clear();
         finalResult.reserve(newMap.size());
         for (const auto &entry : newMap) {
             Value value = entry.second;
+            if (!listFilters.empty() && StateId::IsList(entry.first.StateId())) {
+                auto filter = listFilters.find(entry.first.StateId());
+                if (filter != listFilters.end()) {
+                    auto allocator = [memManager](uint32_t size) -> BufferRef {
+                        return CreateBuffer(memManager, size);
+                    };
+                    RETURN_NOT_OK(filter->second(value, allocator));
+                }
+            }
             if (!reserveDeleteMarker && (value.ValueType() == ValueType::DELETE ||
                                          stateFilterManager->StateFilter(entry.first.StateId(), value.SeqId()))) {
                 continue;

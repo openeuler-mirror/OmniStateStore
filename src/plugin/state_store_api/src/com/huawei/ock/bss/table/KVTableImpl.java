@@ -92,6 +92,28 @@ public class KVTableImpl<K, V> extends AbstractTable<K, V> implements Serialized
         }
     }
 
+    /** Restores one complete canonical savepoint entry with its original TTL timestamp. */
+    public void restore(K key, V value, long timestamp) {
+        Preconditions.checkNotNull(key, "input key should not be null.");
+        Preconditions.checkNotNull(value, "input value should not be null.");
+        checkNativeHandleValid();
+
+        try {
+            DirectDataOutputSerializer keyBytes = KVSerializerUtil.serKey(key, keySerializer);
+            DirectDataOutputSerializer valueBytes = KVSerializerUtil.serValue(value, valueSerializer);
+            int result = restorePut(nativeHandle, getKeyHashCode(key), keyBytes.data(), keyBytes.length(),
+                0L, 0, false, valueBytes.data(), valueBytes.length(), timestamp);
+            if (result != 0) {
+                throw new BSSRuntimeException("Savepoint restore write failed: " + result);
+            }
+            addKeyHash(key.hashCode());
+            checkPutConsistency(key, value, keyBytes, valueBytes);
+        } catch (IOException ioException) {
+            LOG.error("Fail to put <{}, {}>.", key, value, ioException);
+            throw new BSSRuntimeException("Fail to put " + key + ", " + value, ioException);
+        }
+    }
+
     @Override
     public void restoreSerialized(byte[] serializedKey, int mixedKeyHash, int bloomKeyHash, byte[] serializedValue) {
         Preconditions.checkNotNull(serializedKey);

@@ -106,6 +106,18 @@ public:
         mSeqId.store(seqId);
     }
 
+    // Savepoint entries arrive in key order, not timestamp order. Preserve their
+    // timestamps independently, but keep subsequent writes newer than all entries.
+    inline void AdvanceTo(uint64_t seqId)
+    {
+        for (uint64_t current = mSeqId.load(std::memory_order_relaxed); current < seqId;
+             current = mSeqId.load(std::memory_order_relaxed)) {
+            if (mSeqId.compare_exchange_weak(current, seqId)) {
+                break;
+            }
+        }
+    }
+
 private:
     std::atomic<uint64_t> mSeqId{ 0 };
 };

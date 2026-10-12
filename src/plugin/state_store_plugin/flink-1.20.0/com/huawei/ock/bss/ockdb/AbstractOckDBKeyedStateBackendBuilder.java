@@ -17,6 +17,7 @@ import com.huawei.ock.bss.OckDBOptions;
 import com.huawei.ock.bss.common.BoostStateDB;
 import com.huawei.ock.bss.common.conf.BoostConfig;
 import com.huawei.ock.bss.common.exception.BSSRuntimeException;
+import com.huawei.ock.bss.common.memory.SizeAllocator;
 import com.huawei.ock.bss.metric.BoostNativeMetricOptions;
 import com.huawei.ock.bss.metric.BoostSnapshotMetric;
 import com.huawei.ock.bss.queue.DeepCopyHeapPriorityQueueSetFactory;
@@ -40,6 +41,7 @@ import org.apache.flink.configuration.IllegalConfigurationException;
 import org.apache.flink.configuration.TaskManagerOptions;
 import org.apache.flink.core.fs.CloseableRegistry;
 import org.apache.flink.metrics.MetricGroup;
+import org.apache.flink.runtime.memory.OpaqueMemoryResource;
 import org.apache.flink.runtime.query.TaskKvStateRegistry;
 import org.apache.flink.runtime.state.AbstractKeyedStateBackendBuilder;
 import org.apache.flink.runtime.state.BackendBuildingException;
@@ -59,7 +61,6 @@ import org.apache.flink.runtime.state.InternalKeyContextImpl;
 import org.apache.flink.runtime.state.metrics.LatencyTrackingStateConfig;
 import org.apache.flink.runtime.state.ttl.TtlTimeProvider;
 import org.apache.flink.util.FileUtils;
-import org.apache.flink.util.IOUtils;
 import org.apache.flink.util.UserCodeClassLoader;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -133,6 +134,9 @@ public abstract class AbstractOckDBKeyedStateBackendBuilder<K> extends AbstractK
     protected boolean enableIncrementalCheckpointing;
 
     protected String jobID;
+
+    @Nullable
+    protected OpaqueMemoryResource<SizeAllocator> managedMemoryResource;
 
     /**
      * BSS native metric options
@@ -323,6 +327,12 @@ public abstract class AbstractOckDBKeyedStateBackendBuilder<K> extends AbstractK
         return this;
     }
 
+    public AbstractOckDBKeyedStateBackendBuilder<K> setManagedMemoryResource(
+        OpaqueMemoryResource<SizeAllocator> managedMemoryResource) {
+        this.managedMemoryResource = managedMemoryResource;
+        return this;
+    }
+
     private String getExecutionID() {
         String[] splitPath = getPathString(this.instanceBasePath).split("_uuid_", 2);
         if (splitPath.length != 2) {
@@ -422,19 +432,39 @@ public abstract class AbstractOckDBKeyedStateBackendBuilder<K> extends AbstractK
         Map<String, RegisteredStateMetaInfoBase> registeredKvStateMetaInfos,
         CloseableRegistry cancelStreamRegistryForBackend, BoostSnapshotStrategyBase<K> checkpointSnapshotStrategy,
         Throwable e) throws BackendBuildingException {
-        IOUtils.closeQuietly(cancelStreamRegistryForBackend);
-        IOUtils.closeQuietly(db);
-        IOUtils.closeQuietly(resourceContainer);
+        closeAndSuppress(checkpointSnapshotStrategy, e);
+        closeAndSuppress(cancelStreamRegistryForBackend, e);
+        closeAndSuppress(db, e);
+        closeAndSuppress(resourceContainer, e);
         registeredKvStateMetaInfos.clear();
-        IOUtils.closeQuietly(checkpointSnapshotStrategy);
         try {
             FileUtils.deleteDirectory(instanceBasePath);
-        } catch (IOException ex) {
+        } catch (Throwable ex) {
             logger.warn("Failed to delete base path for BoostStateDB: " + instanceBasePath.getName(), ex);
+            e.addSuppressed(ex);
         }
+        closeAndSuppress(this.managedMemoryResource, e);
+        this.managedMemoryResource = null;
         String message = "Failed to create Boost keyed state-backend.";
         logger.error(message, e);
+        if (e instanceof RuntimeException) {
+            throw (RuntimeException) e;
+        }
+        if (e instanceof Error) {
+            throw (Error) e;
+        }
         throw new BackendBuildingException(message, e);
+    }
+
+    private void closeAndSuppress(AutoCloseable closeable, Throwable failure) {
+        if (closeable == null) {
+            return;
+        }
+        try {
+            closeable.close();
+        } catch (Throwable closeFailure) {
+            failure.addSuppressed(closeFailure);
+        }
     }
 
     /**

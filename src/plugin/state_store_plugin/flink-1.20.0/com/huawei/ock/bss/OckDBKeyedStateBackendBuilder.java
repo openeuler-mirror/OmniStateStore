@@ -91,16 +91,8 @@ public class OckDBKeyedStateBackendBuilder<K> extends AbstractOckDBKeyedStateBac
      */
     @Override
     public OckDBKeyedStateBackend<K> build() throws BackendBuildingException {
-        initInstanceBasePath();
-
-        BoostConfig dbOptions = createBoostConfig();
-        createBackupPathForLocalRecovery(dbOptions);
-        BoostStateDB db = new BoostStateDB(dbOptions);
-        if (this.boostNativeMetricOptions.isStatisticsEnabled()) {
-            db.createBoostNativeMetric(this.boostNativeMetricOptions, this.metricGroup);
-        }
+        BoostStateDB db = null;
         Map<String, RegisteredStateMetaInfoBase> registeredKvStateMetaInfos = new HashMap<>();
-        PriorityQueueSetFactory priorityQueueSetFactory = initPriorityQueueFactory(db, registeredKvStateMetaInfos);
         Map<String, Table> tables = new HashMap<>();
         Map<String, KeyedStateDescriptor> keyedStateDescriptorMap = new HashMap<>();
         Map<String, NSKeyedStateDescriptor> nsKeyedStateDescriptorMap = new HashMap<>();
@@ -111,11 +103,20 @@ public class OckDBKeyedStateBackendBuilder<K> extends AbstractOckDBKeyedStateBac
         CloseableRegistry cancelStreamRegistryForBackend = new CloseableRegistry();
         BoostSnapshotStrategyBase<K> snapshotStrategy = null;
         HeapPriorityQueuesManager heapPriorityQueuesManager = null;
+        ResourceGuard resourceGuard = new ResourceGuard();
 
         try {
+            initInstanceBasePath();
+            BoostConfig dbOptions = createBoostConfig();
+            createBackupPathForLocalRecovery(dbOptions);
+            db = new BoostStateDB(dbOptions);
+            if (this.boostNativeMetricOptions.isStatisticsEnabled()) {
+                db.createBoostNativeMetric(this.boostNativeMetricOptions, this.metricGroup);
+            }
+            PriorityQueueSetFactory priorityQueueSetFactory = initPriorityQueueFactory(db,
+                registeredKvStateMetaInfos);
             int keyGroupPrefixBytes = CompositeKeySerializationUtils.computeRequiredBytesInKeyGroupPrefix(
                 numberOfKeyGroups);
-            ResourceGuard resourceGuard = new ResourceGuard();
             UUID backendUID = UUID.randomUUID();
             SortedMap<Long, Collection<HandleAndLocalPath>> materializedSstFiles = new TreeMap<>();
             long lastCompletedCheckpointId = -1L;
@@ -137,17 +138,30 @@ public class OckDBKeyedStateBackendBuilder<K> extends AbstractOckDBKeyedStateBac
                 keyGroupPrefixBytes, backendUID, registeredKvStateMetaInfos, lastCompletedCheckpointId,
                 materializedSstFiles, keyedStateDescriptorMap, nsKeyedStateDescriptorMap, heapPriorityQueuesManager,
                 priorityQueueIsAsyncSnapshot);
+
+            logger.info("Finished building Boost keyed state-backend at {}.", instanceBasePath.getName());
+            OckDBKeyedStateBackend<K> backend = new OckDBKeyedStateBackend<>(db, tables, this.instanceBasePath,
+                this.instanceOckDBPath,
+                keyedStateDescriptorMap, nsKeyedStateDescriptorMap, registeredKvStateMetaInfos, registeredPQStates,
+                this.priorityQueueIsAsyncSnapshot, this.keyGroupRange, this.userCodeClassLoader,
+                this.localRecoveryConfig, this.kvStateRegistry, this.fileCompatibleIdentifier, this.executionConfig,
+                this.config, this.metricGroup, this.keySerializerProvider.currentSchemaSerializer(),
+                this.ttlTimeProvider, this.latencyTrackingStateConfig, cancelStreamRegistryForBackend,
+                this.keyGroupCompressionDecorator, this.keyContext, priorityQueueSetFactory, this.resourceContainer,
+                heapPriorityQueuesManager, snapshotStrategy);
+            backend.setManagedMemoryResource(this.managedMemoryResource);
+            backend.setSnapshotResourceGuard(resourceGuard);
+            this.managedMemoryResource = null;
+            return backend;
         } catch (Throwable e) {
+            try {
+                resourceGuard.close();
+            } catch (Throwable closeFailure) {
+                e.addSuppressed(closeFailure);
+            }
             releaseResource(db, registeredKvStateMetaInfos, cancelStreamRegistryForBackend, snapshotStrategy, e);
         }
-        logger.info("Finished building Boost keyed state-backend at {}.", instanceBasePath.getName());
-        return new OckDBKeyedStateBackend<>(db, tables, this.instanceBasePath, this.instanceOckDBPath,
-            keyedStateDescriptorMap, nsKeyedStateDescriptorMap, registeredKvStateMetaInfos, registeredPQStates,
-            this.priorityQueueIsAsyncSnapshot, this.keyGroupRange, this.userCodeClassLoader, this.localRecoveryConfig,
-            this.kvStateRegistry, this.fileCompatibleIdentifier, this.executionConfig, this.config, this.metricGroup,
-            this.keySerializerProvider.currentSchemaSerializer(), this.ttlTimeProvider, this.latencyTrackingStateConfig,
-            cancelStreamRegistryForBackend, this.keyGroupCompressionDecorator, this.keyContext, priorityQueueSetFactory,
-            this.resourceContainer, heapPriorityQueuesManager, snapshotStrategy);
+        throw new BackendBuildingException("Failed to create Boost keyed state-backend.");
     }
 
     private BoostSnapshotStrategyBase<K> initSavepointAndCheckpointStrategies(

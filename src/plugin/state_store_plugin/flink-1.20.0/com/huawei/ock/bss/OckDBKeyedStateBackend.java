@@ -14,6 +14,7 @@ package com.huawei.ock.bss;
 import com.huawei.ock.bss.common.BoostStateDB;
 import com.huawei.ock.bss.common.conf.TableConfig;
 import com.huawei.ock.bss.common.exception.BSSRuntimeException;
+import com.huawei.ock.bss.common.memory.SizeAllocator;
 import com.huawei.ock.bss.resource.ResourceContainer;
 import com.huawei.ock.bss.snapshot.BoostSnapshotStrategyBase;
 import com.huawei.ock.bss.snapshot.FullBoostSnapshotResources;
@@ -76,6 +77,7 @@ import org.apache.flink.core.fs.CloseableRegistry;
 import org.apache.flink.metrics.MetricGroup;
 import org.apache.flink.runtime.checkpoint.CheckpointOptions;
 import org.apache.flink.runtime.checkpoint.SnapshotType;
+import org.apache.flink.runtime.memory.OpaqueMemoryResource;
 import org.apache.flink.runtime.query.TaskKvStateRegistry;
 import org.apache.flink.runtime.state.AbstractKeyedStateBackend;
 import org.apache.flink.runtime.state.CheckpointStreamFactory;
@@ -104,7 +106,6 @@ import org.apache.flink.runtime.state.metrics.LatencyTrackingStateConfig;
 import org.apache.flink.runtime.state.ttl.TtlTimeProvider;
 import org.apache.flink.util.FileUtils;
 import org.apache.flink.util.FlinkRuntimeException;
-import org.apache.flink.util.IOUtils;
 import org.apache.flink.util.Preconditions;
 import org.apache.flink.util.ResourceGuard;
 import org.apache.flink.util.StateMigrationException;
@@ -169,7 +170,7 @@ public class OckDBKeyedStateBackend<K> extends AbstractKeyedStateBackend<K> {
 
     private final LocalRecoveryConfig localRecoveryConfig;
 
-    private final ResourceGuard resourceGuard;
+    private ResourceGuard resourceGuard;
 
     private final ResourceContainer resourceContainer;
 
@@ -188,6 +189,9 @@ public class OckDBKeyedStateBackend<K> extends AbstractKeyedStateBackend<K> {
     private final Map<String, NSKeyedStateDescriptor> nsKeyedStateDescriptorMap;
 
     private final Map<String, RegisteredStateMetaInfoBase> registeredKvStateMetaInfos;
+
+    @Nullable
+    private OpaqueMemoryResource<SizeAllocator> managedMemoryResource;
 
     public OckDBKeyedStateBackend(BoostStateDB db, Map<String, Table> tables, File instanceBasePath,
         File instanceOckDBPath, Map<String, KeyedStateDescriptor> keyedStateDescriptorMap,
@@ -220,6 +224,14 @@ public class OckDBKeyedStateBackend<K> extends AbstractKeyedStateBackend<K> {
         this.resourceGuard = new ResourceGuard();
         this.checkpointSnapshotStrategy = checkpointSnapshotStrategy;
         this.configuration = config;
+    }
+
+    void setManagedMemoryResource(OpaqueMemoryResource<SizeAllocator> managedMemoryResource) {
+        this.managedMemoryResource = managedMemoryResource;
+    }
+
+    void setSnapshotResourceGuard(ResourceGuard resourceGuard) {
+        this.resourceGuard = resourceGuard;
     }
 
     /**
@@ -339,30 +351,81 @@ public class OckDBKeyedStateBackend<K> extends AbstractKeyedStateBackend<K> {
     }
 
     @Override
-    public void dispose() {
-        File snapshotBackupPath = new File(this.db.getConfig().getSnapshotBackupDir());
+    public synchronized void dispose() {
         if (this.disposed) {
             return;
         }
-        this.resourceGuard.close();
+        this.disposed = true;
+        Throwable failure = null;
+        File snapshotBackupPath = null;
+        try {
+            if (this.db != null && this.db.getConfig().getSnapshotBackupDir() != null) {
+                snapshotBackupPath = new File(this.db.getConfig().getSnapshotBackupDir());
+            }
+        } catch (Throwable e) {
+            failure = appendFailure(failure, e);
+        }
         try {
             super.dispose();
+        } catch (Throwable e) {
+            failure = appendFailure(failure, e);
+        }
+        try {
+            this.resourceGuard.close();
+        } catch (Throwable e) {
+            failure = appendFailure(failure, e);
+        }
+        try {
+            if (this.checkpointSnapshotStrategy != null) {
+                this.checkpointSnapshotStrategy.close();
+            }
+        } catch (Throwable e) {
+            failure = appendFailure(failure, e);
+        }
+        try {
             if (this.db != null) {
                 this.db.close();
-                this.db = null;
             }
-        } catch (Exception e) {
-            LOG.warn("Failed to close BoostStateDB", e);
-            throw new BSSRuntimeException("Failed to close BoostStateDB.", e);
+        } catch (Throwable e) {
+            failure = appendFailure(failure, e);
         } finally {
-            IOUtils.closeQuietly(this.resourceContainer);
+            this.db = null;
+        }
+        try {
+            this.resourceContainer.close();
+        } catch (Throwable e) {
+            failure = appendFailure(failure, e);
+        }
+        try {
             this.tables.clear();
+            cleanInstanceBasePath();
+            if (localRecoveryConfig.isLocalRecoveryEnabled() && snapshotBackupPath != null) {
+                cleanSnapshotBackupPath(snapshotBackupPath);
+            }
+        } catch (Throwable e) {
+            failure = appendFailure(failure, e);
         }
-        cleanInstanceBasePath();
-        if (localRecoveryConfig.isLocalRecoveryEnabled()) {
-            cleanSnapshotBackupPath(snapshotBackupPath);
+        OpaqueMemoryResource<SizeAllocator> memoryResource = this.managedMemoryResource;
+        this.managedMemoryResource = null;
+        if (memoryResource != null) {
+            try {
+                memoryResource.close();
+            } catch (Throwable e) {
+                failure = appendFailure(failure, e);
+            }
         }
-        this.disposed = true;
+        if (failure != null) {
+            LOG.warn("Failed to dispose BoostStateDB backend completely.", failure);
+            throw new BSSRuntimeException("Failed to dispose BoostStateDB backend completely.", failure);
+        }
+    }
+
+    private static Throwable appendFailure(Throwable previous, Throwable next) {
+        if (previous == null) {
+            return next;
+        }
+        previous.addSuppressed(next);
+        return previous;
     }
 
     private void cleanInstanceBasePath() {
@@ -456,6 +519,8 @@ public class OckDBKeyedStateBackend<K> extends AbstractKeyedStateBackend<K> {
             stateDescriptor.getName());
         TableConfig tableConfig = (new TableConfig.Builder()).setTableTtl(
                 stateTtlConfig.isEnabled() ? stateTtlConfig.getTtl().toMilliseconds() : -1L)
+            .setTtlTimeProvider(ttlTimeProvider)
+            .setListTtlCompactionEnabled(stateTtlConfig.getCleanupStrategies().inRocksdbCompactFilter())
             .setIsEnableKVSeparate(false)
             .build();
         table.updateTableConfig(tableConfig);

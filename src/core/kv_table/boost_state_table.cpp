@@ -45,6 +45,7 @@ BResult AbstractTable::Init(const FreshTableRef &freshTable, const SliceTableMan
                             const StateIdProviderRef &stateIdProvider, TableDescriptionRef &description,
                             SeqGeneratorRef seqGenerator, int64_t tableTtl, StateFilterManagerRef &stateFilterManager)
 {
+    mCompactionFilterManager = stateFilterManager;
     mFreshTable = freshTable;
     mDescription = description;
     mStateIdProvider = stateIdProvider;
@@ -71,6 +72,12 @@ uint16_t AbstractTable::GetStateId(uint32_t &keyHashCode)
     // 先计算stateId，再修改hash，避免修改hash影响计算stateId
     mKeyGroupUtil->SetKeyGroup(keyHashCode, keyGroupIndex);
     return mStateIdHelper->GetStateId(keyGroupIndex);
+}
+
+void AbstractTable::RegisterListCompactionFilter(ListTtlCompactionFilter filter)
+{
+    mCompactionFilterManager->RegisterListCompactionFilter(mStateIdProvider->GetStateId(mDescription),
+                                                           std::move(filter));
 }
 
 SequenceIdFilterRef &AbstractTable::UpdateTtl(int64_t tableTtl)
@@ -108,6 +115,34 @@ BResult KVTable::Put(uint32_t keyHashCode, const BinaryData &priKey, const Binar
     putVal.Init(ValueType::PUT, value.Length(), value.Data(), mSeqGenerator->Next());
     BResult result = mFreshTable->Put(queryKey, putVal);
     return result;
+}
+
+BResult AbstractTable::RestorePut(uint32_t keyHashCode, const BinaryData &priKey, const BinaryData &secKey,
+                                  bool hasSecondKey, const BinaryData &value, int64_t timestamp)
+{
+    if (timestamp < 0 || static_cast<uint64_t>(timestamp) >= MAX_TIMESTAMP) {
+        return BSS_INVALID_PARAM;
+    }
+    // Sequence comparisons are per logical key. A canonical savepoint contains
+    // one complete value per key, so different keys may share this sequence ID.
+    // Do not use NextSeqID: it would renew older entries or overflow the counter
+    // when more than 65536 distinct keys share the same TTL timestamp.
+    uint64_t seqId = SeqIDUtils::GenerateSeqID(static_cast<uint64_t>(timestamp), 1);
+    mSeqGenerator->AdvanceTo(seqId);
+    uint16_t stateId = GetStateId(keyHashCode);
+    Value restoredValue;
+    restoredValue.Init(ValueType::PUT, value.Length(), value.Data(), seqId);
+    if (hasSecondKey) {
+        QueryKey queryKey(stateId, keyHashCode, priKey, secKey);
+        KeyValue keyValue;
+        keyValue.key = queryKey;
+        keyValue.value = restoredValue;
+        auto ret = mFreshTable->Add(keyValue);
+        PeakFilterAdd(priKey, secKey);
+        return ret;
+    }
+    QueryKey queryKey(stateId, keyHashCode, priKey);
+    return mFreshTable->Put(queryKey, restoredValue);
 }
 
 BResult KVTable::Get(uint32_t hashCode, const BinaryData &key, BinaryData &value)

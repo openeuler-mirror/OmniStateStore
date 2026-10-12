@@ -18,6 +18,7 @@
 #include "include/bss_types.h"
 #include "include/config.h"
 #include "lsm_store/version/version_meta_serializer.h"
+#include "slice_table/compaction/slice_compaction_utils.h"
 
 using namespace ock::bss;
 
@@ -832,4 +833,91 @@ bool TestFile::KeyMatch(std::vector<uint8_t> array, uint32_t hash)
         hash += delta;
     }
     return true;
+}
+
+// TTL list compaction must rewrite registered values, including files eligible for reuse.
+TEST_F(TestFile, test_list_ttl_compaction_rewrites_after_merge_without_changing_sequence)
+{
+    ConfigRef config = std::make_shared<Config>(NO_0, NO_15, NO_16);
+    config->SetLsmStoreCompactionSwitch(0);
+    config->SetFileStoreL0NumTrigger(NO_2);
+    config->SetZeroCopySwitch(true);
+    config->SetTtlFilterSwitch(true);
+    config->SetTotalDBSize(IO_SIZE_2G);
+    InitEnv(config);
+    uint16_t stateId = StateId::Of(NO_1, StateType::LIST);
+    SliceKey key = mGenerator->GenerateSglKey(NO_10, stateId);
+    Value oldValue = mGenerator->GenerateValue(IO_SIZE_4M + NO_1, mSeqGenerator->Next());
+    Value latestValue = mGenerator->GenerateValue(IO_SIZE_4M + NO_1, mSeqGenerator->Next());
+    std::atomic<uint32_t> calls{ 0 };
+    mTestStateFilterManager->RegisterListCompactionFilter(
+        stateId, [&calls](Value &value, const Value::BufferAllocator &) -> BResult {
+            ++calls;
+            value.Init(value.ValueType(), NO_16, value.ValueData(), value.SeqId(), value.Buffer());
+            return BSS_OK;
+        });
+    std::vector<std::pair<SliceKey, Value>> oldEntries{ { key, oldValue } };
+    std::vector<std::pair<SliceKey, Value>> newEntries{ { key, latestValue } };
+    FlushLevel0Table(oldEntries);
+    FlushLevel0Table(newEntries);
+    EXPECT_EQ(calls.load(), 0U);  // No callback in flush or ordinary reads.
+    Value before;
+    ASSERT_TRUE(mLsmStore->Get(key, before));
+    EXPECT_EQ(before.ValueLen(), latestValue.ValueLen());
+    EXPECT_EQ(calls.load(), 0U);
+    config->SetLsmStoreCompactionSwitch(1);
+    mLsmStore->StartLsmCompaction();
+    sleep(1);
+    for (int attempt = 0; attempt < NO_30 && !mLsmStore->CheckCompactionCompleted(); ++attempt) {
+        sleep(1);
+    }
+    ASSERT_TRUE(mLsmStore->CheckCompactionCompleted());
+    ASSERT_GT(calls.load(), 0U);
+    Value actual;
+    ASSERT_TRUE(mLsmStore->Get(key, actual));
+    EXPECT_EQ(actual.ValueLen(), NO_16);
+    EXPECT_EQ(actual.SeqId(), latestValue.SeqId());
+    EXPECT_EQ(memcmp(actual.ValueData(), latestValue.ValueData(), NO_16), 0);
+}
+
+TEST_F(TestFile, test_list_ttl_slice_compaction_filters_after_append_merge)
+{
+    ConfigRef config = std::make_shared<Config>(NO_0, NO_15, NO_16);
+    config->SetTtlFilterSwitch(true);
+    InitEnv(config);
+    uint16_t stateId = StateId::Of(NO_1, StateType::LIST);
+    SliceKey key = mGenerator->GenerateSglKey(NO_10, stateId);
+    Value older = mGenerator->GenerateValue(NO_16, mSeqGenerator->Next());
+    Value newer = mGenerator->GenerateValue(NO_16, mSeqGenerator->Next());
+    newer.Init(APPEND, newer.ValueLen(), newer.ValueData(), newer.SeqId(), newer.Buffer());
+    std::vector<DataSliceRef> slices;
+    for (Value value : { newer, older }) {
+        auto slice = std::make_shared<Slice>();
+        std::vector<std::pair<SliceKey, Value>> entries{ { key, value } };
+        SliceCreateMeta meta = { 1 };
+        ASSERT_EQ(slice->Initialize(entries, meta, mMemManager), BSS_OK);
+        auto data = std::make_shared<DataSlice>();
+        data->Init(slice);
+        slices.push_back(data);
+    }
+    uint32_t calls = 0;
+    mTestStateFilterManager->RegisterListCompactionFilter(
+        stateId, [&calls](Value &value, const Value::BufferAllocator &) -> BResult {
+            ++calls;
+            EXPECT_EQ(value.ValueLen(), NO_32);
+            EXPECT_EQ(value.ValueType(), PUT);
+            value.Init(value.ValueType(), NO_16, value.ValueData() + NO_16, value.SeqId(), value.Buffer());
+            return BSS_OK;
+        });
+    uint32_t count = 0;
+    std::vector<std::pair<SliceKey, Value>> result;
+    ASSERT_EQ(SliceCompactionUtils::MergeDataSlicesForCompaction(
+                  result, count, slices, mMemManager, false, mTestStateFilterManager, [](SliceKey) { return false; },
+                  true),
+              BSS_OK);
+    ASSERT_EQ(calls, 1U);
+    ASSERT_EQ(result.size(), 1U);
+    EXPECT_EQ(result.front().second.SeqId(), newer.SeqId());
+    EXPECT_EQ(result.front().second.ValueLen(), NO_16);
+    EXPECT_EQ(memcmp(result.front().second.ValueData(), newer.ValueData(), NO_16), 0);
 }

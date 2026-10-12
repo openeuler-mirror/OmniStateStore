@@ -21,6 +21,7 @@
 #include <vector>
 
 #include "common/bss_log.h"
+#include "common/util/seq_generator.h"
 #include "gtest/gtest.h"
 #include "include/boost_state_db.h"
 #include "include/boost_state_table.h"
@@ -3077,6 +3078,106 @@ TEST_F(TestDB, test_cp_lsm_and_get_return_ok_with_blob)
     }
     DeleteCpFile();
 }
+
+TEST_F(TestDB, savepoint_ttl_out_of_order_and_counter_capacity)
+{
+    auto fresh = static_cast<BoostStateDBImpl *>(mDB)->GetFreshTable();
+    const uint64_t timestamp = TimeStampUtil::GetCurrentTime() - 60000;
+    uint8_t payload[] = { 42 };
+    BinaryData value(payload, sizeof(payload));
+    for (uint32_t i = 0; i < 70000; ++i) {
+        BinaryData key(reinterpret_cast<uint8_t *>(&i), sizeof(i));
+        uint32_t hash = HashForTest(key.Data(), key.Length());
+        uint64_t time = timestamp - (i >= 65537 ? (i % 3) * 1000 : 0);
+        ASSERT_EQ(kVTable->RestorePut(hash, key, BinaryData(), false, value, time), BSS_OK);
+        uint16_t stateId = kVTable->GetStateId(hash);
+        QueryKey query(stateId, hash, key);
+        Value restored;
+        ASSERT_TRUE(fresh->Get(query, restored));
+        ASSERT_EQ(SeqIDUtils::GetTimestamp(restored.SeqId()), time);
+    }
+    ASSERT_EQ(fresh->ForceFlushToSlice(), BSS_OK);
+    mDB->ForceTriggerEvict();
+    for (uint32_t i = 0; i < 70000; ++i) {
+        BinaryData key(reinterpret_cast<uint8_t *>(&i), sizeof(i));
+        BinaryData result;
+        ASSERT_EQ(kVTable->Get(HashForTest(key.Data(), key.Length()), key, result), BSS_OK);
+        ASSERT_EQ(result.Length(), 1);
+        ASSERT_EQ(result.Data()[0], 42);
+    }
+}
+
+TEST_F(TestDB, savepoint_ttl_future_timestamp_then_update_and_delete)
+{
+    uint8_t keyBytes[] = { 1, 2, 3 };
+    uint8_t payload[] = { 42 };
+    BinaryData key(keyBytes, sizeof(keyBytes));
+    BinaryData value(payload, sizeof(payload));
+    uint32_t hash = HashForTest(key.Data(), key.Length());
+    uint64_t future = TimeStampUtil::GetCurrentTime() + 60000;
+    ASSERT_EQ(kVTable->RestorePut(hash, key, BinaryData(), false, value, future), BSS_OK);
+    ForceEvictToLsm();
+    payload[0] = 43;
+    ASSERT_EQ(kVTable->Put(hash, key, value), BSS_OK);
+    auto fresh = static_cast<BoostStateDBImpl *>(mDB)->GetFreshTable();
+    uint32_t transformedHash = hash;
+    uint16_t stateId = kVTable->GetStateId(transformedHash);
+    QueryKey query(stateId, transformedHash, key);
+    Value updated;
+    ASSERT_TRUE(fresh->Get(query, updated));
+    ASSERT_GT(updated.SeqId(), SeqIDUtils::GenerateSeqID(future, 1));
+    ForceEvictToLsm();
+    BinaryData result;
+    ASSERT_EQ(kVTable->Get(hash, key, result), BSS_OK);
+    ASSERT_EQ(result.Data()[0], 43);
+    ASSERT_EQ(kVTable->Remove(hash, key), BSS_OK);
+    ForceEvictToLsm();
+    ASSERT_EQ(kVTable->Get(hash, key, result), BSS_NOT_EXISTS);
+    ASSERT_EQ(kVTable->RestorePut(hash, key, BinaryData(), false, value, -1), BSS_INVALID_PARAM);
+    ASSERT_EQ(kVTable->RestorePut(hash, key, BinaryData(), false, value, MAX_TIMESTAMP), BSS_INVALID_PARAM);
+}
+
+TEST_F(TestDB, savepoint_ttl_checkpoint_retains_old_timestamp)
+{
+    uint8_t keyBytes[] = { 13, 14, 15, 16 };
+    uint8_t payload[] = { 42 };
+    BinaryData key(keyBytes, sizeof(keyBytes));
+    BinaryData value(payload, sizeof(payload));
+    uint32_t hash = HashForTest(key.Data(), key.Length());
+    uint64_t timestamp = TimeStampUtil::GetCurrentTime() - 60000;
+    ASSERT_EQ(kVTable->RestorePut(hash, key, BinaryData(), false, value, timestamp), BSS_OK);
+    std::string base = GetCurrentWorkingDirectory() + "/cp";
+    mkdir(base.c_str(), mode_t(NO_777));
+    std::string checkpoint = base + "/restore-ttl";
+    mkdir(checkpoint.c_str(), mode_t(NO_777));
+    ASSERT_NE(mDB->CreateSyncCheckpoint(checkpoint, 1), nullptr);
+    ASSERT_EQ(mDB->CreateAsyncCheckpoint(1, false), BSS_OK);
+    auto config = std::make_shared<Config>(mDB->GetConfig());
+    config->SetLocalPath(checkpoint + "/restored");
+    CloseAllDb();
+    mDB = BoostStateDBFactory::Create();
+    ASSERT_EQ(mDB->Open(config), BSS_OK);
+    metric = new BoostNativeMetric(NO_31);
+    metric->Init();
+    mDB->RegisterMetric(metric);
+    kVTable = std::dynamic_pointer_cast<KVTable>(CreateFromDB(StateType::VALUE, "kVTable", mDB));
+    nsKVTable = std::dynamic_pointer_cast<NsKVTable>(CreateFromDB(StateType::SUB_VALUE, "nsKVTable", mDB));
+    kMapTable = std::dynamic_pointer_cast<KMapTable>(CreateFromDB(StateType::MAP, "kMapTable", mDB));
+    nsKMapTable = std::dynamic_pointer_cast<NsKMapTable>(CreateFromDB(StateType::SUB_MAP, "nsKMapTable", mDB));
+    kListTable = std::dynamic_pointer_cast<KListTable>(CreateFromDB(StateType::LIST, "kListTable", mDB));
+    nsKListTable = std::dynamic_pointer_cast<NsKListTable>(CreateFromDB(StateType::SUB_LIST, "nsKListTable", mDB));
+    std::unordered_map<std::string, std::string> paths;
+    std::vector<std::string> checkpoints{ checkpoint };
+    ASSERT_EQ(mDB->Restore(checkpoints, paths), BSS_OK);
+    BinaryData result;
+    ASSERT_EQ(kVTable->Get(hash, key, result), BSS_OK);
+    PrepareForTTL(1000);
+    ASSERT_EQ(static_cast<BoostStateDBImpl *>(mDB)->GetFreshTable()->ForceFlushToSlice(), BSS_OK);
+    mDB->ForceTriggerEvict();
+    ASSERT_EQ(kVTable->Get(hash, key, result), BSS_NOT_EXISTS);
+    DeleteCpFile();
+}
+
 }  // namespace test_kv_table
 }  // namespace test
 }  // namespace bss

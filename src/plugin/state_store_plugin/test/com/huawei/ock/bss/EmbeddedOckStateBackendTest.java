@@ -20,10 +20,13 @@ import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 
 import com.huawei.ock.bss.common.BoostStateDB;
+import com.huawei.ock.bss.common.conf.BoostConfig;
+import com.huawei.ock.bss.common.exception.BSSRuntimeException;
 import com.huawei.ock.bss.common.memory.SizeAllocator;
 import com.huawei.ock.bss.metric.BoostNativeMetricOptions;
 import com.huawei.ock.bss.ockdb.NativeLibraryLoader;
 import com.huawei.ock.bss.ockdb.OckDBLog;
+import com.huawei.ock.bss.resource.ResourceContainer;
 
 import org.apache.flink.api.common.JobID;
 import org.apache.flink.api.common.typeutils.TypeSerializer;
@@ -48,6 +51,7 @@ import org.apache.flink.runtime.state.LocalRecoveryConfig;
 import org.apache.flink.runtime.state.TaskStateManager;
 import org.apache.flink.runtime.state.ttl.TtlTimeProvider;
 import org.apache.flink.runtime.taskmanager.TaskManagerRuntimeInfo;
+import org.apache.flink.util.ResourceGuard;
 import org.apache.flink.util.UserCodeClassLoader;
 import org.apache.flink.util.function.ThrowingRunnable;
 import org.junit.After;
@@ -56,6 +60,7 @@ import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Test;
 import org.junit.runner.RunWith;
+import org.mockito.Mockito;
 import org.powermock.api.mockito.PowerMockito;
 import org.powermock.core.classloader.annotations.PrepareForTest;
 import org.powermock.modules.junit4.PowerMockRunner;
@@ -64,7 +69,9 @@ import org.powermock.reflect.Whitebox;
 import java.io.File;
 import java.io.IOException;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * EmbeddedOckStateBackendTest
@@ -92,6 +99,8 @@ public class EmbeddedOckStateBackendTest {
     private static String logFilePath;
 
     private Configuration config;
+
+    private AtomicInteger managedMemoryReleaseCount;
 
     @BeforeClass
     public static void init() {
@@ -131,6 +140,7 @@ public class EmbeddedOckStateBackendTest {
     @Before
     public void setUp() {
         config = new Configuration();
+        managedMemoryReleaseCount = new AtomicInteger();
         String osName = System.getProperty("os.name").toLowerCase();
         if (osName.contains("windows")) {
             config.setString(OckDBOptions.LOCAL_DIRECTORIES, WINDOWS_TEST_LOCAL_DIR);
@@ -285,9 +295,11 @@ public class EmbeddedOckStateBackendTest {
             PowerMockito.when(lrConfigMock, "isLocalRecoveryEnabled").thenReturn(true);
             MemoryManager memoryManagerMock = PowerMockito.mock(MemoryManager.class);
             PowerMockito.when(env, "getMemoryManager").thenReturn(memoryManagerMock);
+            OpaqueMemoryResource<SizeAllocator> managedMemoryResource = createMemoryResourceMock();
             PowerMockito.when(
-                    memoryManagerMock.getSharedMemoryResourceForManagedMemory(anyString(), any(), anyDouble()))
-                .thenReturn(createMemoryResourceMock());
+                    memoryManagerMock.<SizeAllocator>getSharedMemoryResourceForManagedMemory(
+                        anyString(), any(), anyDouble()))
+                .thenReturn(managedMemoryResource);
             OckDBKeyedStateBackendBuilder<String> builderMock = PowerMockito.mock(OckDBKeyedStateBackendBuilder.class);
             PowerMockito.whenNew(OckDBKeyedStateBackendBuilder.class).withAnyArguments().thenReturn(builderMock);
             OckDBKeyedStateBackend<String> backendMock = PowerMockito.mock(OckDBKeyedStateBackend.class);
@@ -301,12 +313,16 @@ public class EmbeddedOckStateBackendTest {
             PowerMockito.when(env, "getJobID").thenReturn(jobID);
             PowerMockito.when(builderMock, "setNativeMetricOptions", any(BoostNativeMetricOptions.class))
                 .thenReturn(builderMock);
+            PowerMockito.when(builderMock, "setManagedMemoryResource", any(OpaqueMemoryResource.class))
+                .thenReturn(builderMock);
             // run the test
             AbstractKeyedStateBackend<String> backend = stateBackend.createKeyedStateBackend(env, jobID,
                 operatorIdentifier, keySerializer, numberOfKeyGroups,
                 keyGroupRange, kvStateRegistry, ttlTimeProvider, metricGroup, stateHandles, cancelStreamRegistry,
                 managedMemoryFraction);
             Assert.assertNotNull(backend);
+            Assert.assertEquals(0, managedMemoryReleaseCount.get());
+            Mockito.verify(builderMock).setManagedMemoryResource(managedMemoryResource);
         } catch (Exception e) {
             e.printStackTrace();
             fail("Should not have thrown any exception");
@@ -317,6 +333,88 @@ public class EmbeddedOckStateBackendTest {
     public void test_create_with_bf_key_count_beyond_left_bound() throws Exception {
         config.set(OckDBOptions.OCKDB_BLOOM_FILTER_EXPECTED_KEY_COUNT, 999999);
         buildKeyedStateBackEnd();
+    }
+
+    @Test
+    public void test_release_managed_memory_when_backend_build_fails() throws Exception {
+        config.set(OckDBOptions.OCKDB_BLOOM_FILTER_EXPECTED_KEY_COUNT, 999999);
+        try {
+            buildKeyedStateBackEnd();
+            fail("Expected backend creation to fail");
+        } catch (IllegalConfigurationException expected) {
+            Assert.assertEquals(1, managedMemoryReleaseCount.get());
+        }
+    }
+
+    @Test
+    public void test_dispose_releases_managed_memory_once_even_when_native_close_fails() throws Exception {
+        BoostStateDB db = PowerMockito.mock(BoostStateDB.class);
+        BoostConfig dbConfig = PowerMockito.mock(BoostConfig.class);
+        PowerMockito.when(db.getConfig()).thenReturn(dbConfig);
+        PowerMockito.when(dbConfig.getSnapshotBackupDir()).thenReturn(null);
+        PowerMockito.doThrow(new RuntimeException("close failure")).when(db).close();
+        OckDBKeyedStateBackend<String> backend = createBareBackend(createMemoryResourceMock(), db);
+
+        try {
+            backend.dispose();
+            fail("Expected dispose failure");
+        } catch (BSSRuntimeException expected) {
+            Assert.assertEquals("close failure", expected.getCause().getMessage());
+            Assert.assertEquals(1, managedMemoryReleaseCount.get());
+        }
+        Mockito.verify(db).close();
+        backend.dispose();
+        Assert.assertEquals(1, managedMemoryReleaseCount.get());
+    }
+
+    @Test
+    public void test_shared_managed_memory_is_released_after_last_backend_disposes() throws Exception {
+        MemoryManager memoryManager = MemoryManager.create(1024 * 1024, 4096);
+        OpaqueMemoryResource<SizeAllocator> firstLease = memoryManager.getSharedMemoryResourceForManagedMemory(
+            "test-shared-memory", size -> new SizeAllocator("first", size), 0.5);
+        OpaqueMemoryResource<SizeAllocator> secondLease = memoryManager.getSharedMemoryResourceForManagedMemory(
+            "test-shared-memory", size -> new SizeAllocator("second", size), 0.5);
+        OckDBKeyedStateBackend<String> firstBackend = createBareBackend(firstLease, null);
+        OckDBKeyedStateBackend<String> secondBackend = createBareBackend(secondLease, null);
+
+        Assert.assertFalse(memoryManager.verifyEmpty());
+        firstBackend.dispose();
+        Assert.assertFalse(memoryManager.verifyEmpty());
+        secondBackend.dispose();
+        Assert.assertTrue(memoryManager.verifyEmpty());
+    }
+
+    @Test(timeout = 5000)
+    public void test_dispose_cancels_streams_before_waiting_for_snapshots() throws Exception {
+        OckDBKeyedStateBackend<String> backend = createBareBackend(createMemoryResourceMock(), null);
+        ResourceGuard snapshotResourceGuard = new ResourceGuard();
+        ResourceGuard.Lease snapshotLease = snapshotResourceGuard.acquireResource();
+        CloseableRegistry cancelStreamRegistry = new CloseableRegistry();
+        cancelStreamRegistry.registerCloseable(snapshotLease::close);
+        Whitebox.setInternalState(backend, "resourceGuard", snapshotResourceGuard);
+        Whitebox.setInternalState(backend, "cancelStreamRegistry", cancelStreamRegistry);
+
+        backend.dispose();
+
+        Assert.assertEquals(1, managedMemoryReleaseCount.get());
+    }
+
+    private OckDBKeyedStateBackend<String> createBareBackend(OpaqueMemoryResource<SizeAllocator> memoryResource,
+        BoostStateDB db) {
+        OckDBKeyedStateBackend<String> backend = Whitebox.newInstance(OckDBKeyedStateBackend.class);
+        LocalRecoveryConfig localRecoveryConfig = PowerMockito.mock(LocalRecoveryConfig.class);
+        PowerMockito.when(localRecoveryConfig.isLocalRecoveryEnabled()).thenReturn(false);
+        Whitebox.setInternalState(backend, "db", db);
+        Whitebox.setInternalState(backend, "tables", new HashMap<>());
+        Whitebox.setInternalState(backend, "instanceBasePath", new File(dbPath, "dispose-test"));
+        Whitebox.setInternalState(backend, "localRecoveryConfig", localRecoveryConfig);
+        Whitebox.setInternalState(backend, "resourceGuard", new ResourceGuard());
+        Whitebox.setInternalState(backend, "resourceContainer", new ResourceContainer());
+        Whitebox.setInternalState(backend, "checkpointSnapshotStrategy", (Object) null);
+        Whitebox.setInternalState(backend, "managedMemoryResource", memoryResource);
+        Whitebox.setInternalState(backend, "cancelStreamRegistry", new CloseableRegistry());
+        Whitebox.setInternalState(backend, "keyValueStatesByName", new HashMap<>());
+        return backend;
     }
 
     @Test(expected = IllegalConfigurationException.class)
@@ -383,7 +481,8 @@ public class EmbeddedOckStateBackendTest {
         MemoryManager memoryManagerMock = PowerMockito.mock(MemoryManager.class);
         PowerMockito.when(env, "getMemoryManager").thenReturn(memoryManagerMock);
         PowerMockito.when(
-                memoryManagerMock.getSharedMemoryResourceForManagedMemory(anyString(), any(), anyDouble()))
+                memoryManagerMock.<SizeAllocator>getSharedMemoryResourceForManagedMemory(
+                    anyString(), any(), anyDouble()))
             .thenReturn(createMemoryResourceMock());
         UserCodeClassLoader userCodeClassLoaderMock = PowerMockito.mock(UserCodeClassLoader.class);
         PowerMockito.when(env, "getUserCodeClassLoader").thenReturn(userCodeClassLoaderMock);
@@ -393,9 +492,8 @@ public class EmbeddedOckStateBackendTest {
             managedMemoryFraction);
     }
 
-    private OpaqueMemoryResource<AutoCloseable> createMemoryResourceMock() {
-        ThrowingRunnable<Exception> disposer = () -> {
-        };
+    private OpaqueMemoryResource<SizeAllocator> createMemoryResourceMock() {
+        ThrowingRunnable<Exception> disposer = managedMemoryReleaseCount::incrementAndGet;
         return new OpaqueMemoryResource<>(new SizeAllocator("test", 1073741824), 1073741824, disposer);
     }
 
@@ -447,7 +545,8 @@ public class EmbeddedOckStateBackendTest {
             MemoryManager memoryManagerMock = PowerMockito.mock(MemoryManager.class);
             PowerMockito.when(env, "getMemoryManager").thenReturn(memoryManagerMock);
             PowerMockito.when(
-                    memoryManagerMock.getSharedMemoryResourceForManagedMemory(anyString(), any(), anyDouble()))
+                    memoryManagerMock.<SizeAllocator>getSharedMemoryResourceForManagedMemory(
+                        anyString(), any(), anyDouble()))
                 .thenReturn(createMemoryResourceMock());
             PowerMockito.when(builderMock, "setTaskSlotFlag", anyInt()).thenReturn(builderMock);
             PowerMockito.when(builderMock, "setTaskSlotMemoryLimit", anyLong()).thenReturn(builderMock);
@@ -455,6 +554,8 @@ public class EmbeddedOckStateBackendTest {
             PowerMockito.when(builderMock, "setJobID", anyString()).thenReturn(builderMock);
             PowerMockito.when(env, "getJobID").thenReturn(jobID);
             PowerMockito.when(builderMock, "setNativeMetricOptions", any(BoostNativeMetricOptions.class))
+                .thenReturn(builderMock);
+            PowerMockito.when(builderMock, "setManagedMemoryResource", any(OpaqueMemoryResource.class))
                 .thenReturn(builderMock);
             // run the test
             AbstractKeyedStateBackend<String> backend = stateBackend.createKeyedStateBackend(env, jobID,

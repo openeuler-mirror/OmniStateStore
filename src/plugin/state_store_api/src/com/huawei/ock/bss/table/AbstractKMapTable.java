@@ -217,6 +217,32 @@ public abstract class AbstractKMapTable<K, UK, UV, M extends Map<UK, UV>> extend
         }
     }
 
+    /** Restores one complete canonical savepoint entry with its original TTL timestamp. */
+    public void restore(K key, UK userKey, UV userValue, long timestamp) {
+        Preconditions.checkNotNull(key);
+        Preconditions.checkNotNull(userKey);
+        checkNativeHandleValid();
+
+        try {
+            DirectDataOutputSerializer firstKey = KVSerializerUtil.serKey(key, keySerializer);
+            DirectDataOutputSerializer secondKey = KVSerializerUtil.serSubKey(userKey, ukSerializer);
+            DirectDataOutputSerializer value = KVSerializerUtil.serValue(userValue, uvSerializer);
+
+            int result = restorePut(nativeHandle, getKeyHashCode(key), firstKey.data(), firstKey.length(),
+                secondKey.data(), secondKey.length(), true, value.data(), value.length(), timestamp);
+            if (result != 0) {
+                throw new BSSRuntimeException("Savepoint restore write failed: " + result);
+            }
+            addKeyHash(key.hashCode());
+            addKeyHash(key.hashCode(), userKey.hashCode());
+            checkAddConsistency(key, userKey, firstKey, value);
+        } catch (IOException ioException) {
+            LOG.error("Fail to add key {} map key {} in map.", key, userKey, ioException);
+            throw new BSSRuntimeException("Fail to add key " + key + " map key " + userKey + " with list.",
+                ioException);
+        }
+    }
+
     @Override
     public void restoreSerialized(byte[] serializedKey, int mixedKeyHash, int bloomKeyHash,
         byte[] serializedUserKey, int userKeyHash, byte[] serializedValue) {

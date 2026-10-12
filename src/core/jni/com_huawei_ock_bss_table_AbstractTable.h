@@ -32,6 +32,10 @@ JNIEXPORT jlong JNICALL Java_com_huawei_ock_bss_table_AbstractTable_open(JNIEnv 
  */
 JNIEXPORT void JNICALL Java_com_huawei_ock_bss_table_AbstractTable_updateTtl(JNIEnv *, jclass, jlong, jstring, jobject);
 
+JNIEXPORT jint JNICALL Java_com_huawei_ock_bss_table_AbstractTable_restorePut(JNIEnv *, jclass, jlong, jint, jlong,
+                                                                              jint, jlong, jint, jboolean, jlong, jint,
+                                                                              jlong);
+
 #ifdef __cplusplus
 }
 #endif

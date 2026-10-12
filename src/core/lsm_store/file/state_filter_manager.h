@@ -12,9 +12,12 @@
 #ifndef BOOST_SS_STATE_FILTER_MANAGER_H
 #define BOOST_SS_STATE_FILTER_MANAGER_H
 
+#include <mutex>
+
 #include "binary/slice_binary.h"
 #include "include/table_description.h"
 #include "kv_table/stateId_provider.h"
+#include "list_ttl_compaction_filter.h"
 #include "lsm_store/key/full_key_filter.h"
 #include "lsm_store/key/key_group_state_filter.h"
 #include "sequence_id_filter.h"
@@ -160,7 +163,25 @@ public:
         return stateFilter->GetTtlTime();
     }
 
+    void RegisterListCompactionFilter(uint16_t stateId, ListTtlCompactionFilter filter)
+    {
+        std::lock_guard<std::mutex> lock(mListCompactionMutex);
+        if (filter && mConf->GetTtlFilterSwitch()) {
+            mListCompactionFilters[stateId] = std::move(filter);
+        } else {
+            mListCompactionFilters.erase(stateId);
+        }
+    }
+
+    ListTtlCompactionFilters SnapshotListCompactionFilters()
+    {
+        std::lock_guard<std::mutex> lock(mListCompactionMutex);
+        return mListCompactionFilters;
+    }
+
 private:
+    std::mutex mListCompactionMutex;
+    ListTtlCompactionFilters mListCompactionFilters;
     inline uint32_t ComputeKeyGroup(uint32_t keyHashCode, uint16_t stateId) const
     {
         return StateId::GetStateType(stateId) == PQ ? mKeyGroupUtil->ComputePQKeyGroupForKeyHash(keyHashCode) :
