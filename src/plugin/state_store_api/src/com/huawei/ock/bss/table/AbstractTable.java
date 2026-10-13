@@ -28,6 +28,7 @@ import com.huawei.ock.bss.table.iterator.TableKeyIterator;
 import org.apache.flink.core.memory.MemorySegment;
 import org.apache.flink.core.memory.MemorySegmentFactory;
 import org.apache.flink.runtime.operators.util.BloomFilter;
+import org.apache.flink.runtime.state.ttl.TtlTimeProvider;
 import org.apache.flink.util.CloseableIterator;
 import org.apache.flink.util.MathUtils;
 import org.apache.flink.util.Preconditions;
@@ -95,6 +96,12 @@ public abstract class AbstractTable<K, V> extends AbstractNativeHandleReference 
 
     public synchronized void updateTableConfig(TableConfig newConfig) {
         long newTtl = newConfig.getTableTtl();
+        // Native read and compaction TTL filters use the system clock. A different Flink clock
+        // would make restored timestamps expire at different times in Flink and in native storage.
+        if (db.getConfig().getTtlFilterSwitch() && newTtl > 0L
+            && newConfig.getTtlTimeProvider() != TtlTimeProvider.DEFAULT) {
+            throw new IllegalArgumentException("Native TTL filtering requires TtlTimeProvider.DEFAULT (system clock)");
+        }
         if (newTtl > 0L) {
             LOG.info("{} update table config with old tableDescription {}, new tableConfig: {}", getClass(),
                 this.description, newConfig);
@@ -321,4 +328,7 @@ public abstract class AbstractTable<K, V> extends AbstractNativeHandleReference 
      * @param des             description
      */
     public static native void updateTtl(long nativeDBAddress, String nativeClass, TableDescription des);
+
+    protected static native int restorePut(long handle, int hash, long key, int keyLength,
+        long secondKey, int secondKeyLength, boolean hasSecondKey, long value, int valueLength, long timestamp);
 }

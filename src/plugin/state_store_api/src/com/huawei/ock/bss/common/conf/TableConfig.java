@@ -11,14 +11,30 @@
 
 package com.huawei.ock.bss.common.conf;
 
+import org.apache.flink.runtime.state.ttl.TtlTimeProvider;
+
+import java.util.Objects;
+
 public class TableConfig {
     private final long ttl;
 
+    private final TtlTimeProvider ttlTimeProvider;
+
+    private final boolean listTtlCompactionEnabled;
+
+    public boolean isListTtlCompactionEnabled() { return listTtlCompactionEnabled; }
+
+    public TtlTimeProvider getTtlTimeProvider() {
+        return ttlTimeProvider;
+    }
+
     private final boolean isKVSeparateEnable;
 
-    private TableConfig(long tableTtl, boolean isKVSeparateEnable) {
+    private TableConfig(long tableTtl, boolean isKVSeparateEnable, TtlTimeProvider ttlTimeProvider, boolean listTtlCompactionEnabled) {
         this.ttl = tableTtl;
         this.isKVSeparateEnable = isKVSeparateEnable;
+        this.ttlTimeProvider = ttlTimeProvider;
+        this.listTtlCompactionEnabled = listTtlCompactionEnabled;
     }
 
     public long getTableTtl() {
@@ -37,6 +53,21 @@ public class TableConfig {
     public static class Builder {
         private long ttl = -1L;
 
+        private TtlTimeProvider ttlTimeProvider = TtlTimeProvider.DEFAULT;
+
+        private boolean listTtlCompactionEnabled = true;
+
+        public Builder setListTtlCompactionEnabled(boolean enabled) {
+            this.listTtlCompactionEnabled = enabled;
+            return this;
+        }
+
+        /** When native TTL filtering is enabled, only {@link TtlTimeProvider#DEFAULT} is supported. */
+        public Builder setTtlTimeProvider(TtlTimeProvider provider) {
+            this.ttlTimeProvider = Objects.requireNonNull(provider);
+            return this;
+        }
+
         private boolean isKVSeparateEnable;
 
         public Builder setTableTtl(long ttl) {
@@ -50,7 +81,7 @@ public class TableConfig {
         }
 
         public TableConfig build() {
-            return new TableConfig(this.ttl, this.isKVSeparateEnable);
+            return new TableConfig(this.ttl, this.isKVSeparateEnable, this.ttlTimeProvider, this.listTtlCompactionEnabled);
         }
     }
 }

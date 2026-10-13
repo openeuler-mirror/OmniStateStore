@@ -14,6 +14,24 @@ import com.huawei.ock.bss.EmbeddedOckStateBackend;
 import com.huawei.ock.bss.OckDBKeyedStateBackend;
 import com.huawei.ock.bss.common.BoostStateDB;
 import com.huawei.ock.bss.resource.ResourceContainer;
+import com.huawei.ock.bss.table.KVTableImpl;
+import com.huawei.ock.bss.table.KListTableImpl;
+import com.huawei.ock.bss.table.KMapTableImpl;
+import com.huawei.ock.bss.table.KeyPair;
+import com.huawei.ock.bss.table.api.Table;
+import org.apache.flink.core.memory.DataInputDeserializer;
+import org.apache.flink.core.memory.DataOutputSerializer;
+import org.apache.flink.api.common.typeutils.base.LongSerializer;
+import org.apache.flink.api.common.typeutils.base.ListSerializer;
+import org.apache.flink.api.common.typeutils.base.MapSerializer;
+import org.apache.flink.runtime.state.ListDelimitedSerializer;
+import org.apache.flink.runtime.state.VoidNamespace;
+import org.apache.flink.runtime.state.ttl.TtlStateFactory;
+import org.apache.flink.runtime.state.ttl.TtlValue;
+import org.mockito.Mockito;
+import java.util.Map;
+import java.util.List;
+import java.util.Arrays;
 import com.huawei.ock.bss.restore.BoostRestoreOperation;
 import com.huawei.ock.bss.restore.BoostSavepointRestoreOperation;
 
@@ -55,6 +73,102 @@ public class BoostSavepointRestoreOperationTest {
         Assert.assertTrue(restoreOperation instanceof BoostSavepointRestoreOperation);
         Assert.assertEquals(2,
             ((Integer) Whitebox.getInternalState(restoreOperation, "keyGroupPrefixBytes")).intValue());
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    public void savepointValuePayloadPreservesOriginalTimestamp() throws Exception {
+        BoostRestoreOperation<String> operation = new TestBuilder().createSavepointRestoreOperation();
+        Map<String, Table> tables = Whitebox.getInternalState(operation, "tables");
+        KVTableImpl<String, TtlValue<String>> table = Mockito.mock(KVTableImpl.class);
+        tables.put("state", table);
+        TtlStateFactory.TtlSerializer<String> serializer = ttlSerializer();
+        TtlValue<String> value = new TtlValue<>("old", 123);
+        DataOutputSerializer bytes = new DataOutputSerializer(32);
+        serializer.serialize(value, bytes);
+        DataInputDeserializer input = Whitebox.getInternalState(operation, "valueDeserializer");
+        byte[] valueBytes = bytes.getCopyOfBuffer();
+        input.setBuffer(valueBytes);
+        Whitebox.invokeMethod(operation, "restoreKeyedAndNSKeyedState", "state", "key",
+            VoidNamespace.INSTANCE, new byte[0], new byte[0], "key".hashCode(), 0, 17, serializer, valueBytes);
+        Mockito.verify(table).restore(Mockito.eq("key"), Mockito.argThat(v -> sameTtlValue(value, v)),
+            Mockito.eq(123L));
+        Mockito.verifyNoMoreInteractions(table);
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    public void savepointListPayloadRestoresOnceInOriginalOrder() throws Exception {
+        BoostRestoreOperation<String> operation = new TestBuilder().createSavepointRestoreOperation();
+        Map<String, Table> tables = Whitebox.getInternalState(operation, "tables");
+        KListTableImpl<KeyPair<String, String>, TtlValue<String>> table = Mockito.mock(KListTableImpl.class);
+        tables.put("state", table);
+        TtlStateFactory.TtlSerializer<String> serializer = ttlSerializer();
+        List<TtlValue<String>> values = Arrays.asList(new TtlValue<>("new", 456), new TtlValue<>("old", 123));
+        byte[] bytes = new ListDelimitedSerializer().serializeList(values, serializer);
+        Whitebox.invokeMethod(operation, "restoreListState", "state", "key", "namespace",
+            new byte[0], new byte[0], "key".hashCode(), "namespace".hashCode(), 17, bytes,
+            new ListSerializer<>(serializer));
+        Mockito.verify(table).restore(Mockito.eq(new KeyPair<>("key", "namespace")),
+            Mockito.argThat(v -> v.size() == 2 && sameTtlValue(values.get(0), v.get(0))
+                && sameTtlValue(values.get(1), v.get(1))), Mockito.eq(456L));
+        Mockito.verifyNoMoreInteractions(table);
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    public void savepointMapPayloadPreservesEntryTimestamp() throws Exception {
+        BoostRestoreOperation<String> operation = new TestBuilder().createSavepointRestoreOperation();
+        Map<String, Table> tables = Whitebox.getInternalState(operation, "tables");
+        KMapTableImpl<String, String, TtlValue<String>> table = Mockito.mock(KMapTableImpl.class);
+        tables.put("state", table);
+        TtlStateFactory.TtlSerializer<String> serializer = ttlSerializer();
+        TtlValue<String> value = new TtlValue<>("old", 123);
+        DataOutputSerializer bytes = new DataOutputSerializer(32);
+        bytes.writeBoolean(false);
+        serializer.serialize(value, bytes);
+        DataInputDeserializer input = Whitebox.getInternalState(operation, "valueDeserializer");
+        byte[] valueBytes = bytes.getCopyOfBuffer();
+        input.setBuffer(valueBytes);
+        bytes.clear();
+        StringSerializer.INSTANCE.serialize("mapKey", bytes);
+        byte[] canonicalKey = bytes.getCopyOfBuffer();
+        DataInputDeserializer keyInput = Whitebox.getInternalState(operation, "keyDeserializer");
+        keyInput.setBuffer(canonicalKey);
+        Whitebox.invokeMethod(operation, "restoreMapState", "state", "key", VoidNamespace.INSTANCE,
+            new byte[0], new byte[0], "key".hashCode(), 0, 17, canonicalKey, valueBytes,
+            new MapSerializer<>(StringSerializer.INSTANCE, serializer));
+        Mockito.verify(table).restore(Mockito.eq("key"), Mockito.eq("mapKey"),
+            Mockito.argThat(v -> sameTtlValue(value, v)), Mockito.eq(123L));
+        Mockito.verifyNoMoreInteractions(table);
+    }
+
+    private static boolean sameTtlValue(TtlValue<String> expected, TtlValue<String> actual) {
+        return actual != null && expected.getLastAccessTimestamp() == actual.getLastAccessTimestamp()
+            && expected.getUserValue().equals(actual.getUserValue());
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    public void nonTtlSavepointUsesSerializedRestorePath() throws Exception {
+        BoostRestoreOperation<String> operation = new TestBuilder().createSavepointRestoreOperation();
+        Map<String, Table> tables = Whitebox.getInternalState(operation, "tables");
+        KVTableImpl<String, String> table = Mockito.mock(KVTableImpl.class);
+        tables.put("state", table);
+        byte[] keyBytes = new byte[]{1, 2, 3};
+        DataOutputSerializer bytes = new DataOutputSerializer(32);
+        StringSerializer.INSTANCE.serialize("value", bytes);
+        byte[] valueBytes = bytes.getCopyOfBuffer();
+        Whitebox.invokeMethod(operation, "restoreKeyedAndNSKeyedState", "state", "key",
+            VoidNamespace.INSTANCE, keyBytes, new byte[0], 101, 0, 202,
+            StringSerializer.INSTANCE, valueBytes);
+        Mockito.verify(table).restoreSerialized(Mockito.same(keyBytes), Mockito.eq(202), Mockito.eq(101),
+            Mockito.same(valueBytes));
+        Mockito.verifyNoMoreInteractions(table);
+    }
+
+    private static TtlStateFactory.TtlSerializer<String> ttlSerializer() {
+        return new TtlStateFactory.TtlSerializer<>(LongSerializer.INSTANCE, StringSerializer.INSTANCE);
     }
 
     private static final class TestBuilder extends AbstractOckDBKeyedStateBackendBuilder<String> {

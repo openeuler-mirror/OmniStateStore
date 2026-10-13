@@ -38,6 +38,8 @@ import com.huawei.ock.bss.state.internal.namespace.NSKeyedMapStateImpl;
 import com.huawei.ock.bss.state.internal.namespace.NSKeyedState;
 import com.huawei.ock.bss.state.internal.namespace.NSKeyedValueState;
 import com.huawei.ock.bss.state.internal.namespace.NSKeyedValueStateImpl;
+import com.huawei.ock.bss.table.KeyPair;
+import com.huawei.ock.bss.table.TtlSavepointRestore;
 import com.huawei.ock.bss.table.api.KListTable;
 import com.huawei.ock.bss.table.api.KMapTable;
 import com.huawei.ock.bss.table.api.KVTable;
@@ -49,7 +51,6 @@ import com.huawei.ock.bss.table.api.SerializedKVRestoreTable;
 import com.huawei.ock.bss.table.api.SerializedListRestoreTable;
 import com.huawei.ock.bss.table.api.SerializedMapRestoreTable;
 import com.huawei.ock.bss.table.api.TableDescription;
-import com.huawei.ock.bss.table.KeyPair;
 import com.huawei.ock.bss.util.DescriptionUtils;
 
 import org.apache.flink.api.common.state.StateDescriptor;
@@ -539,6 +540,12 @@ public class BoostSavepointRestoreOperation<K> extends AbstractBoostRestoreOpera
     private <N, V> void restoreKeyedAndNSKeyedState(String stateName, K key, N namespace, byte[] keyBytes,
         byte[] namespaceBytes, int keyJavaHash, int namespaceJavaHash, int mixedKeyHash,
         TypeSerializer<V> valueSerializer, byte[] originalValueBytes) throws IOException {
+        if (TtlSavepointRestore.isTtlSerializer(valueSerializer)) {
+            V value = valueSerializer.deserialize(this.valueDeserializer);
+            TtlSavepointRestore.restoreValue(this.tables.get(stateName), key,
+                namespace instanceof VoidNamespace ? null : namespace, value);
+            return;
+        }
         if (BoostConfig.DEBUG_MODE) {
             V value = valueSerializer.deserialize(this.valueDeserializer);
             restoreValueLegacy(stateName, key, namespace, value);
@@ -572,6 +579,12 @@ public class BoostSavepointRestoreOperation<K> extends AbstractBoostRestoreOpera
         }
 
         TypeSerializer<E> elementSerializer = ((ListSerializer<E>) stateSerializer).getElementSerializer();
+        if (TtlSavepointRestore.isTtlSerializer(elementSerializer)) {
+            List<E> values = this.listDelimitedSerializer.deserializeList(valueBytes, elementSerializer);
+            TtlSavepointRestore.restoreList(this.tables.get(stateName), key,
+                namespace instanceof VoidNamespace ? null : namespace, values);
+            return;
+        }
         if (BoostConfig.DEBUG_MODE) {
             List<E> values = this.listDelimitedSerializer.deserializeList(valueBytes, elementSerializer);
             if (namespace instanceof VoidNamespace) {
@@ -606,6 +619,14 @@ public class BoostSavepointRestoreOperation<K> extends AbstractBoostRestoreOpera
             canonicalKey, userKeyStart, userKeyEnd);
         boolean isNull = this.valueDeserializer.readBoolean();
         UV mapEntryValue = null;
+        if (TtlSavepointRestore.isTtlSerializer(stateSerializer.getValueSerializer())) {
+            if (!isNull) {
+                mapEntryValue = stateSerializer.getValueSerializer().deserialize(this.valueDeserializer);
+            }
+            TtlSavepointRestore.restoreMapEntry(this.tables.get(stateName), key,
+                namespace instanceof VoidNamespace ? null : namespace, mapEntryKey, mapEntryValue);
+            return;
+        }
         if (isNull) {
             restoreMapLegacy(stateName, key, namespace, mapEntryKey, null);
             return;

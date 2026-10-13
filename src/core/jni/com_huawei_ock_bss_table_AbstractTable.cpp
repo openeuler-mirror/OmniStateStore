@@ -15,9 +15,27 @@
 
 #include "common/scope_guard.h"
 #include "include/boost_state_db.h"
+#include "include/boost_state_table.h"
 #include "kv_helper.h"
 
 using namespace ock::bss;
+
+JNIEXPORT jint JNICALL Java_com_huawei_ock_bss_table_AbstractTable_restorePut(JNIEnv *, jclass, jlong handle, jint hash,
+                                                                              jlong key, jint keyLength,
+                                                                              jlong secondKey, jint secondKeyLength,
+                                                                              jboolean hasSecondKey, jlong value,
+                                                                              jint valueLength, jlong timestamp)
+{
+    if (handle == 0 || key == 0 || value == 0 || hash < 0 || keyLength < 0 || valueLength < 0 || secondKeyLength < 0 ||
+        (hasSecondKey && secondKey == 0)) {
+        return BSS_INVALID_PARAM;
+    }
+    auto *table = reinterpret_cast<AbstractTable *>(handle);
+    BinaryData priKey(reinterpret_cast<uint8_t *>(key), static_cast<uint32_t>(keyLength));
+    BinaryData secKey(reinterpret_cast<uint8_t *>(secondKey), static_cast<uint32_t>(secondKeyLength));
+    BinaryData data(reinterpret_cast<uint8_t *>(value), static_cast<uint32_t>(valueLength));
+    return table->RestorePut(static_cast<uint32_t>(hash), priKey, secKey, hasSecondKey, data, timestamp);
+}
 
 namespace {
 

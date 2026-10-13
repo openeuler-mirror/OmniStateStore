@@ -20,6 +20,7 @@
 #include "compaction/list_state_file_reuse_planner.h"
 #include "file_address_util.h"
 #include "file_info.h"
+#include "file_mem_allocator.h"
 #include "lsm_store/version/version_meta_serializer.h"
 
 namespace ock {
@@ -311,8 +312,10 @@ Compaction::Result LsmStore::BackgroundCompaction()
                 }
             } else {
                 if (mZeroCopySwitch && mTombstoneService == nullptr && !mConf->GetEnableKVSeparate()) {
-                    auto adoptableFilter = [this](uint16_t stateId, uint64_t seqId) {
-                        return mStateFilterManager == nullptr || !mStateFilterManager->StateFilter(stateId, seqId);
+                    auto listFilters = mStateFilterManager->SnapshotListCompactionFilters();
+                    auto adoptableFilter = [this, &listFilters](uint16_t stateId, uint64_t seqId) {
+                        return listFilters.count(stateId) == 0 &&
+                               (mStateFilterManager == nullptr || !mStateFilterManager->StateFilter(stateId, seqId));
                     };
                     ListStateFileReusePlanner::Build(compaction, adoptableFilter);
                 }
@@ -390,6 +393,7 @@ BResult LsmStore::DoCompaction(const CompactionProcessorRef &processor)
 
     const std::vector<FileMetaDataRef> &adoptedFiles = processor->mCompaction->GetAdoptedFiles();
     size_t adoptedFileIndex = 0;
+    const auto listFilters = mStateFilterManager->SnapshotListCompactionFilters();
     // 2. 遍历迭代器添加KVPair.
     while (iterator->HasNext()) {
         if (UNLIKELY(mCompactionAbort.load())) {
@@ -419,6 +423,26 @@ BResult LsmStore::DoCompaction(const CompactionProcessorRef &processor)
         if (UNLIKELY(processor->mCompaction->ShouldStopBefore(current))) {
             LOG_INFO("Should stop do compaction, fileStoreSeqId:" << mSeqId << ".");
             RETURN_NOT_OK_NO_LOG(FinishCompactionOutputFile(processor));
+        }
+
+        // Only registered TTL lists pay the parsing cost, after version merging.
+        // Preserve PUT/APPEND boundaries: an empty APPEND must not hide older data.
+        if (!listFilters.empty() && StateId::IsList(current->key.StateId())) {
+            auto filter = listFilters.find(current->key.StateId());
+            if (filter != listFilters.end()) {
+                auto allocator = [this, holder](uint32_t size) -> BufferRef {
+                    auto address = FileMemAllocator::Alloc(mMemManager, holder, size, __FUNCTION__);
+                    if (address == 0) {
+                        return nullptr;
+                    }
+                    auto buffer = MakeRef<ByteBuffer>(reinterpret_cast<uint8_t *>(address), size, mMemManager);
+                    if (buffer == nullptr) {
+                        mMemManager->ReleaseMemory(address);
+                    }
+                    return buffer;
+                };
+                RETURN_NOT_OK(filter->second(current->value, allocator));
+            }
         }
 
         // 如果当前键值对的值类型为删除并且底层也不存在，则跳过该键值对.

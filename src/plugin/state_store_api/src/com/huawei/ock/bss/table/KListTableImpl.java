@@ -13,6 +13,7 @@ package com.huawei.ock.bss.table;
 
 import com.huawei.ock.bss.common.BoostStateDB;
 import com.huawei.ock.bss.common.conf.BoostConfig;
+import com.huawei.ock.bss.common.conf.TableConfig;
 import com.huawei.ock.bss.common.consistency.ListTableConsistencyUtil;
 import com.huawei.ock.bss.common.consistency.ListTableUtilParam;
 import com.huawei.ock.bss.common.exception.BSSRuntimeException;
@@ -20,6 +21,7 @@ import com.huawei.ock.bss.common.memory.DirectBuffer;
 import com.huawei.ock.bss.common.memory.DirectDataInputDeserializer;
 import com.huawei.ock.bss.common.memory.DirectDataOutputSerializer;
 import com.huawei.ock.bss.common.serialize.KVSerializerUtil;
+import com.huawei.ock.bss.common.serialize.FlinkTtlListCompactionFilter;
 import com.huawei.ock.bss.common.serialize.ThreadLocalOutputViewPool;
 import com.huawei.ock.bss.table.api.KListTable;
 import com.huawei.ock.bss.table.api.SerializedListRestoreTable;
@@ -85,6 +87,20 @@ public class KListTableImpl<K, E> extends AbstractTable<K, List<E>>
         this.debugMap = new ConcurrentHashMap<>();
     }
 
+    @Override
+    public synchronized void updateTableConfig(TableConfig config) {
+        super.updateTableConfig(config);
+        if (db.getConfig().getTtlFilterSwitch()) {
+            FlinkTtlListCompactionFilter filter = config.getTableTtl() > 0 && config.isListTtlCompactionEnabled()
+                ? FlinkTtlListCompactionFilter.create(description, config.getTtlTimeProvider()) : null;
+            if (registerTtlCompaction(nativeHandle, config.getTableTtl(), filter) != 0) {
+                throw new BSSRuntimeException("Failed to register List TTL compaction filter");
+            }
+        }
+    }
+
+    private static native int registerTtlCompaction(long handle, long ttl, FlinkTtlListCompactionFilter filter);
+
     /**
      * put
      *
@@ -101,6 +117,28 @@ public class KListTableImpl<K, E> extends AbstractTable<K, List<E>>
             DirectBuffer valueBytes = KVSerializerUtil.serList(value, elementSerializer);
             put(nativeHandle, getKeyHashCode(key), keyBytes.data(), keyBytes.length(), valueBytes.data(),
                 valueBytes.length());
+            addKeyHash(key.hashCode());
+            checkPutConsistency(key, value, keyBytes);
+        } catch (IOException ioException) {
+            LOG.error("Fail to put {} with list.", key, ioException);
+            throw new BSSRuntimeException("Fail to put " + key + " with list.", ioException);
+        }
+    }
+
+    /** Restores one complete canonical savepoint entry with its original TTL timestamp. */
+    public void restore(K key, List<E> value, long timestamp) {
+        Preconditions.checkNotNull(key);
+        Preconditions.checkNotNull(value);
+        checkNativeHandleValid();
+
+        try {
+            DirectDataOutputSerializer keyBytes = KVSerializerUtil.serKey(key, keySerializer);
+            DirectBuffer valueBytes = KVSerializerUtil.serList(value, elementSerializer);
+            int result = restorePut(nativeHandle, getKeyHashCode(key), keyBytes.data(), keyBytes.length(),
+                0L, 0, false, valueBytes.data(), valueBytes.length(), timestamp);
+            if (result != 0) {
+                throw new BSSRuntimeException("Savepoint restore write failed: " + result);
+            }
             addKeyHash(key.hashCode());
             checkPutConsistency(key, value, keyBytes);
         } catch (IOException ioException) {

@@ -17,6 +17,7 @@
 #include <unordered_map>
 #include <vector>
 
+#include "lsm_store/file/list_ttl_compaction_filter.h"
 #include "table.h"
 
 namespace ock {
@@ -101,9 +102,16 @@ public:
 
     SequenceIdFilterRef &UpdateTtl(int64_t tableTtl);
 
+    void RegisterListCompactionFilter(ListTtlCompactionFilter filter);
+
     virtual KeyIterator *KeysIterator(const BinaryData &namespaceData);
 
     void Close() override;
+
+    // Only for canonical savepoint restore into an empty backend. Each complete
+    // logical value is inserted once (including an entire list).
+    BResult RestorePut(uint32_t keyHashCode, const BinaryData &priKey, const BinaryData &secKey, bool hasSecondKey,
+                       const BinaryData &value, int64_t timestamp);
 
     virtual MapIterator *FullEntryIterator();
 
@@ -129,6 +137,7 @@ protected:
     }
 
 protected:
+    StateFilterManagerRef mCompactionFilterManager;
     FreshTableRef mFreshTable;
     SliceTableManagerRef mSliceTable;
     TableDescriptionRef mDescription;
