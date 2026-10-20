@@ -87,13 +87,13 @@ In this test case, dual-stream Join + AGG is used. The following figure shows th
 
 **Figure 1** Running the Nexmark Q4 case
 
-<a href="./figures/Nexmark_task_screenshot.png"><img src="./figures/Nexmark_task_screenshot.png" alt="WebUI" width="1000" /></a>
+<img src="./figures/Nexmark_task_screenshot.png" alt="WebUI" width="1000" />
 
 RocksDBMapState is used for the dual-stream join operation, and RocksDBValueState is used for the AGG operation. Based on the collected flame graph data, RocksDB accounts for over 60% of the execution time, making it the primary performance bottleneck in this test case.  
 
 **Figure 2** CPU flame graph of the Nexmark Q4 case
 
-<a href="./figures/Nexmark_task_flame_graph.png"><img src="./figures/Nexmark_task_flame_graph.png" alt="Flame_graph" width="1000" /></a>
+<img src="./figures/Nexmark_task_flame_graph.png" alt="Flame_graph" width="1000" />
 
 To generate a sufficient number of states for evaluating the acceleration effect of OmniStateStore, this example runs Nexmark with 100 million data records. For details about the Nexmark configuration file example, see [nexmark.yaml](#Nexmark usage description).
 

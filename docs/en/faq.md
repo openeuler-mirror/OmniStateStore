@@ -10,7 +10,7 @@ When running the Nexmark 0.2 Q4 test case with Flink 1.16.1 and attempting to en
 
 **Figure 1** OmniStateStore error information
 
-<a href="./figures/OmniStateStore_faq1.png"><img src="./figures/OmniStateStore_faq1.png" alt="faq" width="1200" /></a>
+<img src="./figures/OmniStateStore_faq1.png" alt="faq" width="1200" />
 
 **Cause**
 
@@ -32,11 +32,11 @@ Solution 2: Merge the modifications from Flink 1.16.1 into OmniStateStore, then 
 
 **Figure 2** Job Manager error information
 
-<a href="./figures/OmniStateStore_faq2-1.png"><img src="./figures/OmniStateStore_faq2-1.png" alt="faq" width="1200" /></a>
+<img src="./figures/OmniStateStore_faq2-1.png" alt="faq" width="1200" />
 
 **Figure 3** Task Manager error information
 
-<a href="./figures/OmniStateStore_faq2-2.png"><img src="./figures/OmniStateStore_faq2-2.png" alt="faq" width="1200" /></a>
+<img src="./figures/OmniStateStore_faq2-2.png" alt="faq" width="1200" />
 
 **Cause**
 

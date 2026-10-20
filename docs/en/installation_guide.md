@@ -279,7 +279,7 @@ Install Docker and deploy multiple containers to set up the Flink environment. I
 
 ## Installing OmniStateStore
 
-1. Obtain the software package `BoostKit-omniruntime-omnistatestore-1.3.0.zip` based on [OmniStateStore software list](#Obtaining the software package).
+1. Obtain the software package `BoostKit-omniruntime-omnistatestore-1.3.0.zip` based on [OmniStateStore software list](#obtaining-software-packages).
 
 2. Configure the environment variable by specifying `FLINK_HOME`, `JAVA_HOME`, and `LD_LIBRARY_PATH`.
 

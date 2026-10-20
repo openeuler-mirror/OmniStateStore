@@ -86,13 +86,13 @@ state.backend.incremental: true
 
 **图1** nexmark q4 用例运行示意图
 
-<a href="./figures/Nexmark任务运行网页截图.png"><img src="./figures/Nexmark任务运行网页截图.png" alt="webUI" width="1000" /></a>
+<img src="./figures/Nexmark任务运行网页截图.png" alt="webUI" width="1000" />
 
 双流Join操作主要使用RocksDBMapState，AGG操作主要使用RocksDBValueState。通过采集火焰图信息，可以观测到该用例RocksDB占比超过60%，是该用例的主要性能瓶颈。火焰图信息如下图所示：
 
 **图2** nexmark q4 用例CPU火焰图
 
-<a href="./figures/Nexmark任务火焰图.png"><img src="./figures/Nexmark任务火焰图.png" alt="flame graph" width="1000" /></a>
+<img src="./figures/Nexmark任务火焰图.png" alt="flame graph" width="1000" />
 
 为了创建足够数量的状态以验证omniStateStore的加速效果，本实施例使用1亿数据量运行nexmark。Nexmark的配置文件样例请参阅[nexmark.yaml](#nexmark使用说明)。
 

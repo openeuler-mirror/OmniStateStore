@@ -10,7 +10,7 @@
 
 **图1** OmniStateStore运行报错截图
 
-<a href="./figures/OmniStateStore faq1.png"><img src="./figures/OmniStateStore faq1.png" alt="faq" width="1200" /></a>
+<img src="./figures/OmniStateStore faq1.png" alt="faq" width="1200" />
 
 **问题原因**
 
@@ -32,11 +32,11 @@ Flink任务运行时未成功加载librocksdb.so.6，导致任务运行失败。
 
 **图2** OmniStateStore JobManager运行报错截图
 
-<a href="./figures/OmniStateStore faq2-1.png"><img src="./figures/OmniStateStore faq2-1.png" alt="faq" width="1200" /></a>
+<img src="./figures/OmniStateStore faq2-1.png" alt="faq" width="1200" />
 
 **图3** OmniStateStore TaskManager运行报错截图
 
-<a href="./figures/OmniStateStore faq2-2.png"><img src="./figures/OmniStateStore faq2-2.png" alt="faq" width="1200" /></a>
+<img src="./figures/OmniStateStore faq2-2.png" alt="faq" width="1200" />
 
 **问题原因**
 
