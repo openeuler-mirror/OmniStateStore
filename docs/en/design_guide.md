@@ -10,7 +10,7 @@ OmniStateStore is designed for the Flink + RocksDB architecture. As a middle-lay
 
 **Figure 1** System architecture of OmniStateStore
 
-<a href="./figures/Overall_OmniStateStore_architecture_design.png"><img src="./figures/Overall_OmniStateStore_architecture_design.png" alt="Overall OmniStateStore architecture design" width="800" /></a>
+<img src="./figures/Overall_OmniStateStore_architecture_design.png" alt="Overall OmniStateStore architecture design" width="800" />
 
 ## Key Technologies of OmniStateStore
 
@@ -38,7 +38,7 @@ When a state range query operation is performed, the key prefix of the state to 
 
 **Figure 2** Flink filter principle
 
-<a href="./figures/Flink_filter_principle.png"><img src="./figures/Flink_filter_principle.png" alt="Filter principle" width="700" /></a>
+<img src="./figures/Flink_filter_principle.png" alt="Filter principle" width="700" />
 
 The filters provided by RocksDB have the following limitations in Flink scenarios:
 
@@ -58,7 +58,7 @@ When key lengths in the dataset are inconsistent, the filter dynamically determi
 
 **Figure 3** OmniStateStore partition filter principle
 
-<a href="./figures/OmniStateStore_partition_filter_principle.png"><img src="./figures/OmniStateStore_partition_filter_principle.png" alt="Filter principle" width="700" /></a>
+<img src="./figures/OmniStateStore_partition_filter_principle.png" alt="Filter principle" width="700" />
 
 ## Flink Semantic State Caching Algorithm
 
@@ -74,7 +74,7 @@ Specifically, LinkedHashMap is used as the underlying data structure for the sta
 
 **Figure 4** Principle of the Flink semantic state caching algorithm
 
-<a href="./figures/Principle_of_the_Flink_semantic_state_caching_algorithm.png"><img src="./figures/Principle_of_the_Flink_semantic_state_caching_algorithm.png" alt="Falcon cache" width="750" /></a>
+<img src="./figures/Principle_of_the_Flink_semantic_state_caching_algorithm.png" alt="Falcon cache" width="750" />
 
 ### Dual-Stream Join Data Cache Algorithm
 
@@ -114,7 +114,7 @@ The following figure shows the principle of merge optimization. The main princip
 
 **Figure 5** Merge read/write optimization algorithm
 
-<a href="./figures/Merge_optimization_principle_of_OmniStateStore.png"><img src="./figures/Merge_optimization_principle_of_OmniStateStore.png" alt="Filter principle" width="450" /></a>
+<img src="./figures/Merge_optimization_principle_of_OmniStateStore.png" alt="Filter principle" width="450" />
 
 ### LZ4 Software-based Compression Optimization
 
@@ -132,4 +132,4 @@ It is important to note that replacing the compression format for all SST levels
 
 **Figure 6** LZ4 software-based compression optimization
 
-<a href="./figures/LZ4_Software_Based_Compression_Optimazation.png"><img src="./figures/LZ4_Software_Based_Compression_Optimazation.png" alt="Filter principle" width="500" /></a>
+<img src="./figures/LZ4_Software_Based_Compression_Optimazation.png" alt="Filter principle" width="500" />

@@ -10,7 +10,7 @@ OmniStateStore适用于Flink + RocksDB架构，作为Flink和RocksDB之间的中
 
 **图1** OmniStateStore系统架构图
 
-<a href="./figures/OmniStateStore整体架构设计.png"><img src="./figures/OmniStateStore整体架构设计.png" alt="OmniStateStore整体架构设计" width="800" /></a>
+<img src="./figures/OmniStateStore整体架构设计.png" alt="OmniStateStore整体架构设计" width="800" />
 
 ## OmniStateStore特性关键技术
 
@@ -38,7 +38,7 @@ RocksDB通常使用block cache加速状态查询操作，其中一大核心机�
 
 **图2** Flink filter原理示意图
 
-<a href="./figures/Flink Filter原理示意图.png"><img src="./figures/Flink Filter原理示意图.png" alt="filter原理" width="700" /></a>
+<img src="./figures/Flink Filter原理示意图.png" alt="filter原理" width="700" />
 
 RocksDB提供的filter在Flink场景应用主要存在以下两个问题：
 
@@ -58,7 +58,7 @@ RocksDB提供的filter在Flink场景应用主要存在以下两个问题：
 
 **图3** OmniStateStore partition filter原理示意图
 
-<a href="./figures/OmniStateStore partition filter原理示意图.png"><img src="./figures/OmniStateStore partition filter原理示意图.png" alt="filter原理图" width="700" /></a>
+<img src="./figures/OmniStateStore partition filter原理示意图.png" alt="filter原理图" width="700" />
 
 ## Flink语义状态缓存算法
 
@@ -114,7 +114,7 @@ Merge优化的原理图如下图所示。其主要原理是，使用rocksdb的me
 
 **图5** Merge读写优化算法原理示意图
 
-<a href="./figures/OmniStateStore的merge优化原理.png"><img src="./figures/OmniStateStore的merge优化原理.png" alt="filter原理图" width="450" /></a>
+<img src="./figures/OmniStateStore的merge优化原理.png" alt="filter原理图" width="450" />
 
 ### LZ4软算压缩优化
 
@@ -132,4 +132,4 @@ LZ4软算压缩优化的原理图如下图所示。其主要原理是，将rocks
 
 **图6** LZ4软算压缩优化原理示意图
 
-<a href="./figures/LZ4软算压缩优化图.png"><img src="./figures/LZ4软算压缩优化图.png" alt="filter原理图" width="500" /></a>
+<img src="./figures/LZ4软算压缩优化图.png" alt="filter原理图" width="500" />

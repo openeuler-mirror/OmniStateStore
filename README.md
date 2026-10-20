@@ -34,7 +34,7 @@ OmniStateStore是对接Flink和RocksDB的中间层，包含动态Filter技术、
 
 **图1** OmniStateStore整体架构设计
 
-<a href="./docs/zh/figures/OmniStateStore整体架构设计.png"><img src="./docs/zh/figures/OmniStateStore整体架构设计.png" alt="OmniStateStore整体架构设计" width="800" /></a>
+<img src="./docs/zh/figures/OmniStateStore整体架构设计.png" alt="OmniStateStore整体架构设计" width="800" />
 
 ### 典型部署配置
 
