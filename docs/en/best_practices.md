@@ -81,7 +81,7 @@ state.backend.incremental: true
 
 ## Test Case
 
-This example test is based on the Nexmark 0.2 Q4 case. For instructions on downloading Nexmark, click [Download Link](https://github.com/nexmark/nexmark/releases/tag/v0.2.0). For details about how to use Nexmark, see [Usage Description](#Nexmark Usage Description).
+This example test is based on the Nexmark 0.2 Q4 case. For instructions on downloading Nexmark, click [Download Link](https://github.com/nexmark/nexmark/releases/tag/v0.2.0). For details about how to use Nexmark, see [Usage Description](#nexmark-usage-description).
 
 In this test case, dual-stream Join + AGG is used. The following figure shows the test result.
 
@@ -95,7 +95,7 @@ RocksDBMapState is used for the dual-stream join operation, and RocksDBValueStat
 
 <img src="./figures/Nexmark_task_flame_graph.png" alt="Flame_graph" width="1000" />
 
-To generate a sufficient number of states for evaluating the acceleration effect of OmniStateStore, this example runs Nexmark with 100 million data records. For details about the Nexmark configuration file example, see [nexmark.yaml](#Nexmark usage description).
+To generate a sufficient number of states for evaluating the acceleration effect of OmniStateStore, this example runs Nexmark with 100 million data records. For details about the Nexmark configuration file example, see [nexmark.yaml](#nexmark-usage-description).
 
 ## OmniStateStore Practice
 
