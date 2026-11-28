@@ -93,6 +93,7 @@ stages:
             with:
               name: ci-result-pre-commit
               path: .ci-results/pre-commit
+              overwrite: true
 
       build_x86_64:
         name: Build_x86-64
@@ -158,6 +159,7 @@ stages:
             with:
               name: omnistatestore-release-x86_64
               path: dist/BoostKit-omnistatestore_1.1.0_x86_64_release.tar.gz
+              overwrite: true
 
           - name: Save result
             if: ${{ always() }}
@@ -179,6 +181,7 @@ stages:
             with:
               name: ci-result-x86-64
               path: .ci-results/x86_64
+              overwrite: true
 
       build_aarch64:
         name: Build_aarch64
@@ -277,6 +280,7 @@ stages:
             with:
               name: omnistatestore-release-aarch64
               path: dist/BoostKit-omnistatestore_1.1.0_aarch64_release.tar.gz
+              overwrite: true
 
           - name: Save result
             if: ${{ always() }}
@@ -298,6 +302,7 @@ stages:
             with:
               name: ci-result-aarch64
               path: .ci-results/aarch64
+              overwrite: true
 
       ut:
         name: UT_omniStateStore
@@ -448,6 +453,7 @@ stages:
                 test/build/coverage.info
                 test/build/gcovr_report/
                 test/build/shard/
+              overwrite: true
 
           - name: Save result
             if: ${{ always() }}
@@ -469,3 +475,4 @@ stages:
             with:
               name: ci-result-dt
               path: .ci-results/DT
+              overwrite: true
